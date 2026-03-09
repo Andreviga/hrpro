@@ -20,14 +20,22 @@ describe('PayrollService document generation', () => {
     },
     payrollResult: {
       findMany: jest.fn(),
-      aggregate: jest.fn()
+      aggregate: jest.fn(),
+      count: jest.fn(),
+      findUnique: jest.fn(),
+      delete: jest.fn()
+    },
+    payrollEvent: {
+      deleteMany: jest.fn()
     },
     employeeDocument: {
-      findMany: jest.fn()
+      findMany: jest.fn(),
+      updateMany: jest.fn()
     },
     company: {
       findUnique: jest.fn()
-    }
+    },
+    $transaction: jest.fn()
   } as any;
 
   const audit = { log: jest.fn() } as any;
@@ -35,6 +43,8 @@ describe('PayrollService document generation', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.$transaction.mockImplementation(async (arg: any) => (typeof arg === 'function' ? arg(prisma) : Promise.all(arg)));
+    prisma.employeeDocument.updateMany.mockResolvedValue({ count: 0 });
   });
 
   it('generates documents idempotently', async () => {
@@ -308,6 +318,89 @@ describe('PayrollService document generation', () => {
     expect(result.employeesCount).toBe(5);
   });
 
+  it('removes payroll result and soft-deletes linked run documents', async () => {
+    prisma.payrollRun.findUnique.mockResolvedValue({
+      id: 'run-rm-1',
+      companyId: 'c1',
+      status: 'draft'
+    });
+
+    prisma.payrollResult.findUnique.mockResolvedValue({
+      id: 'result-1',
+      employee: { fullName: 'Ana' }
+    });
+
+    prisma.payrollEvent.deleteMany.mockResolvedValue({ count: 3 });
+    prisma.payrollResult.delete.mockResolvedValue({ id: 'result-1' });
+    prisma.employeeDocument.updateMany.mockResolvedValue({ count: 2 });
+
+    const service = new PayrollService(prisma, audit, documents);
+
+    const result = await service.removeEmployeeFromRun({
+      payrollRunId: 'run-rm-1',
+      employeeId: 'emp-1',
+      companyId: 'c1',
+      userId: 'u1',
+      reason: 'ajuste'
+    });
+
+    expect(result).toMatchObject({
+      removed: true,
+      removedPayrollResult: true,
+      deletedDocumentsCount: 2,
+      employeeName: 'Ana'
+    });
+
+    expect(prisma.employeeDocument.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          payrollRunId: 'run-rm-1',
+          employeeId: 'emp-1',
+          deletedAt: null
+        }),
+        data: expect.objectContaining({
+          deletedBy: 'u1',
+          deletedReason: 'ajuste'
+        })
+      })
+    );
+
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'remove_employee_from_run',
+        after: expect.objectContaining({
+          removedPayrollResult: true,
+          deletedDocumentsCount: 2
+        })
+      })
+    );
+  });
+
+  it('marks removal when only linked documents exist', async () => {
+    prisma.payrollRun.findUnique.mockResolvedValue({
+      id: 'run-rm-2',
+      companyId: 'c1',
+      status: 'draft'
+    });
+
+    prisma.payrollResult.findUnique.mockResolvedValue(null);
+    prisma.employeeDocument.updateMany.mockResolvedValue({ count: 1 });
+
+    const service = new PayrollService(prisma, audit, documents);
+
+    const result = await service.removeEmployeeFromRun({
+      payrollRunId: 'run-rm-2',
+      employeeId: 'emp-2',
+      companyId: 'c1',
+      userId: 'u1'
+    });
+
+    expect(result).toMatchObject({
+      removed: true,
+      removedPayrollResult: false,
+      deletedDocumentsCount: 1
+    });
+  });
   it('auto-generates documents on close', async () => {
     prisma.payrollRun.findUnique.mockResolvedValue({
       id: 'run-2',

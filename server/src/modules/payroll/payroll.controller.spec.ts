@@ -6,7 +6,10 @@ const payrollServiceMock = {
   generateDocumentsForRun: jest.fn(),
   reprocessDocumentsForRun: jest.fn(),
   generateIncomeStatementsForYear: jest.fn(),
-  closeRun: jest.fn()
+  closeRun: jest.fn(),
+  listPaystubsByEmployee: jest.fn(),
+  listPaystubsByCompany: jest.fn(),
+  removeEmployeeFromRun: jest.fn()
 };
 
 describe('PayrollController', () => {
@@ -141,6 +144,49 @@ describe('PayrollController', () => {
     });
   });
 
+  it('lists company paystubs for admin', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PayrollController],
+      providers: [{ provide: PayrollService, useValue: payrollServiceMock }]
+    }).compile();
+
+    const controller = moduleRef.get(PayrollController);
+    payrollServiceMock.listPaystubsByCompany.mockResolvedValueOnce([{ id: 'p1' }]);
+
+    const result = await controller.listPaystubs({
+      user: { role: 'admin', companyId: 'c1', employeeId: 'emp-1' }
+    } as any);
+
+    expect(result).toEqual([{ id: 'p1' }]);
+    expect(payrollServiceMock.listPaystubsByCompany).toHaveBeenCalledWith('c1');
+    expect(payrollServiceMock.listPaystubsByEmployee).not.toHaveBeenCalled();
+  });
+
+  it('removes an employee from payroll run via controller', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PayrollController],
+      providers: [{ provide: PayrollService, useValue: payrollServiceMock }]
+    }).compile();
+
+    const controller = moduleRef.get(PayrollController);
+    payrollServiceMock.removeEmployeeFromRun.mockResolvedValueOnce({ removed: true });
+
+    const result = await controller.removeEmployeeFromRun(
+      'run-1',
+      'emp-1',
+      { reason: 'ajuste' },
+      { user: { companyId: 'c1', sub: 'u1' } } as any
+    );
+
+    expect(result).toEqual({ removed: true });
+    expect(payrollServiceMock.removeEmployeeFromRun).toHaveBeenCalledWith({
+      payrollRunId: 'run-1',
+      employeeId: 'emp-1',
+      companyId: 'c1',
+      userId: 'u1',
+      reason: 'ajuste'
+    });
+  });
   it('closes a payroll run', async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [PayrollController],

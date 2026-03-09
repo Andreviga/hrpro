@@ -443,14 +443,44 @@ export class PayrollService {
       include: { employee: true }
     });
 
-    if (!payrollResult) {
+    const now = new Date();
+
+    const txResult = await this.prisma.$transaction(async (tx) => {
+      let removedPayrollResult = false;
+
+      if (payrollResult) {
+        await tx.payrollEvent.deleteMany({ where: { payrollResultId: payrollResult.id } });
+        await tx.payrollResult.delete({ where: { id: payrollResult.id } });
+        removedPayrollResult = true;
+      }
+
+      const documentsUpdate = await tx.employeeDocument.updateMany({
+        where: {
+          companyId: params.companyId,
+          employeeId: params.employeeId,
+          payrollRunId: params.payrollRunId,
+          deletedAt: null
+        },
+        data: {
+          deletedAt: now,
+          deletedBy: params.userId ?? null,
+          deletedReason: params.reason ?? 'removed_from_payroll_run'
+        }
+      });
+
+      return {
+        removedPayrollResult,
+        deletedDocumentsCount: Number(documentsUpdate?.count ?? 0)
+      };
+    });
+
+    const removedPayrollResult = txResult.removedPayrollResult;
+    const deletedDocumentsCount = txResult.deletedDocumentsCount;
+    const removed = removedPayrollResult || deletedDocumentsCount > 0;
+
+    if (!removed) {
       return { removed: false, message: 'Funcionario nao encontrado nesta competencia.' };
     }
-
-    await this.prisma.$transaction([
-      this.prisma.payrollEvent.deleteMany({ where: { payrollResultId: payrollResult.id } }),
-      this.prisma.payrollResult.delete({ where: { id: payrollResult.id } })
-    ]);
 
     await this.audit.log({
       companyId: params.companyId,
@@ -462,15 +492,19 @@ export class PayrollService {
       after: {
         payrollRunId: params.payrollRunId,
         employeeId: params.employeeId,
-        employeeName: payrollResult.employee.fullName
+        employeeName: payrollResult?.employee.fullName,
+        removedPayrollResult,
+        deletedDocumentsCount
       }
     });
 
     return {
-      removed: true,
+      removed,
       payrollRunId: params.payrollRunId,
       employeeId: params.employeeId,
-      employeeName: payrollResult.employee.fullName
+      employeeName: payrollResult?.employee.fullName,
+      removedPayrollResult,
+      deletedDocumentsCount
     };
   }
 
