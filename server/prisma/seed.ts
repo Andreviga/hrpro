@@ -66,6 +66,55 @@ async function main() {
     }
   });
 
+  await prisma.employee.upsert({
+    where: { cpf: '37024665840' },
+    update: {
+      fullName: 'Gustavo Takashi Moraes Assano',
+      rg: '350276912',
+      birthDate: new Date('1988-02-29'),
+      email: 'gustavo.assano@gmail.com',
+      phone: '11984923087',
+      admissionDate: new Date('2026-01-27'),
+      addressLine: 'Avenida Itacira, 2173',
+      city: 'Sao Paulo',
+      state: 'SP',
+      zipCode: '04061002',
+      position: 'Professor de Portugues',
+      department: 'centro_educacional',
+      status: EmployeeStatus.active,
+      salaryType: SalaryType.monthly,
+      baseSalary: 2144.16,
+      weeklyHours: 15,
+      transportVoucherValue: 0,
+      mealVoucherValue: 180
+    },
+    create: {
+      companyId: company.id,
+      fullName: 'Gustavo Takashi Moraes Assano',
+      cpf: '37024665840',
+      rg: '350276912',
+      birthDate: new Date('1988-02-29'),
+      email: 'gustavo.assano@gmail.com',
+      phone: '11984923087',
+      employeeCode: 'PROF002',
+      admissionDate: new Date('2026-01-27'),
+      addressLine: 'Avenida Itacira, 2173',
+      city: 'Sao Paulo',
+      state: 'SP',
+      zipCode: '04061002',
+      position: 'Professor de Portugues',
+      department: 'centro_educacional',
+      status: EmployeeStatus.active,
+      salaryType: SalaryType.monthly,
+      baseSalary: 2144.16,
+      weeklyHours: 15,
+      dependents: 0,
+      unionFee: false,
+      transportVoucherValue: 0,
+      mealVoucherValue: 180
+    }
+  });
+
   await prisma.user.update({
     where: { email: 'joao@hrpro.com' },
     data: { employeeId: employee.id }
@@ -157,3 +206,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
