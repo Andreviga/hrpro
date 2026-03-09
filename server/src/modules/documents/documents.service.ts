@@ -1,4 +1,4 @@
-﻿import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DocumentStatus } from '@prisma/client';
@@ -141,6 +141,42 @@ Declaro que as informacoes acima foram prestadas em conformidade com o modelo da
 Data de emissao: {{data_emissao}}
 Assinatura da fonte pagadora: {{assinatura_fonte_pagadora}}
 Cargo/responsavel: {{responsavel_cargo_nome}}
+`.trim();
+
+const PAYSTUB_TEMPLATE_NAME = 'Holerite Padrao (Automatico)';
+
+const paystubRequiredPlaceholders = [
+  'employee_name',
+  'employee_cpf',
+  'employee_position',
+  'employee_department',
+  'payroll_month',
+  'payroll_year',
+  'gross_salary',
+  'total_deductions',
+  'net_salary',
+  'fgts'
+];
+
+export const buildPaystubTemplateName = () => PAYSTUB_TEMPLATE_NAME;
+
+export const buildPaystubRequiredPlaceholders = () => [...paystubRequiredPlaceholders];
+
+export const buildPaystubTemplateContent = () => `
+DEMONSTRATIVO DE PAGAMENTO
+Funcionario: {{employee_name}}
+CPF: {{employee_cpf}}
+Cargo: {{employee_position}}
+Departamento: {{employee_department}}
+Competencia: {{payroll_month}}/{{payroll_year}}
+
+PROVENTOS E DESCONTOS
+Salario Bruto: {{gross_salary}}
+Total de Descontos: {{total_deductions}}
+Salario Liquido: {{net_salary}}
+FGTS: {{fgts}}
+
+Declaro ter recebido os valores acima referentes a competencia informada.
 `.trim();
 const sanitizeFilenamePart = (value: string) => {
   return value.replace(/[^a-zA-Z0-9_-]+/g, '_');
@@ -309,6 +345,36 @@ export class DocumentsService {
       status: 'draft',
       requiredPlaceholders: buildIncomeStatementRequiredPlaceholders(),
       reason: params.reason ?? 'bootstrap_informe_rendimentos'
+    });
+
+    return { created: true, template };
+  }
+
+  async ensurePaystubTemplate(params: { companyId: string; userId?: string; reason?: string }) {
+    const existing = await this.prisma.documentTemplate.findFirst({
+      where: {
+        companyId: params.companyId,
+        type: 'holerite',
+        name: PAYSTUB_TEMPLATE_NAME,
+        deletedAt: null
+      },
+      orderBy: [{ version: 'desc' }, { updatedAt: 'desc' }]
+    });
+
+    if (existing) {
+      return { created: false, template: existing };
+    }
+
+    const template = await this.createTemplate({
+      companyId: params.companyId,
+      userId: params.userId,
+      type: 'holerite',
+      name: PAYSTUB_TEMPLATE_NAME,
+      description: 'Template padrao de holerite para emissao em lote.',
+      content: buildPaystubTemplateContent(),
+      status: 'draft',
+      requiredPlaceholders: buildPaystubRequiredPlaceholders(),
+      reason: params.reason ?? 'bootstrap_holerite'
     });
 
     return { created: true, template };

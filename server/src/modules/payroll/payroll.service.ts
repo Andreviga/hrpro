@@ -1,4 +1,4 @@
-﻿import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Queue } from 'bullmq';
@@ -742,7 +742,7 @@ export class PayrollService {
     payrollRunId: string;
     companyId: string;
     userId?: string;
-    documentType: 'trct' | 'recibo_ferias';
+    documentType: 'trct' | 'recibo_ferias' | 'holerite';
     templateId?: string;
     employeeIds?: string[];
     extraPlaceholders?: Record<string, string>;
@@ -757,14 +757,22 @@ export class PayrollService {
 
     const template = params.templateId
       ? await this.prisma.documentTemplate.findUnique({ where: { id: params.templateId } })
-      : await this.prisma.documentTemplate.findFirst({
-          where: {
-            companyId: params.companyId,
-            type: params.documentType as any,
-            deletedAt: null
-          },
-          orderBy: [{ version: 'desc' }, { updatedAt: 'desc' }]
-        });
+      : params.documentType === 'holerite'
+        ? (
+            await this.documents.ensurePaystubTemplate({
+              companyId: params.companyId,
+              userId: params.userId,
+              reason: params.reason ?? 'bootstrap_holerite'
+            })
+          ).template
+        : await this.prisma.documentTemplate.findFirst({
+            where: {
+              companyId: params.companyId,
+              type: params.documentType as any,
+              deletedAt: null
+            },
+            orderBy: [{ version: 'desc' }, { updatedAt: 'desc' }]
+          });
 
     if (!template || template.companyId !== params.companyId) {
       throw new NotFoundException('Template not found for document generation');
@@ -865,7 +873,7 @@ export class PayrollService {
     payrollRunId: string;
     companyId: string;
     userId?: string;
-    documentType: 'trct' | 'recibo_ferias';
+    documentType: 'trct' | 'recibo_ferias' | 'holerite';
     templateId?: string;
     employeeIds?: string[];
     extraPlaceholders?: Record<string, string>;

@@ -278,7 +278,7 @@ export class PayrollController {
     @Param('id') id: string,
     @Body()
     body: {
-      documentType: 'trct' | 'recibo_ferias';
+      documentType: 'trct' | 'recibo_ferias' | 'holerite';
       templateId?: string;
       employeeIds?: string[];
       extraPlaceholders?: Record<string, string>;
@@ -304,7 +304,7 @@ export class PayrollController {
     @Param('id') id: string,
     @Body()
     body: {
-      documentType: 'trct' | 'recibo_ferias';
+      documentType: 'trct' | 'recibo_ferias' | 'holerite';
       templateId?: string;
       employeeIds?: string[];
       extraPlaceholders?: Record<string, string>;

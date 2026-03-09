@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Central de documentos com templates, instancias e exportacoes.
  */
 import React, { useEffect, useState } from 'react';
@@ -106,7 +106,7 @@ const emptyDocumentForm = {
 
 const emptyGenerationForm = {
   payrollRunId: '',
-  documentType: 'trct' as 'trct' | 'recibo_ferias',
+  documentType: 'trct' as 'trct' | 'recibo_ferias' | 'holerite',
   templateId: '',
   employeeIds: '',
   reason: ''
@@ -826,7 +826,7 @@ const DocumentsCenterPage: React.FC = () => {
               <CardHeader>
                 <CardTitle>Gerar documentos pela folha</CardTitle>
                 <CardDescription>
-                  Acione geracao em lote de TRCT ou recibo de ferias.
+                  Acione geracao em lote de TRCT, recibo de ferias ou holerite.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -842,7 +842,7 @@ const DocumentsCenterPage: React.FC = () => {
                   <Label>Tipo de documento</Label>
                   <Select
                     value={generationForm.documentType}
-                    onValueChange={(value) => setGenerationForm({ ...generationForm, documentType: value as 'trct' | 'recibo_ferias' })}
+                    onValueChange={(value) => setGenerationForm({ ...generationForm, documentType: value as 'trct' | 'recibo_ferias' | 'holerite' })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -850,6 +850,7 @@ const DocumentsCenterPage: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="trct">TRCT</SelectItem>
                       <SelectItem value="recibo_ferias">Recibo de Ferias</SelectItem>
+                      <SelectItem value="holerite">Holerite</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1150,6 +1151,4 @@ const DocumentsCenterPage: React.FC = () => {
 };
 
 export default DocumentsCenterPage;
-
-
 

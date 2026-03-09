@@ -31,7 +31,7 @@ describe('PayrollService document generation', () => {
   } as any;
 
   const audit = { log: jest.fn() } as any;
-  const documents = { createDocumentFromTemplate: jest.fn(), ensureIncomeStatementTemplate: jest.fn() } as any;
+  const documents = { createDocumentFromTemplate: jest.fn(), ensureIncomeStatementTemplate: jest.fn(), ensurePaystubTemplate: jest.fn() } as any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -94,8 +94,64 @@ describe('PayrollService document generation', () => {
     expect(documents.createDocumentFromTemplate).toHaveBeenCalledWith(
       expect.objectContaining({ payrollRunId: 'run-1' })
     );
-  });
+    });
 
+  it('auto-bootstraps default holerite template for payroll batch generation', async () => {
+    prisma.payrollRun.findUnique.mockResolvedValue({
+      id: 'run-hol-1',
+      companyId: 'c1',
+      month: 2,
+      year: 2026
+    });
+
+    documents.ensurePaystubTemplate.mockResolvedValue({
+      created: true,
+      template: {
+        id: 'tpl-hol-1',
+        companyId: 'c1',
+        type: 'holerite',
+        name: 'Holerite Padrao (Automatico)'
+      }
+    });
+
+    prisma.payrollResult.findMany.mockResolvedValue([
+      {
+        employeeId: 'e1',
+        grossSalary: 3200,
+        totalDeductions: 420,
+        netSalary: 2780,
+        fgts: 256,
+        employee: { fullName: 'Ana', cpf: '111', position: 'Docente', department: 'pedagogico' }
+      }
+    ]);
+
+    documents.createDocumentFromTemplate.mockResolvedValue({ id: 'doc-hol-1' });
+
+    const service = new PayrollService(prisma, audit, documents);
+
+    const result = await service.generateDocumentsForRun({
+      payrollRunId: 'run-hol-1',
+      companyId: 'c1',
+      userId: 'u1',
+      documentType: 'holerite'
+    });
+
+    expect(result.createdCount).toBe(1);
+    expect(documents.ensurePaystubTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyId: 'c1',
+        userId: 'u1',
+        reason: 'bootstrap_holerite'
+      })
+    );
+    expect(documents.createDocumentFromTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        templateId: 'tpl-hol-1',
+        payrollRunId: 'run-hol-1',
+        employeeId: 'e1'
+      })
+    );
+  });
 
   it('generates annual income statements from closed runs', async () => {
     prisma.company.findUnique.mockResolvedValue({ id: 'c1', cnpj: '12345678000199', name: 'Escola X' });
@@ -309,3 +365,4 @@ describe('PayrollService document generation', () => {
     }));
   });
 });
+

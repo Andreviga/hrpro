@@ -1,4 +1,4 @@
-﻿import { request } from './http';
+import { request } from './http';
 
 export type DocumentType =
   | 'trct'
@@ -202,7 +202,7 @@ export const documentsApi = {
 
   async generateFromPayroll(payload: {
     payrollRunId: string;
-    documentType: 'trct' | 'recibo_ferias';
+    documentType: 'trct' | 'recibo_ferias' | 'holerite';
     templateId?: string;
     employeeIds?: string[];
     reason?: string;
@@ -230,3 +230,4 @@ export const documentsApi = {
     });
   }
 };
+

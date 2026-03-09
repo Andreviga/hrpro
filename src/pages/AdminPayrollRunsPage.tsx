@@ -22,7 +22,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { useToast } from '../hooks/use-toast';
 import { payrollApi, PayrollRun, PayrollRunSummary } from '../services/payrollApi';
-import { BarChart3, CalendarCheck, Loader2, Lock, RefreshCcw, Unlock } from 'lucide-react';
+import { BarChart3, CalendarCheck, FileText, Loader2, Lock, RefreshCcw, Unlock } from 'lucide-react';
 
 const statusLabels: Record<PayrollRun['status'], string> = {
   draft: 'Rascunho',
@@ -163,6 +163,29 @@ const AdminPayrollRunsPage: React.FC = () => {
       });
     } finally {
       setDialogOpen(false);
+    }
+  };
+
+  const handleGenerateHolerites = async (run: PayrollRun) => {
+    try {
+      const result = await payrollApi.generateDocumentsFromRun(run.id, {
+        documentType: 'holerite',
+        reason: `emissao_holerites_${run.month}_${run.year}`
+      });
+
+      const summary = result.skippedCount > 0
+        ? `${result.createdCount} gerados e ${result.skippedCount} ja existentes.`
+        : `${result.createdCount} gerados com sucesso.`;
+
+      toast({
+        title: 'Holerites emitidos',
+        description: `Competencia ${run.month}/${run.year}: ${summary}`
+      });
+    } catch (error) {
+      toast({
+        title: 'Falha ao emitir holerites',
+        description: getFriendlyError(error, 'Nao foi possivel emitir os holerites da competencia.')
+      });
     }
   };
 
@@ -414,6 +437,15 @@ const AdminPayrollRunsPage: React.FC = () => {
                               <Unlock className="h-4 w-4 mr-1" />
                               Reabrir
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleGenerateHolerites(run)}
+                              disabled={run.status === 'draft'}
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              Emitir holerites
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -451,3 +483,4 @@ const AdminPayrollRunsPage: React.FC = () => {
 };
 
 export default AdminPayrollRunsPage;
+

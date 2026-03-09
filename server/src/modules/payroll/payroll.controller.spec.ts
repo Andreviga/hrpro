@@ -47,6 +47,37 @@ describe('PayrollController', () => {
     });
   });
 
+  it('queues holerite generation for a payroll run', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PayrollController],
+      providers: [{ provide: PayrollService, useValue: payrollServiceMock }]
+    }).compile();
+
+    const controller = moduleRef.get(PayrollController);
+    payrollServiceMock.generateDocumentsForRun.mockResolvedValueOnce({ createdCount: 27 });
+
+    const result = await controller.generateDocuments(
+      'run-hol-1',
+      {
+        documentType: 'holerite',
+        reason: 'emitir holerites'
+      },
+      { user: { companyId: 'c1', sub: 'u1' } } as any
+    );
+
+    expect(result).toEqual({ createdCount: 27 });
+    expect(payrollServiceMock.generateDocumentsForRun).toHaveBeenCalledWith({
+      payrollRunId: 'run-hol-1',
+      companyId: 'c1',
+      userId: 'u1',
+      documentType: 'holerite',
+      templateId: undefined,
+      employeeIds: undefined,
+      extraPlaceholders: undefined,
+      reason: 'emitir holerites'
+    });
+  });
+
   it('reprocesses document generation for a payroll run', async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [PayrollController],
@@ -125,3 +156,4 @@ describe('PayrollController', () => {
     expect(payrollServiceMock.closeRun).toHaveBeenCalledWith('run-3', 'u1');
   });
 });
+

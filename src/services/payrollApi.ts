@@ -72,8 +72,24 @@ export const payrollApi = {
     });
   },
 
+  async generateDocumentsFromRun(
+    payrollRunId: string,
+    payload: {
+      documentType: 'trct' | 'recibo_ferias' | 'holerite';
+      templateId?: string;
+      employeeIds?: string[];
+      reason?: string;
+    }
+  ) {
+    return request<{ createdCount: number; skippedCount: number }>(`/payroll-runs/${payrollRunId}/documents`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
   async getSummary(month: number, year: number) {
     const params = new URLSearchParams({ month: String(month), year: String(year) });
     return request<PayrollRunSummary>(`/payroll/runs/summary?${params.toString()}`);
   }
 };
+
