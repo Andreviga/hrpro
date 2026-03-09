@@ -18,8 +18,7 @@ services:
     rootDir: server
     plan: free
     buildCommand: npm ci && npm run prisma:generate && npm run build
-    preDeployCommand: npx prisma migrate deploy && npm run prisma:seed:js
-    startCommand: node dist/main.js
+    startCommand: npx prisma migrate deploy && npm run prisma:seed:js && node dist/main.js
     healthCheckPath: /docs
     envVars:
       - key: DATABASE_URL
@@ -67,3 +66,4 @@ services:
           type: web
           name: hrpro-api
           envVarKey: RENDER_EXTERNAL_URL
+
