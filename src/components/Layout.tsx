@@ -1,5 +1,5 @@
 /**
- * Layout principal da aplicaÃ§Ã£o com navegaÃ§Ã£o e header
+ * Layout principal da aplicação com navegação e header
  */
 import React, { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -16,19 +16,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '#/', icon: Home },
     { name: 'Holerites', href: '#/paystubs', icon: FileText },
-    { name: 'GestÃ£o AcadÃªmica', href: '#/calendar', icon: CalendarIcon },
-    { name: 'RelatÃ³rios', href: '#/reports', icon: TrendingUp },
+    { name: 'Gestão Acadêmica', href: '#/calendar', icon: CalendarIcon },
+    { name: 'Relatórios', href: '#/reports', icon: TrendingUp },
     { name: 'Documentos', href: '#/documents', icon: Upload },
-    { name: 'RescisÃ£o', href: '#/rescision', icon: Calculator },
+    { name: 'Rescisão', href: '#/rescision', icon: Calculator },
     { name: 'Suporte', href: '#/support', icon: MessageCircle },
   ];
 
   const adminNavigation = [
-    { name: 'FuncionÃ¡rios', href: '#/admin/employees', icon: Users },
-    { name: 'CompetÃªncias', href: '#/admin/payroll-runs', icon: CalendarCheck },
-    { name: 'VisÃ£o Macro Folha', href: '#/admin/payroll-grid', icon: TableProperties },
-    { name: 'FÃ³rmulas e Tabelas', href: '#/admin/formulas', icon: Code },
-    { name: 'ConfiguraÃ§Ãµes', href: '#/admin/config', icon: Settings },
+    { name: 'Funcionários', href: '#/admin/employees', icon: Users },
+    { name: 'Competências', href: '#/admin/payroll-runs', icon: CalendarCheck },
+    { name: 'Emitir Holerites', href: '#/admin/paystub-batch', icon: FileText },
+    { name: 'Visão Macro Folha', href: '#/admin/payroll-grid', icon: TableProperties },
+    { name: 'Fórmulas e Tabelas', href: '#/admin/formulas', icon: Code },
+    { name: 'Configurações', href: '#/admin/config', icon: Settings },
     { name: 'Upload Folha', href: '#/admin/payroll-upload', icon: Upload },
   ];
 
@@ -85,7 +86,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <>
                   <li className="pt-4">
                     <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                      AdministraÃ§Ã£o
+                      Administração
                     </div>
                   </li>
                   {adminNavigation.map((item) => (

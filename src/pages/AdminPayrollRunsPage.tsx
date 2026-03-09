@@ -168,10 +168,14 @@ const AdminPayrollRunsPage: React.FC = () => {
 
   const handleGenerateHolerites = async (run: PayrollRun) => {
     try {
-      const result = await payrollApi.generateDocumentsFromRun(run.id, {
-        documentType: 'holerite',
-        reason: `emissao_holerites_${run.month}_${run.year}`
-      });
+      const result = await payrollApi.generateDocumentsFromRun(
+        run.id,
+        {
+          documentType: 'holerite',
+          reason: `emissao_holerites_${run.month}_${run.year}`
+        },
+        true
+      );
 
       const summary = result.skippedCount > 0
         ? `${result.createdCount} gerados e ${result.skippedCount} ja existentes.`

@@ -79,9 +79,14 @@ export const payrollApi = {
       templateId?: string;
       employeeIds?: string[];
       reason?: string;
-    }
+    },
+    reprocess = false
   ) {
-    return request<{ createdCount: number; skippedCount: number }>(`/payroll-runs/${payrollRunId}/documents`, {
+    const endpoint = reprocess
+      ? `/payroll-runs/${payrollRunId}/documents/reprocess`
+      : `/payroll-runs/${payrollRunId}/documents`;
+
+    return request<{ createdCount: number; skippedCount: number }>(endpoint, {
       method: 'POST',
       body: JSON.stringify(payload)
     });

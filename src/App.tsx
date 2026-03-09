@@ -24,6 +24,7 @@ import RescisionCalculatorPage from './pages/RescisionCalculatorPage';
 import AdminPayrollRunsPage from './pages/AdminPayrollRunsPage';
 import AdminFormulasPage from './pages/AdminFormulasPage';
 import AdminPayrollGridPage from './pages/AdminPayrollGridPage';
+import AdminPaystubBatchPage from './pages/AdminPaystubBatchPage';
 import { Toaster } from './components/ui/toaster';
 
 export default function App() {
@@ -177,6 +178,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/admin/paystub-batch" 
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminPaystubBatchPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/rescision" 
             element={
               <ProtectedRoute>
@@ -190,3 +199,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+
