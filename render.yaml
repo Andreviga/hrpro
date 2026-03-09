@@ -2,10 +2,12 @@ databases:
   - name: hrpro-postgres
     databaseName: hrpro
     user: hrpro
+    plan: free
 
 services:
   - type: keyvalue
     name: hrpro-redis
+    plan: free
     ipAllowList:
       - source: 0.0.0.0/0
         description: public
@@ -36,6 +38,7 @@ services:
     name: hrpro-worker
     runtime: node
     rootDir: server
+    plan: starter
     buildCommand: npm ci && npm run prisma:generate && npm run build
     startCommand: node dist/worker.js
     envVars:
