@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import * as XLSX from 'xlsx';
+import { createHash } from 'crypto';
 
 const normalize = (value: string) => value.toLowerCase().trim();
 
@@ -16,7 +17,16 @@ const headerAliases: Record<string, string[]> = {
   fullName: ['nome', 'funcionario', 'colaborador', 'professor'],
   cpf: ['cpf'],
   rg: ['rg'],
+  pis: ['pis'],
+  ctps: ['ctps', 'carteira de trabalho'],
   email: ['email', 'e-mail'],
+  phone: ['telefone', 'celular'],
+  birthDate: ['nascimento', 'data de nascimento'],
+  motherName: ['nome da mae', 'mãe', 'nome da mãe'],
+  addressLine: ['endereco', 'endereço', 'logradouro'],
+  neighborhood: ['bairro'],
+  cityState: ['cidade/uf', 'cidade', 'cidade uf'],
+  zipCode: ['cep'],
   position: ['cargo', 'funcao', 'disciplina'],
   department: ['departamento', 'setor', 'unidade'],
   admissionDate: ['admissao', 'data admissao', 'data de admissao'],
@@ -277,6 +287,21 @@ const parseDate = (value: any) => {
   if (Number.isNaN(date.getTime())) return undefined;
   return date;
 };
+const monthNames: Record<string, number> = {
+  janeiro: 1,
+  fevereiro: 2,
+  marco: 3,
+  abril: 4,
+  maio: 5,
+  junho: 6,
+  julho: 7,
+  agosto: 8,
+  setembro: 9,
+  outubro: 10,
+  novembro: 11,
+  dezembro: 12
+};
+
 const inferCompetency = (sheetName: string, fileName?: string) => {
   const source = `${sheetName} ${fileName ?? ''}`;
   const lower = normalizeText(source);
@@ -293,20 +318,6 @@ const inferCompetency = (sheetName: string, fileName?: string) => {
   }
 
   if (!month) {
-    const monthNames: Record<string, number> = {
-      janeiro: 1,
-      fevereiro: 2,
-      marco: 3,
-      abril: 4,
-      maio: 5,
-      junho: 6,
-      julho: 7,
-      agosto: 8,
-      setembro: 9,
-      outubro: 10,
-      novembro: 11,
-      dezembro: 12
-    };
     for (const [name, value] of Object.entries(monthNames)) {
       if (lower.includes(name)) {
         month = value;
@@ -315,12 +326,127 @@ const inferCompetency = (sheetName: string, fileName?: string) => {
     }
   }
 
+  if (!month && /\b13\b/.test(lower)) {
+    month = 12;
+  }
+
   return {
     month: month ?? new Date().getMonth() + 1,
     year: year ?? new Date().getFullYear()
   };
 };
 
+const splitCityState = (value: any) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return { city: undefined, state: undefined };
+
+  const bySlash = raw.split('/').map((item) => item.trim()).filter(Boolean);
+  if (bySlash.length >= 2) {
+    return { city: bySlash[0], state: bySlash[1].toUpperCase() };
+  }
+
+  const byDash = raw.split('-').map((item) => item.trim()).filter(Boolean);
+  if (byDash.length >= 2) {
+    return { city: byDash[0], state: byDash[1].toUpperCase() };
+  }
+
+  return { city: raw, state: undefined };
+};
+
+const inferDepartmentFromCompanyLabel = (value: any) => {
+  const label = normalizeText(value);
+  if (!label) return 'geral';
+  if (label.includes('recreacao')) return 'recreacao';
+  if (label.includes('centro educacional')) return 'centro_educacional';
+  return 'geral';
+};
+
+const getProfilePriority = (profile: SheetProfile) => {
+  if (profile === 'cadastro') return 0;
+  if (profile === 'tab_auxilio') return 1;
+  if (profile === 'quantidade_aula') return 2;
+  if (profile === 'folha') return 3;
+  return 4;
+};
+
+const isNonEmployeeRowLabel = (value: string) => {
+  const normalized = normalizeText(value);
+  if (!normalized) return true;
+
+  const blockedKeywords = [
+    'total',
+    'totalizador',
+    'inss centro',
+    'inss recreacao',
+    'irpf centro',
+    'irpf recreacao',
+    'vale transporte',
+    'vale alimentacao',
+    'folha de pagamento'
+  ];
+
+  return blockedKeywords.some((keyword) => normalized.includes(keyword));
+};
+
+const isTemporaryEmployeeCode = (value: any) => String(value ?? '').startsWith('TMP-AUTO-');
+
+const buildTemporaryCpf = (params: {
+  companyId: string;
+  fullName: string;
+  usedCpfs: Set<string>;
+}) => {
+  const normalizedName = normalizeText(params.fullName);
+
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const hash = createHash('sha1')
+      .update(`${params.companyId}:${normalizedName}:${attempt}`)
+      .digest('hex');
+
+    const digits = hash
+      .split('')
+      .map((char) => String(Number.parseInt(char, 16) % 10))
+      .join('');
+
+    const cpf = `9${digits.slice(0, 10)}`;
+    if (!params.usedCpfs.has(cpf)) {
+      return cpf;
+    }
+  }
+
+  throw new Error(`Nao foi possivel gerar CPF temporario para ${params.fullName}`);
+};
+
+const getTargetMonthTokens = (month: number) => {
+  const monthTokenMap: Record<number, string[]> = {
+    1: ['janeiro', 'jan'],
+    2: ['fevereiro', 'fev'],
+    3: ['marco', 'mar'],
+    4: ['abril', 'abr'],
+    5: ['maio', 'mai'],
+    6: ['junho', 'jun'],
+    7: ['julho', 'jul'],
+    8: ['agosto', 'ago'],
+    9: ['setembro', 'set'],
+    10: ['outubro', 'out'],
+    11: ['novembro', 'nov'],
+    12: ['dezembro', 'dez']
+  };
+
+  return monthTokenMap[month] ?? [];
+};
+
+const isTargetPayrollSheet = (sheetName: string, target: { month: number; year: number }) => {
+  const lower = normalizeText(sheetName);
+  const monthTokens = getTargetMonthTokens(target.month);
+  const monthNumber = String(target.month).padStart(2, '0');
+  const yearShort = String(target.year).slice(-2);
+
+  const hasYear = lower.includes(String(target.year)) || lower.includes(yearShort);
+  const hasMonthToken = monthTokens.some((token) => lower.includes(token));
+  const hasCompactToken = lower.includes(`${monthNumber}${yearShort}`) || lower.includes(`${monthNumber}/${yearShort}`);
+
+  return hasMonthToken || (hasYear && hasCompactToken);
+};
 @Injectable()
 export class ImportsService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
@@ -341,21 +467,207 @@ export class ImportsService {
 
     const workbook = XLSX.read(params.buffer, { type: 'buffer' });
     const errors: string[] = [];
+    const warnings: string[] = [];
+    const importedRunIds = new Set<string>();
     let processedRows = 0;
     let failedRows = 0;
 
-    for (const sheetName of workbook.SheetNames) {
+    const sanitizeCpf = (value: any) => String(value ?? '').replace(/\D/g, '');
+    const normalizeEmployeeName = (value: any) => String(value ?? '').trim().replace(/\s+/g, ' ');
+
+    const targetCompetency = inferCompetency('', params.fileName);
+    const existingEmployees = await this.prisma.employee.findMany({
+      where: { companyId: params.companyId },
+      select: {
+        id: true,
+        companyId: true,
+        fullName: true,
+        cpf: true,
+        rg: true,
+        email: true,
+        phone: true,
+        birthDate: true,
+        motherName: true,
+        addressLine: true,
+        city: true,
+        state: true,
+        zipCode: true,
+        admissionDate: true,
+        pis: true,
+        ctps: true,
+        position: true,
+        department: true,
+        salaryType: true,
+        baseSalary: true,
+        hourlyRate: true,
+        weeklyHours: true,
+        status: true
+      }
+    });
+
+    type CachedEmployee = (typeof existingEmployees)[number];
+    const employeesByCpf = new Map<string, CachedEmployee>();
+    const employeesByName = new Map<string, CachedEmployee>();
+    const usedCpfs = new Set<string>();
+
+    const upsertCache = (employee: CachedEmployee) => {
+      employeesByCpf.set(employee.cpf, employee);
+      employeesByName.set(normalizeText(employee.fullName), employee);
+      usedCpfs.add(employee.cpf);
+    };
+
+    existingEmployees.forEach(upsertCache);
+
+    const findEmployeeInCache = (input: { cpf?: string; fullName?: string }) => {
+      const cpf = sanitizeCpf(input.cpf);
+      if (cpf) {
+        const byCpf = employeesByCpf.get(cpf);
+        if (byCpf) return byCpf;
+      }
+
+      const normalizedName = normalizeText(normalizeEmployeeName(input.fullName));
+      if (!normalizedName) return undefined;
+      return employeesByName.get(normalizedName);
+    };
+
+    const orderedSheetNames = [...workbook.SheetNames].sort((left, right) => {
+      const leftProfile = getSheetProfile(normalizeText(left));
+      const rightProfile = getSheetProfile(normalizeText(right));
+      const profileOrder = getProfilePriority(leftProfile) - getProfilePriority(rightProfile);
+      if (profileOrder !== 0) return profileOrder;
+
+      if (leftProfile === 'folha') {
+        const leftIsTarget = isTargetPayrollSheet(left, targetCompetency);
+        const rightIsTarget = isTargetPayrollSheet(right, targetCompetency);
+        if (leftIsTarget !== rightIsTarget) {
+          return leftIsTarget ? -1 : 1;
+        }
+      }
+
+      return left.localeCompare(right);
+    });
+
+    for (const sheetName of orderedSheetNames) {
       const sheet = workbook.Sheets[sheetName];
+      if (!sheet) continue;
+
       const sheetLower = normalizeText(sheetName);
       const profile = getSheetProfile(sheetLower);
+      if (profile === 'generic') continue;
+
+      if (profile === 'folha' && !isTargetPayrollSheet(sheetName, targetCompetency)) {
+        warnings.push(`Aba "${sheetName}" ignorada por nao corresponder a competencia alvo ${targetCompetency.month}/${targetCompetency.year}.`);
+        continue;
+      }
+
       const { rows, headers, rowOffset } = readSheetRows(sheet, profile);
-      if (!rows.length) continue;
+      if (!rows.length || !headers.length) continue;
+
+      const competency = profile === 'folha' || profile === 'tab_auxilio'
+        ? targetCompetency
+        : inferCompetency(sheetName, params.fileName);
 
       const nameHeader = findHeader(headers, 'fullName');
       const cpfHeader = findHeader(headers, 'cpf');
       const rgHeader = findHeader(headers, 'rg');
-      const competency = inferCompetency(sheetName, params.fileName);
-      let payrollSheetChecked = false;
+
+      const emailHeader = findHeader(headers, 'email');
+      const phoneHeader = findHeader(headers, 'phone');
+      const birthDateHeader = findHeader(headers, 'birthDate');
+      const motherNameHeader = findHeader(headers, 'motherName');
+      const addressLineHeader = findHeader(headers, 'addressLine');
+      const cityStateHeader = findHeader(headers, 'cityState');
+      const zipCodeHeader = findHeader(headers, 'zipCode');
+      const pisHeader = findHeader(headers, 'pis');
+      const ctpsHeader = findHeader(headers, 'ctps');
+      const positionHeader = findHeader(headers, 'position');
+      const departmentHeader = findHeader(headers, 'department');
+      const admissionDateHeader = findHeader(headers, 'admissionDate');
+      const baseSalaryHeader = findHeader(headers, 'baseSalary');
+      const hourlyRateHeader = findHeader(headers, 'hourlyRate');
+      const weeklyHoursHeader = findHeader(headers, 'weeklyHours');
+
+      const grossHeader = findHeader(headers, 'grossSalary');
+      const netHeader = findHeader(headers, 'netSalary');
+      const deductionsHeader = headers.find((header) => {
+        const normalized = normalizeText(header);
+        return normalized.includes('desconto') || normalized.includes('deducao');
+      });
+      const companyHeader = headers.find((header) => normalizeText(header).includes('empresa'));
+
+      const inssMinHeader = headers.find((header) => normalizeText(header) === 'de');
+      const inssMaxHeader = headers.find((header) => normalizeText(header) === 'ate');
+      const inssRateHeader = headers.find((header) => normalizeText(header) === 'aliquota');
+      const inssDeductionHeader = headers.find((header) => normalizeText(header) === 'deduzir');
+      const irrfMinHeader = headers.find((header) => normalizeText(header) === 'de_2');
+      const irrfMaxHeader = headers.find((header) => normalizeText(header) === 'ate_2');
+      const irrfRateHeader = headers.find((header) => normalizeText(header) === 'aliquota_2');
+      const irrfDeductionHeader = headers.find((header) => normalizeText(header) === 'deduzir_2');
+      const dependentHeader = findHeader(headers, 'dependentDeduction');
+
+      let payrollRunId: string | undefined;
+      if (profile === 'folha') {
+        const closedRun = await this.prisma.payrollRun.findFirst({
+          where: {
+            companyId: params.companyId,
+            month: competency.month,
+            year: competency.year,
+            status: 'closed'
+          }
+        });
+
+        if (closedRun) {
+          failedRows += 1;
+          const message = `Competencia ${competency.month}/${competency.year} ja fechada`;
+          errors.push(`Planilha ${sheetName}: ${message}`);
+          await this.prisma.importItem.create({
+            data: {
+              batchId: batch.id,
+              sheet: sheetName,
+              rowNumber: 0,
+              status: 'error',
+              message
+            }
+          });
+
+          await this.prisma.importBatch.update({
+            where: { id: batch.id },
+            data: {
+              status: 'failed',
+              processedRows,
+              failedRows
+            }
+          });
+
+          throw new ConflictException({
+            statusCode: 409,
+            error: 'Conflict',
+            message: 'Competencia fechada. Importacao de folha bloqueada.',
+            code: 'PAYROLL_COMPETENCE_CLOSED',
+            details: { payrollRunId: closedRun.id, month: competency.month, year: competency.year }
+          });
+        }
+
+        const payrollRun = await this.prisma.payrollRun.upsert({
+          where: {
+            companyId_month_year_version: {
+              companyId: params.companyId,
+              month: competency.month,
+              year: competency.year,
+              version: 1
+            }
+          },
+          update: {},
+          create: {
+            companyId: params.companyId,
+            month: competency.month,
+            year: competency.year
+          }
+        });
+
+        payrollRunId = payrollRun.id;
+        importedRunIds.add(payrollRun.id);
+      }
 
       for (let index = 0; index < rows.length; index += 1) {
         const row = rows[index];
@@ -376,83 +688,97 @@ export class ImportsService {
           continue;
         }
 
-        if (sheetLower.includes('cadastro')) {
-          const fullName = nameHeader ? row[nameHeader] : undefined;
-          const cpfRaw = cpfHeader ? row[cpfHeader] : undefined;
-          const cpf = cpfRaw ? String(cpfRaw).replace(/\D/g, '') : '';
+        if (profile === 'cadastro') {
+          const fullName = nameHeader ? normalizeEmployeeName(row[nameHeader]) : '';
+          if (!fullName) continue;
 
-          if (!fullName || !cpf) {
+          const rawCpf = cpfHeader ? sanitizeCpf(row[cpfHeader]) : '';
+          let cpf = rawCpf.length === 11 ? rawCpf : '';
+          if (!cpf) {
+            cpf = buildTemporaryCpf({
+              companyId: params.companyId,
+              fullName,
+              usedCpfs
+            });
+            warnings.push(`Cadastro ${sheetName} linha ${rowNumber}: CPF ausente/invalido para "${fullName}". CPF temporario gerado.`);
+          }
+
+          const { city, state } = splitCityState(cityStateHeader ? row[cityStateHeader] : undefined);
+          const hourlyRate = hourlyRateHeader ? parseNumber(row[hourlyRateHeader]) : null;
+          const baseSalary = baseSalaryHeader ? parseNumber(row[baseSalaryHeader]) : null;
+          const weeklyHours = weeklyHoursHeader ? parseNumber(row[weeklyHoursHeader]) : null;
+          const existingByCpf = employeesByCpf.get(cpf);
+          const existingByName = employeesByName.get(normalizeText(fullName));
+          const shouldReuseByName = !!existingByName && (!rawCpf || isTemporaryEmployeeCode(existingByName.cpf));
+          const existingEmployee = existingByCpf ?? (shouldReuseByName ? existingByName : undefined);
+
+          const employeeData: any = {
+            fullName,
+            cpf,
+            rg: rgHeader ? String(row[rgHeader] || '').trim() || null : null,
+            email: emailHeader ? String(row[emailHeader] || '').trim() || null : null,
+            phone: phoneHeader ? String(row[phoneHeader] || '').trim() || null : null,
+            birthDate: birthDateHeader ? parseDate(row[birthDateHeader]) ?? null : null,
+            motherName: motherNameHeader ? String(row[motherNameHeader] || '').trim() || null : null,
+            addressLine: addressLineHeader ? String(row[addressLineHeader] || '').trim() || null : null,
+            city: city ?? null,
+            state: state ?? null,
+            zipCode: zipCodeHeader ? String(row[zipCodeHeader] || '').trim() || null : null,
+            admissionDate: admissionDateHeader ? parseDate(row[admissionDateHeader]) ?? null : null,
+            pis: pisHeader ? String(row[pisHeader] || '').trim() || null : null,
+            ctps: ctpsHeader ? String(row[ctpsHeader] || '').trim() || null : null,
+            position: positionHeader ? String(row[positionHeader] || '').trim() || 'Colaborador' : 'Colaborador',
+            department: departmentHeader ? String(row[departmentHeader] || '').trim() || 'geral' : 'geral',
+            salaryType: hourlyRate ? 'hourly' : 'monthly',
+            baseSalary,
+            hourlyRate,
+            weeklyHours,
+            status: 'active'
+          };
+
+          try {
+            const saved = existingEmployee
+              ? await this.prisma.employee.update({
+                  where: { id: existingEmployee.id },
+                  data: employeeData
+                })
+              : await this.prisma.employee.create({
+                  data: {
+                    companyId: params.companyId,
+                    ...employeeData
+                  }
+                });
+
+            upsertCache(saved);
+            processedRows += 1;
+            await this.prisma.importItem.create({
+              data: {
+                batchId: batch.id,
+                sheet: sheetName,
+                rowNumber,
+                status: 'ok',
+                message: 'Funcionario importado'
+              }
+            });
+          } catch {
             failedRows += 1;
-            errors.push(`Planilha ${sheetName} linha ${rowNumber}: nome ou CPF ausente`);
+            errors.push(`Planilha ${sheetName} linha ${rowNumber}: falha ao importar funcionario "${fullName}"`);
             await this.prisma.importItem.create({
               data: {
                 batchId: batch.id,
                 sheet: sheetName,
                 rowNumber,
                 status: 'error',
-                message: 'Nome ou CPF ausente'
+                message: 'Falha ao importar funcionario'
               }
             });
-            continue;
           }
-          const emailHeader = findHeader(headers, 'email');
-          const positionHeader = findHeader(headers, 'position');
-          const departmentHeader = findHeader(headers, 'department');
-          const admissionDateHeader = findHeader(headers, 'admissionDate');
-          const baseSalaryHeader = findHeader(headers, 'baseSalary');
-          const hourlyRateHeader = findHeader(headers, 'hourlyRate');
-          const weeklyHoursHeader = findHeader(headers, 'weeklyHours');
-
-          const data: any = {
-            companyId: params.companyId,
-            fullName,
-            cpf,
-            rg: rgHeader ? row[rgHeader] : undefined,
-            email: emailHeader ? row[emailHeader] : undefined,
-            position: positionHeader ? row[positionHeader] : 'Colaborador',
-            department: departmentHeader ? row[departmentHeader] : 'geral',
-            admissionDate: admissionDateHeader ? parseDate(row[admissionDateHeader]) : undefined,
-            salaryType: hourlyRateHeader ? 'hourly' : 'monthly',
-            baseSalary: baseSalaryHeader ? parseNumber(row[baseSalaryHeader]) : undefined,
-            hourlyRate: hourlyRateHeader ? parseNumber(row[hourlyRateHeader]) : undefined,
-            weeklyHours: weeklyHoursHeader ? parseNumber(row[weeklyHoursHeader]) : undefined,
-            status: 'active'
-          };
-
-          await this.prisma.employee.upsert({
-            where: { cpf },
-            update: data,
-            create: data
-          });
-
-          processedRows += 1;
-          await this.prisma.importItem.create({
-            data: {
-              batchId: batch.id,
-              sheet: sheetName,
-              rowNumber,
-              status: 'ok',
-              message: 'Funcionario importado'
-            }
-          });
 
           continue;
         }
-        if (sheetLower.includes('tab auxilio')) {
-          const dependentHeader = findHeader(headers, 'dependentDeduction');
 
-          const inssMinHeader = headers.find((header) => normalizeText(header) === 'de');
-          const inssMaxHeader = headers.find((header) => normalizeText(header) === 'ate');
-          const inssRateHeader = headers.find((header) => normalizeText(header) === 'aliquota');
-          const inssDeductionHeader = headers.find((header) => normalizeText(header) === 'deduzir');
-
-          const irrfMinHeader = headers.find((header) => normalizeText(header) === 'de_2');
-          const irrfMaxHeader = headers.find((header) => normalizeText(header) === 'ate_2');
-          const irrfRateHeader = headers.find((header) => normalizeText(header) === 'aliquota_2');
-          const irrfDeductionHeader = headers.find((header) => normalizeText(header) === 'deduzir_2');
-
+        if (profile === 'tab_auxilio') {
           const dependentDeduction = dependentHeader ? parseNumber(row[dependentHeader]) : null;
-
           let inserted = false;
 
           const inssMinValue = inssMinHeader ? parseNumber(row[inssMinHeader]) : null;
@@ -526,148 +852,103 @@ export class ImportsService {
           if (inserted) {
             processedRows += 1;
           }
-
           continue;
         }
 
-        if (sheetLower.includes('quantidade de aula')) {
-          const cpfRaw = cpfHeader ? row[cpfHeader] : undefined;
-          const cpf = cpfRaw ? String(cpfRaw).replace(/\D/g, '') : '';
-          const fullNameRaw = nameHeader ? row[nameHeader] : undefined;
-          const fullName = fullNameRaw ? String(fullNameRaw).trim() : '';
-          const weeklyHoursHeader = findHeader(headers, 'weeklyHours');
-          const hourlyRateHeader = findHeader(headers, 'hourlyRate');
-          const grossHeader = findHeader(headers, 'grossSalary');
+        if (profile === 'quantidade_aula') {
+          const fullName = nameHeader ? normalizeEmployeeName(row[nameHeader]) : '';
+          const cpf = cpfHeader ? sanitizeCpf(row[cpfHeader]) : '';
+          if (!fullName && !cpf) continue;
+          if (fullName && isNonEmployeeRowLabel(fullName)) continue;
+
+          let employee = findEmployeeInCache({ cpf, fullName });
+          if (!employee && fullName) {
+            const temporaryCpf = buildTemporaryCpf({
+              companyId: params.companyId,
+              fullName,
+              usedCpfs
+            });
+
+            const created = await this.prisma.employee.create({
+              data: {
+                companyId: params.companyId,
+                fullName,
+                cpf: temporaryCpf,
+                position: 'Professor',
+                department: 'pedagogico',
+                salaryType: 'monthly',
+                status: 'active'
+              }
+            });
+
+            upsertCache(created);
+            employee = created;
+            warnings.push(`Aba ${sheetName} linha ${rowNumber}: funcionario "${fullName}" criado automaticamente com CPF temporario.`);
+          }
+
+          if (!employee) continue;
 
           const weeklyHours = weeklyHoursHeader ? parseNumber(row[weeklyHoursHeader]) : null;
           const hourlyRate = hourlyRateHeader ? parseNumber(row[hourlyRateHeader]) : null;
           const grossSalary = grossHeader ? parseNumber(row[grossHeader]) : null;
+          const position = positionHeader ? String(row[positionHeader] || '').trim() : '';
+          const hasProfessorLabel = normalizeText(position).includes('professor');
 
-          if (!cpf && !fullName) continue;
-
-          const employee = cpf
-            ? await this.prisma.employee.findUnique({ where: { cpf } })
-            : await this.prisma.employee.findFirst({
-                where: { companyId: params.companyId, fullName }
-              });
-
-          if (!employee) {
-            failedRows += 1;
-            const lookupText = cpf ? `CPF ${cpf}` : `nome ${fullName}`;
-            errors.push(`Planilha ${sheetName} linha ${rowNumber}: funcionario nao encontrado para ${lookupText}`);
-            await this.prisma.importItem.create({
-              data: {
-                batchId: batch.id,
-                sheet: sheetName,
-                rowNumber,
-                status: 'error',
-                message: 'Funcionario nao encontrado'
-              }
-            });
-            continue;
-          }
-
-          await this.prisma.employee.update({
+          const updated = await this.prisma.employee.update({
             where: { id: employee.id },
             data: {
+              position: position || employee.position,
+              department: hasProfessorLabel ? 'pedagogico' : employee.department,
+              salaryType: hourlyRate ? 'hourly' : employee.salaryType,
               weeklyHours: weeklyHours ?? employee.weeklyHours,
               hourlyRate: hourlyRate ?? employee.hourlyRate,
-              baseSalary: grossSalary ?? employee.baseSalary
+              baseSalary: grossSalary ?? employee.baseSalary,
+              status: 'active'
             }
           });
 
+          upsertCache(updated);
           processedRows += 1;
           continue;
         }
 
-        if (sheetLower.includes('folha de pagto') || sheetLower.includes('folha de pagamento')) {
-          if (!payrollSheetChecked) {
-            payrollSheetChecked = true;
-            const closedRun = await this.prisma.payrollRun.findFirst({
-              where: {
-                companyId: params.companyId,
-                month: competency.month,
-                year: competency.year,
-                status: 'closed'
-              }
-            });
+        if (profile === 'folha') {
+          const fullName = nameHeader ? normalizeEmployeeName(row[nameHeader]) : '';
+          const cpf = cpfHeader ? sanitizeCpf(row[cpfHeader]) : '';
+          if (!fullName && !cpf) continue;
+          if (fullName && isNonEmployeeRowLabel(fullName)) continue;
 
-            if (closedRun) {
-              failedRows += 1;
-              const message = `Competencia ${competency.month}/${competency.year} ja fechada`;
-              errors.push(`Planilha ${sheetName}: ${message}`);
-              await this.prisma.importItem.create({
-                data: {
-                  batchId: batch.id,
-                  sheet: sheetName,
-                  rowNumber: 0,
-                  status: 'error',
-                  message
-                }
-              });
-              await this.prisma.importBatch.update({
-                where: { id: batch.id },
-                data: {
-                  status: 'failed',
-                  processedRows,
-                  failedRows
-                }
-              });
-              throw new ConflictException({
-                statusCode: 409,
-                error: 'Conflict',
-                message: 'Competencia fechada. Importacao de folha bloqueada.',
-                code: 'PAYROLL_COMPETENCE_CLOSED',
-                details: { payrollRunId: closedRun.id, month: competency.month, year: competency.year }
-              });
-            }
-          }
-
-          const cpfRaw = cpfHeader ? row[cpfHeader] : undefined;
-          const cpf = cpfRaw ? String(cpfRaw).replace(/\D/g, '') : '';
-          const fullName = nameHeader ? row[nameHeader] : undefined;
-
-          if (!cpf && !fullName) {
-            continue;
-          }
-
-          const employee = cpf
-            ? await this.prisma.employee.findUnique({ where: { cpf } })
-            : await this.prisma.employee.findFirst({
-                where: { companyId: params.companyId, fullName: String(fullName) }
-              });
-
-          if (!employee) {
-            failedRows += 1;
-            errors.push(`Planilha ${sheetName} linha ${rowNumber}: funcionario nao encontrado`);
-            await this.prisma.importItem.create({
-              data: {
-                batchId: batch.id,
-                sheet: sheetName,
-                rowNumber,
-                status: 'error',
-                message: 'Funcionario nao encontrado'
-              }
-            });
-            continue;
-          }
-
-          const payrollRun = await this.prisma.payrollRun.upsert({
-            where: {
-              companyId_month_year_version: {
-                companyId: params.companyId,
-                month: competency.month,
-                year: competency.year,
-                version: 1
-              }
-            },
-            update: {},
-            create: {
+          let employee = findEmployeeInCache({ cpf, fullName });
+          if (!employee && fullName) {
+            const temporaryCpf = buildTemporaryCpf({
               companyId: params.companyId,
-              month: competency.month,
-              year: competency.year
-            }
-          });
+              fullName,
+              usedCpfs
+            });
+            const departmentFromCompany = companyHeader
+              ? inferDepartmentFromCompanyLabel(row[companyHeader])
+              : 'geral';
+
+            const created = await this.prisma.employee.create({
+              data: {
+                companyId: params.companyId,
+                fullName,
+                cpf: temporaryCpf,
+                rg: rgHeader ? String(row[rgHeader] || '').trim() || null : null,
+                position: 'Colaborador',
+                department: departmentFromCompany,
+                salaryType: 'monthly',
+                baseSalary: grossHeader ? parseNumber(row[grossHeader]) : null,
+                status: 'active'
+              }
+            });
+
+            upsertCache(created);
+            employee = created;
+            warnings.push(`Folha ${sheetName} linha ${rowNumber}: funcionario "${fullName}" criado automaticamente com CPF temporario.`);
+          }
+
+          if (!employee || !payrollRunId) continue;
 
           const earnings: { code: string; description: string; amount: number }[] = [];
           const deductions: { code: string; description: string; amount: number }[] = [];
@@ -675,44 +956,51 @@ export class ImportsService {
           for (const header of headers) {
             const mapping = findRubricMapping(header);
             if (!mapping) continue;
+
             const info = mapping[1];
             const amount = parseNumber(row[header]);
             if (amount === null || amount === 0) continue;
 
-            const normalizedAmount = info.type === 'deduction' ? Math.abs(amount) : amount;
+            // In this model VA can be informational credit, not payroll deduction.
+            const isMealVoucherCredit = info.code === 'VA' && !String(row[header] ?? '').includes('(');
+            const normalizedAmount = Math.abs(amount);
             const entry = {
               code: info.code,
               description: header,
               amount: normalizedAmount
             };
 
-            if (info.type === 'earning') {
+            if (info.type === 'earning' || isMealVoucherCredit) {
               earnings.push(entry);
             } else {
               deductions.push(entry);
             }
           }
 
-          const grossHeader = findHeader(headers, 'grossSalary');
-          const netHeader = findHeader(headers, 'netSalary');
-          const deductionsHeader = headers.find((header) => {
-            const normalized = normalizeText(header);
-            return normalized.includes('desconto') || normalized.includes('deducao');
-          });
-
           const grossSalary = grossHeader ? parseNumber(row[grossHeader]) : null;
-          const totalDeductions = deductionsHeader ? parseNumber(row[deductionsHeader]) : null;
           const netSalary = netHeader ? parseNumber(row[netHeader]) : null;
+          const explicitDeductions = deductionsHeader ? parseNumber(row[deductionsHeader]) : null;
 
           const gross = grossSalary ?? earnings.reduce((acc, item) => acc + item.amount, 0);
-          const deductionsSum = totalDeductions !== null ? Math.abs(totalDeductions) : deductions.reduce((acc, item) => acc + Math.abs(item.amount), 0);
+          const eventDeductions = deductions.reduce((acc, item) => acc + Math.abs(item.amount), 0);
+          const deductionsFromNet =
+            grossSalary !== null && netSalary !== null
+              ? Math.max(grossSalary - netSalary, 0)
+              : null;
+
+          const deductionsSum =
+            explicitDeductions !== null
+              ? Math.abs(explicitDeductions)
+              : deductionsFromNet ?? eventDeductions;
+
           const net = netSalary ?? gross - deductionsSum;
-          const fgts = gross * 0.08;
+          const hasValues = gross > 0 || net > 0 || earnings.length > 0 || deductions.length > 0;
+          if (!hasValues) continue;
 
           const payrollResult = await this.prisma.payrollResult.upsert({
             where: {
               payrollRunId_employeeId: {
-                payrollRunId: payrollRun.id,
+                payrollRunId,
                 employeeId: employee.id
               }
             },
@@ -720,15 +1008,15 @@ export class ImportsService {
               grossSalary: gross,
               totalDeductions: deductionsSum,
               netSalary: net,
-              fgts
+              fgts: gross * 0.08
             },
             create: {
-              payrollRunId: payrollRun.id,
+              payrollRunId,
               employeeId: employee.id,
               grossSalary: gross,
               totalDeductions: deductionsSum,
               netSalary: net,
-              fgts
+              fgts: gross * 0.08
             }
           });
 
@@ -761,10 +1049,7 @@ export class ImportsService {
           }
 
           processedRows += 1;
-          continue;
         }
-
-        processedRows += 1;
       }
     }
 
@@ -786,33 +1071,71 @@ export class ImportsService {
       after: { processedRows, failedRows }
     });
 
+    const guideSummaries = importedRunIds.size
+      ? (await Promise.all(Array.from(importedRunIds).map((runId) => this.buildGuideSummaryByRunId(runId)))).filter(Boolean)
+      : [];
+
     return {
       batchId: updatedBatch.id,
       success: failedRows === 0,
       message: failedRows === 0 ? 'Importacao concluida' : 'Importacao concluida com erros',
       processedRows,
       failedRows,
-      errors
+      errors,
+      warnings,
+      guideSummaries
+    };
+  }
+
+  private async buildGuideSummaryByRunId(payrollRunId: string) {
+    const payrollRun = await this.prisma.payrollRun.findUnique({
+      where: { id: payrollRunId }
+    });
+
+    if (!payrollRun) return null;
+
+    const results = await this.prisma.payrollResult.findMany({
+      where: { payrollRunId },
+      include: { events: true }
+    });
+
+    const sumByCode = (codes: string[]) =>
+      results.reduce(
+        (total, result) =>
+          total +
+          result.events
+            .filter((event) => codes.includes(event.code))
+            .reduce((acc, event) => acc + Math.abs(Number(event.amount)), 0),
+        0
+      );
+
+    const grossSalary = results.reduce((total, result) => total + Number(result.grossSalary), 0);
+    const totalDeductions = results.reduce((total, result) => total + Number(result.totalDeductions), 0);
+    const netSalary = results.reduce((total, result) => total + Number(result.netSalary), 0);
+    const fgts = results.reduce((total, result) => total + Number(result.fgts), 0);
+
+    return {
+      payrollRunId,
+      month: payrollRun.month,
+      year: payrollRun.year,
+      employeesCount: results.length,
+      totals: {
+        grossSalary,
+        totalDeductions,
+        netSalary,
+        fgts
+      },
+      guides: {
+        inss: sumByCode(['INSS', 'INSS13']),
+        irrf: sumByCode(['IRRF', 'IRRF13']),
+        fgts,
+        transportVoucher: sumByCode(['VT']),
+        mealVoucher: sumByCode(['VA']),
+        loanConsigned: sumByCode(['EMPRESTIMO']),
+        salaryFamily: sumByCode(['SAL_FAM'])
+      }
     };
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

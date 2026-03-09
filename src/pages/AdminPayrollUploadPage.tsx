@@ -31,6 +31,28 @@ const AdminPayrollUploadPage: React.FC = () => {
     processedRows: number;
     failedRows: number;
     errors: string[];
+    warnings?: string[];
+    guideSummaries?: Array<{
+      payrollRunId: string;
+      month: number;
+      year: number;
+      employeesCount: number;
+      totals: {
+        grossSalary: number;
+        totalDeductions: number;
+        netSalary: number;
+        fgts: number;
+      };
+      guides: {
+        inss: number;
+        irrf: number;
+        fgts: number;
+        transportVoucher: number;
+        mealVoucher: number;
+        loanConsigned: number;
+        salaryFamily: number;
+      };
+    }>;
   } | null>(null);
 
   const getFriendlyError = (error: unknown, fallback: string) => {
@@ -44,6 +66,12 @@ const AdminPayrollUploadPage: React.FC = () => {
     }
     return fallback;
   };
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value || 0);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -242,6 +270,47 @@ const AdminPayrollUploadPage: React.FC = () => {
                   </div>
                 </div>
 
+                {(uploadResult.warnings?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="h-5 w-5 text-orange-600" />
+                      <span className="font-medium text-orange-800">Avisos de Importação</span>
+                    </div>
+                    <div className="bg-orange-50 p-4 rounded-lg max-h-40 overflow-y-auto">
+                      <ul className="space-y-1 text-sm text-orange-800">
+                        {uploadResult.warnings?.map((warning, index) => (
+                          <li key={index}>â€¢ {warning}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {(uploadResult.guideSummaries?.length ?? 0) > 0 && (
+                  <div className="space-y-3">
+                    <div className="font-medium text-slate-800">Resumo das Guias por Competência</div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {uploadResult.guideSummaries?.map((summary) => (
+                        <div key={summary.payrollRunId} className="border rounded-lg p-4 bg-slate-50 space-y-2">
+                          <div className="font-medium text-slate-900">
+                            Competência {String(summary.month).padStart(2, '0')}/{summary.year} • {summary.employeesCount} funcionário(s)
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-slate-700">
+                            <div>INSS: {formatCurrency(summary.guides.inss)}</div>
+                            <div>IRRF: {formatCurrency(summary.guides.irrf)}</div>
+                            <div>FGTS: {formatCurrency(summary.guides.fgts)}</div>
+                            <div>VT: {formatCurrency(summary.guides.transportVoucher)}</div>
+                            <div>VA: {formatCurrency(summary.guides.mealVoucher)}</div>
+                            <div>Empréstimo: {formatCurrency(summary.guides.loanConsigned)}</div>
+                            <div>Salário-família: {formatCurrency(summary.guides.salaryFamily)}</div>
+                            <div>Líquido total: {formatCurrency(summary.totals.netSalary)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {uploadResult.errors.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
@@ -316,3 +385,4 @@ const AdminPayrollUploadPage: React.FC = () => {
 };
 
 export default AdminPayrollUploadPage;
+

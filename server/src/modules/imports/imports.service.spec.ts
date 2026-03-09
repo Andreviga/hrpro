@@ -10,6 +10,9 @@ jest.mock('xlsx', () => ({
 
 describe('ImportsService', () => {
   const prisma = {
+    employee: {
+      findMany: jest.fn()
+    },
     importBatch: {
       create: jest.fn(),
       update: jest.fn()
@@ -29,6 +32,7 @@ describe('ImportsService', () => {
   });
 
   it('blocks payroll import when competence is closed', async () => {
+    prisma.employee.findMany.mockResolvedValue([]);
     prisma.importBatch.create.mockResolvedValue({ id: 'batch-1' });
     prisma.payrollRun.findFirst.mockResolvedValue({ id: 'run-closed', status: 'closed' });
 
@@ -45,7 +49,7 @@ describe('ImportsService', () => {
 
     await expect(service.importWorkbook({
       buffer: Buffer.from('test'),
-      fileName: 'folha.xlsx',
+      fileName: 'Folha de pagamento de fevereiro 2026.xlsm',
       companyId: 'c1',
       userId: 'u1'
     })).rejects.toMatchObject({
@@ -65,3 +69,4 @@ describe('ImportsService', () => {
     });
   });
 });
+

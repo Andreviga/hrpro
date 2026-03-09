@@ -88,6 +88,28 @@ export const apiService = {
     processedRows: number;
     failedRows: number;
     errors: string[];
+    warnings?: string[];
+    guideSummaries?: Array<{
+      payrollRunId: string;
+      month: number;
+      year: number;
+      employeesCount: number;
+      totals: {
+        grossSalary: number;
+        totalDeductions: number;
+        netSalary: number;
+        fgts: number;
+      };
+      guides: {
+        inss: number;
+        irrf: number;
+        fgts: number;
+        transportVoucher: number;
+        mealVoucher: number;
+        loanConsigned: number;
+        salaryFamily: number;
+      };
+    }>;
   }> {
     const formData = new FormData();
     formData.append('file', file);
@@ -107,3 +129,4 @@ export const apiService = {
     return response.json();
   }
 };
+
