@@ -19,6 +19,36 @@ const headerAliases: Record<string, string[]> = {
   rg: ['rg'],
   pis: ['pis'],
   ctps: ['ctps', 'carteira de trabalho'],
+  ctpsNumber: ['ctps numero', 'numero ctps', 'ctps n', 'carteira trabalho numero'],
+  ctpsSeries: ['ctps serie', 'serie ctps', 'carteira trabalho serie'],
+  ctpsState: ['ctps uf', 'uf ctps'],
+  rgIssuer: ['orgao emissor', 'rg orgao emissor', 'emissor rg'],
+  rgIssuerState: ['rg uf', 'uf rg'],
+  rgIssueDate: ['data emissao rg', 'rg emissao', 'emissao rg'],
+  socialName: ['nome social'],
+  gender: ['sexo', 'genero'],
+  raceColor: ['raca cor', 'raca/cor', 'cor'],
+  maritalStatus: ['estado civil'],
+  educationLevel: ['grau instrucao', 'escolaridade', 'instrucao'],
+  nationalityCode: ['pais nacionalidade', 'nacionalidade', 'cod pais nacionalidade'],
+  birthCountryCode: ['pais nascimento', 'cod pais nascimento'],
+  birthState: ['uf nascimento', 'estado nascimento'],
+  birthCityCode: ['municipio nascimento ibge', 'cod municipio nascimento'],
+  cityCode: ['municipio ibge', 'cod municipio', 'codigo municipio ibge'],
+  esocialCategoryCode: ['cod categoria esocial', 'categoria esocial', 'cod categ'],
+  esocialRegistrationType: ['tipo regime trabalhista', 'tp reg trab', 'tipo regime trab'],
+  esocialRegimeType: ['tipo regime previdenciario', 'tp reg prev', 'regime previdenciario'],
+  esocialAdmissionType: ['tipo admissao esocial', 'tp admissao', 'tipo admissao'],
+  esocialAdmissionIndicator: ['indicativo admissao', 'ind admissao'],
+  esocialActivityNature: ['natureza atividade', 'nat atividade'],
+  esocialUnionCnpj: ['cnpj sindicato', 'sindicato categoria'],
+  esocialSalaryUnit: ['unidade salario fixo', 'und salario fixo', 'und sal fixo'],
+  esocialContractType: ['tipo contrato esocial', 'tp contrato', 'tipo contrato'],
+  esocialContractEndDate: ['data termino contrato', 'dt termino contrato', 'fim contrato'],
+  esocialWeeklyHours: ['horas semanais esocial', 'qtd hrs sem', 'qtd horas semanais'],
+  esocialWorkSchedule: ['descricao jornada', 'jornada descricao', 'horario contratual'],
+  esocialHasDisability: ['pcd', 'possui deficiencia'],
+  esocialDisabilityType: ['tipo deficiencia'],
   email: ['email', 'e-mail'],
   phone: ['telefone', 'celular'],
   birthDate: ['nascimento', 'data de nascimento'],
@@ -339,6 +369,15 @@ const parseDate = (value: any) => {
   if (Number.isNaN(date.getTime())) return undefined;
   return date;
 };
+
+const parseBoolean = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return null;
+  const normalized = normalizeText(value);
+  if (['1', 'sim', 's', 'true', 't', 'yes', 'y'].includes(normalized)) return true;
+  if (['0', 'nao', 'n', 'false', 'f', 'no'].includes(normalized)) return false;
+  return null;
+};
+
 const monthNames: Record<string, number> = {
   janeiro: 1,
   fevereiro: 2,
@@ -646,14 +685,44 @@ export class ImportsService {
       const phoneHeader = findHeader(headers, 'phone');
       const birthDateHeader = findHeader(headers, 'birthDate');
       const motherNameHeader = findHeader(headers, 'motherName');
+      const socialNameHeader = findHeader(headers, 'socialName');
+      const genderHeader = findHeader(headers, 'gender');
+      const raceColorHeader = findHeader(headers, 'raceColor');
+      const maritalStatusHeader = findHeader(headers, 'maritalStatus');
+      const educationLevelHeader = findHeader(headers, 'educationLevel');
+      const nationalityCodeHeader = findHeader(headers, 'nationalityCode');
+      const birthCountryCodeHeader = findHeader(headers, 'birthCountryCode');
+      const birthStateHeader = findHeader(headers, 'birthState');
+      const birthCityCodeHeader = findHeader(headers, 'birthCityCode');
       const addressLineHeader = findHeader(headers, 'addressLine');
       const cityStateHeader = findHeader(headers, 'cityState');
       const zipCodeHeader = findHeader(headers, 'zipCode');
+      const cityCodeHeader = findHeader(headers, 'cityCode');
       const pisHeader = findHeader(headers, 'pis');
       const ctpsHeader = findHeader(headers, 'ctps');
+      const ctpsNumberHeader = findHeader(headers, 'ctpsNumber');
+      const ctpsSeriesHeader = findHeader(headers, 'ctpsSeries');
+      const ctpsStateHeader = findHeader(headers, 'ctpsState');
+      const rgIssuerHeader = findHeader(headers, 'rgIssuer');
+      const rgIssuerStateHeader = findHeader(headers, 'rgIssuerState');
+      const rgIssueDateHeader = findHeader(headers, 'rgIssueDate');
       const positionHeader = findHeader(headers, 'position');
       const departmentHeader = findHeader(headers, 'department');
       const admissionDateHeader = findHeader(headers, 'admissionDate');
+      const esocialCategoryCodeHeader = findHeader(headers, 'esocialCategoryCode');
+      const esocialRegistrationTypeHeader = findHeader(headers, 'esocialRegistrationType');
+      const esocialRegimeTypeHeader = findHeader(headers, 'esocialRegimeType');
+      const esocialAdmissionTypeHeader = findHeader(headers, 'esocialAdmissionType');
+      const esocialAdmissionIndicatorHeader = findHeader(headers, 'esocialAdmissionIndicator');
+      const esocialActivityNatureHeader = findHeader(headers, 'esocialActivityNature');
+      const esocialUnionCnpjHeader = findHeader(headers, 'esocialUnionCnpj');
+      const esocialSalaryUnitHeader = findHeader(headers, 'esocialSalaryUnit');
+      const esocialContractTypeHeader = findHeader(headers, 'esocialContractType');
+      const esocialContractEndDateHeader = findHeader(headers, 'esocialContractEndDate');
+      const esocialWeeklyHoursHeader = findHeader(headers, 'esocialWeeklyHours');
+      const esocialWorkScheduleHeader = findHeader(headers, 'esocialWorkSchedule');
+      const esocialHasDisabilityHeader = findHeader(headers, 'esocialHasDisability');
+      const esocialDisabilityTypeHeader = findHeader(headers, 'esocialDisabilityType');
       const baseSalaryHeader = findHeader(headers, 'baseSalary');
       const hourlyRateHeader = findHeader(headers, 'hourlyRate');
       const weeklyHoursHeader = findHeader(headers, 'weeklyHours');
@@ -807,17 +876,47 @@ export class ImportsService {
             fullName,
             cpf,
             rg: rgHeader ? String(row[rgHeader] || '').trim() || null : null,
+            rgIssuer: rgIssuerHeader ? String(row[rgIssuerHeader] || '').trim() || null : null,
+            rgIssuerState: rgIssuerStateHeader ? String(row[rgIssuerStateHeader] || '').trim() || null : null,
+            rgIssueDate: rgIssueDateHeader ? parseDate(row[rgIssueDateHeader]) ?? null : null,
             email: emailHeader ? String(row[emailHeader] || '').trim() || null : null,
             phone: phoneHeader ? String(row[phoneHeader] || '').trim() || null : null,
             birthDate: birthDateHeader ? parseDate(row[birthDateHeader]) ?? null : null,
             motherName: motherNameHeader ? String(row[motherNameHeader] || '').trim() || null : null,
+            socialName: socialNameHeader ? String(row[socialNameHeader] || '').trim() || null : null,
+            gender: genderHeader ? String(row[genderHeader] || '').trim() || null : null,
+            raceColor: raceColorHeader ? String(row[raceColorHeader] || '').trim() || null : null,
+            maritalStatus: maritalStatusHeader ? String(row[maritalStatusHeader] || '').trim() || null : null,
+            educationLevel: educationLevelHeader ? String(row[educationLevelHeader] || '').trim() || null : null,
+            nationalityCode: nationalityCodeHeader ? String(row[nationalityCodeHeader] || '').trim() || null : null,
+            birthCountryCode: birthCountryCodeHeader ? String(row[birthCountryCodeHeader] || '').trim() || null : null,
+            birthState: birthStateHeader ? String(row[birthStateHeader] || '').trim() || null : null,
+            birthCityCode: birthCityCodeHeader ? String(row[birthCityCodeHeader] || '').trim() || null : null,
             addressLine: addressLineHeader ? String(row[addressLineHeader] || '').trim() || null : null,
             city: city ?? null,
             state: state ?? null,
             zipCode: zipCodeHeader ? String(row[zipCodeHeader] || '').trim() || null : null,
+            cityCode: cityCodeHeader ? String(row[cityCodeHeader] || '').trim() || null : null,
             admissionDate: admissionDateHeader ? parseDate(row[admissionDateHeader]) ?? null : null,
             pis: pisHeader ? String(row[pisHeader] || '').trim() || null : null,
             ctps: ctpsHeader ? String(row[ctpsHeader] || '').trim() || null : null,
+            ctpsNumber: ctpsNumberHeader ? String(row[ctpsNumberHeader] || '').trim() || null : null,
+            ctpsSeries: ctpsSeriesHeader ? String(row[ctpsSeriesHeader] || '').trim() || null : null,
+            ctpsState: ctpsStateHeader ? String(row[ctpsStateHeader] || '').trim() || null : null,
+            esocialCategoryCode: esocialCategoryCodeHeader ? String(row[esocialCategoryCodeHeader] || '').trim() || null : null,
+            esocialRegistrationType: esocialRegistrationTypeHeader ? String(row[esocialRegistrationTypeHeader] || '').trim() || null : null,
+            esocialRegimeType: esocialRegimeTypeHeader ? String(row[esocialRegimeTypeHeader] || '').trim() || null : null,
+            esocialAdmissionType: esocialAdmissionTypeHeader ? String(row[esocialAdmissionTypeHeader] || '').trim() || null : null,
+            esocialAdmissionIndicator: esocialAdmissionIndicatorHeader ? String(row[esocialAdmissionIndicatorHeader] || '').trim() || null : null,
+            esocialActivityNature: esocialActivityNatureHeader ? String(row[esocialActivityNatureHeader] || '').trim() || null : null,
+            esocialUnionCnpj: esocialUnionCnpjHeader ? String(row[esocialUnionCnpjHeader] || '').trim() || null : null,
+            esocialSalaryUnit: esocialSalaryUnitHeader ? String(row[esocialSalaryUnitHeader] || '').trim() || null : null,
+            esocialContractType: esocialContractTypeHeader ? String(row[esocialContractTypeHeader] || '').trim() || null : null,
+            esocialContractEndDate: esocialContractEndDateHeader ? parseDate(row[esocialContractEndDateHeader]) ?? null : null,
+            esocialWeeklyHours: esocialWeeklyHoursHeader ? parseNumber(row[esocialWeeklyHoursHeader]) : null,
+            esocialWorkSchedule: esocialWorkScheduleHeader ? String(row[esocialWorkScheduleHeader] || '').trim() || null : null,
+            esocialHasDisability: esocialHasDisabilityHeader ? parseBoolean(row[esocialHasDisabilityHeader]) : null,
+            esocialDisabilityType: esocialDisabilityTypeHeader ? String(row[esocialDisabilityTypeHeader] || '').trim() || null : null,
             position: positionHeader ? String(row[positionHeader] || '').trim() || 'Colaborador' : 'Colaborador',
             department: departmentHeader ? String(row[departmentHeader] || '').trim() || 'geral' : 'geral',
             salaryType: hourlyRate ? 'hourly' : 'monthly',
@@ -1234,6 +1333,8 @@ export class ImportsService {
     };
   }
 }
+
+
 
 
 

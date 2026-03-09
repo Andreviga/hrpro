@@ -8,26 +8,72 @@ export class EmployeesService {
 
   private buildEmployeeData(data: any) {
     const cpf = data.cpf ? data.cpf.replace(/\D/g, '') : undefined;
+    const unionCnpj = data.esocialUnionCnpj ? data.esocialUnionCnpj.replace(/\D/g, '') : undefined;
     const addressLine = data.address?.street
       ? `${data.address.street}, ${data.address.number}${data.address.complement ? ` - ${data.address.complement}` : ''}`
       : data.addressLine;
+
+    const toDate = (value: unknown) => {
+      if (!value) return undefined;
+      const parsed = value instanceof Date ? value : new Date(String(value));
+      return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+    };
+
+    const toNumber = (value: unknown) => {
+      if (value === null || value === undefined || value === '') return undefined;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    };
 
     return {
       fullName: data.fullName,
       cpf,
       rg: data.rg,
-      birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
+      rgIssuer: data.rgIssuer,
+      rgIssuerState: data.rgIssuerState,
+      rgIssueDate: toDate(data.rgIssueDate),
+      birthDate: toDate(data.birthDate),
       motherName: data.motherName,
+      socialName: data.socialName,
+      gender: data.gender,
+      raceColor: data.raceColor,
+      maritalStatus: data.maritalStatus,
+      educationLevel: data.educationLevel,
+      nationalityCode: data.nationalityCode,
+      birthCountryCode: data.birthCountryCode,
+      birthState: data.birthState,
+      birthCityCode: data.birthCityCode,
       email: data.email,
       phone: data.phone,
       addressLine,
       city: data.address?.city ?? data.city,
       state: data.address?.state ?? data.state,
       zipCode: data.address?.zipCode ?? data.zipCode,
+      cityCode: data.cityCode,
       employeeCode: data.employeeCode,
-      admissionDate: data.admissionDate ? new Date(data.admissionDate) : undefined,
+      admissionDate: toDate(data.admissionDate),
       ctps: data.ctps,
+      ctpsNumber: data.ctpsNumber,
+      ctpsSeries: data.ctpsSeries,
+      ctpsState: data.ctpsState,
       pis: data.pis,
+      esocialCategoryCode: data.esocialCategoryCode,
+      esocialRegistrationType: data.esocialRegistrationType,
+      esocialRegimeType: data.esocialRegimeType,
+      esocialAdmissionType: data.esocialAdmissionType,
+      esocialAdmissionIndicator: data.esocialAdmissionIndicator,
+      esocialActivityNature: data.esocialActivityNature,
+      esocialUnionCnpj: unionCnpj,
+      esocialSalaryUnit: data.esocialSalaryUnit,
+      esocialContractType: data.esocialContractType,
+      esocialContractEndDate: toDate(data.esocialContractEndDate),
+      esocialWeeklyHours: toNumber(data.esocialWeeklyHours),
+      esocialWorkSchedule: data.esocialWorkSchedule,
+      esocialHasDisability:
+        data.esocialHasDisability === null || data.esocialHasDisability === undefined
+          ? undefined
+          : Boolean(data.esocialHasDisability),
+      esocialDisabilityType: data.esocialDisabilityType,
       position: data.position,
       department: data.department,
       status: data.status,

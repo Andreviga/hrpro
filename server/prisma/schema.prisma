@@ -165,10 +165,40 @@ model Employee {
   city         String?
   state        String?
   zipCode      String?
+  cityCode     String?
   employeeCode String?
   admissionDate DateTime?
   ctps         String?
+  ctpsNumber   String?
+  ctpsSeries   String?
+  ctpsState    String?
   pis          String?
+  socialName   String?
+  gender       String?
+  raceColor    String?
+  maritalStatus String?
+  educationLevel String?
+  nationalityCode String?
+  birthCountryCode String?
+  birthState   String?
+  birthCityCode String?
+  rgIssuer     String?
+  rgIssuerState String?
+  rgIssueDate  DateTime?
+  esocialCategoryCode String?
+  esocialRegistrationType String?
+  esocialRegimeType String?
+  esocialAdmissionType String?
+  esocialAdmissionIndicator String?
+  esocialActivityNature String?
+  esocialUnionCnpj String?
+  esocialSalaryUnit String?
+  esocialContractType String?
+  esocialContractEndDate DateTime?
+  esocialWeeklyHours Decimal?
+  esocialWorkSchedule String?
+  esocialHasDisability Boolean?
+  esocialDisabilityType String?
   position     String
   department   String
   status       EmployeeStatus @default(pending_approval)

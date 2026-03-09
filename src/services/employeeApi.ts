@@ -21,7 +21,37 @@ export interface Employee {
   employeeCode?: string;
   admissionDate?: string;
   ctps?: string;
+  ctpsNumber?: string;
+  ctpsSeries?: string;
+  ctpsState?: string;
   pis?: string;
+  socialName?: string;
+  gender?: string;
+  raceColor?: string;
+  maritalStatus?: string;
+  educationLevel?: string;
+  nationalityCode?: string;
+  birthCountryCode?: string;
+  birthState?: string;
+  birthCityCode?: string;
+  cityCode?: string;
+  rgIssuer?: string;
+  rgIssuerState?: string;
+  rgIssueDate?: string;
+  esocialCategoryCode?: string;
+  esocialRegistrationType?: string;
+  esocialRegimeType?: string;
+  esocialAdmissionType?: string;
+  esocialAdmissionIndicator?: string;
+  esocialActivityNature?: string;
+  esocialUnionCnpj?: string;
+  esocialSalaryUnit?: string;
+  esocialContractType?: string;
+  esocialContractEndDate?: string;
+  esocialWeeklyHours?: number;
+  esocialWorkSchedule?: string;
+  esocialHasDisability?: boolean;
+  esocialDisabilityType?: string;
   position: string;
   department: 'centro_educacional' | 'recreacao_infantil' | string;
   contractType?: 'CLT' | 'temporary' | 'intern';
@@ -146,7 +176,40 @@ const mapEmployee = (apiEmployee: any): Employee => {
     employeeCode: apiEmployee.employeeCode || undefined,
     admissionDate: apiEmployee.admissionDate || undefined,
     ctps: apiEmployee.ctps || undefined,
+    ctpsNumber: apiEmployee.ctpsNumber || undefined,
+    ctpsSeries: apiEmployee.ctpsSeries || undefined,
+    ctpsState: apiEmployee.ctpsState || undefined,
     pis: apiEmployee.pis || undefined,
+    socialName: apiEmployee.socialName || undefined,
+    gender: apiEmployee.gender || undefined,
+    raceColor: apiEmployee.raceColor || undefined,
+    maritalStatus: apiEmployee.maritalStatus || undefined,
+    educationLevel: apiEmployee.educationLevel || undefined,
+    nationalityCode: apiEmployee.nationalityCode || undefined,
+    birthCountryCode: apiEmployee.birthCountryCode || undefined,
+    birthState: apiEmployee.birthState || undefined,
+    birthCityCode: apiEmployee.birthCityCode || undefined,
+    cityCode: apiEmployee.cityCode || undefined,
+    rgIssuer: apiEmployee.rgIssuer || undefined,
+    rgIssuerState: apiEmployee.rgIssuerState || undefined,
+    rgIssueDate: apiEmployee.rgIssueDate || undefined,
+    esocialCategoryCode: apiEmployee.esocialCategoryCode || undefined,
+    esocialRegistrationType: apiEmployee.esocialRegistrationType || undefined,
+    esocialRegimeType: apiEmployee.esocialRegimeType || undefined,
+    esocialAdmissionType: apiEmployee.esocialAdmissionType || undefined,
+    esocialAdmissionIndicator: apiEmployee.esocialAdmissionIndicator || undefined,
+    esocialActivityNature: apiEmployee.esocialActivityNature || undefined,
+    esocialUnionCnpj: apiEmployee.esocialUnionCnpj || undefined,
+    esocialSalaryUnit: apiEmployee.esocialSalaryUnit || undefined,
+    esocialContractType: apiEmployee.esocialContractType || undefined,
+    esocialContractEndDate: apiEmployee.esocialContractEndDate || undefined,
+    esocialWeeklyHours: apiEmployee.esocialWeeklyHours ? Number(apiEmployee.esocialWeeklyHours) : undefined,
+    esocialWorkSchedule: apiEmployee.esocialWorkSchedule || undefined,
+    esocialHasDisability:
+      apiEmployee.esocialHasDisability === null || apiEmployee.esocialHasDisability === undefined
+        ? undefined
+        : Boolean(apiEmployee.esocialHasDisability),
+    esocialDisabilityType: apiEmployee.esocialDisabilityType || undefined,
     position: apiEmployee.position,
     department: apiEmployee.department,
     status: apiEmployee.status,
@@ -218,6 +281,14 @@ export const employeeApi = {
     return mapEmployee(data);
   },
 
+  async updateEmployee(id: string, employeeData: Partial<Employee>, reason?: string): Promise<Employee> {
+    const data = await request<any>(`/employees/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...employeeData, reason })
+    });
+    return mapEmployee(data);
+  },
+
   async approveEmployee(id: string): Promise<Employee> {
     const data = await request<any>(`/employees/${id}/approve`, { method: 'POST' });
     return mapEmployee(data);
@@ -273,3 +344,4 @@ export const employeeApi = {
     };
   }
 };
+

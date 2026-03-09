@@ -49,6 +49,8 @@ const AdminEmployeesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('employees');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showNewEmployeeForm, setShowNewEmployeeForm] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Partial<Employee> | null>(null);
+  const [savingEmployee, setSavingEmployee] = useState(false);
   const [filters, setFilters] = useState({
     status: 'all',
     department: 'all',
@@ -164,6 +166,81 @@ const AdminEmployeesPage: React.FC = () => {
       alert('Funcionário cadastrado com sucesso!');
     } catch (error) {
       alert('Erro ao cadastrar funcionário');
+    }
+  };
+
+  const toInputDate = (value?: string) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  };
+
+  const openEditEmployee = (employee: Employee) => {
+    setSelectedEmployee(null);
+    setEditingEmployee({
+      ...employee,
+      birthDate: toInputDate(employee.birthDate),
+      admissionDate: toInputDate(employee.admissionDate),
+      rgIssueDate: toInputDate(employee.rgIssueDate),
+      esocialContractEndDate: toInputDate(employee.esocialContractEndDate),
+      address: employee.address ?? {
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        city: '',
+        state: '',
+        zipCode: ''
+      }
+    });
+  };
+
+  const updateEditingEmployee = (field: keyof Employee, value: any) => {
+    if (!editingEmployee) return;
+    setEditingEmployee({ ...editingEmployee, [field]: value });
+  };
+
+  const updateEditingAddress = (field: keyof NonNullable<Employee['address']>, value: string) => {
+    if (!editingEmployee) return;
+
+    const currentAddress = editingEmployee.address ?? {
+      street: '',
+      number: '',
+      complement: '',
+      neighborhood: '',
+      city: '',
+      state: '',
+      zipCode: ''
+    };
+
+    setEditingEmployee({
+      ...editingEmployee,
+      address: {
+        ...currentAddress,
+        [field]: value
+      }
+    });
+  };
+
+  const handleUpdateEmployee = async () => {
+    if (!editingEmployee?.id) return;
+
+    if (!editingEmployee.fullName || !editingEmployee.cpf || !editingEmployee.position) {
+      alert('Preencha nome, CPF e cargo para salvar.');
+      return;
+    }
+
+    try {
+      setSavingEmployee(true);
+      await employeeApi.updateEmployee(editingEmployee.id, editingEmployee, 'Atualizacao cadastral');
+      setEditingEmployee(null);
+      await loadData();
+      alert('Funcionário atualizado com sucesso!');
+    } catch (error) {
+      alert(getFriendlyError(error, 'Erro ao atualizar funcionário'));
+    } finally {
+      setSavingEmployee(false);
     }
   };
 
@@ -410,7 +487,7 @@ const AdminEmployeesPage: React.FC = () => {
                         <Button variant="outline" size="sm" onClick={() => setSelectedEmployee(employee)}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => openEditEmployee(employee)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => window.location.href = '#/calendar'}>
@@ -762,7 +839,7 @@ const AdminEmployeesPage: React.FC = () => {
                         type="email"
                         value={newEmployee.email || ''}
                         onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
-                        placeholder="funcion�rio@email.com"
+                        placeholder="funcionario@email.com"
                       />
                     </div>
                     <div>
@@ -875,6 +952,460 @@ const AdminEmployeesPage: React.FC = () => {
                     variant="outline" 
                     onClick={() => setShowNewEmployeeForm(false)}
                   >
+                    Cancelar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Modal de Edicao de Funcionario */}
+        {editingEmployee && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+              <CardHeader>
+                <CardTitle>Editar funcionario</CardTitle>
+                <CardDescription>Atualize os dados cadastrais e campos eSocial.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <h3 className="font-semibold mb-3">Dados principais</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>Nome completo *</Label>
+                      <Input
+                        value={editingEmployee.fullName || ''}
+                        onChange={(e) => updateEditingEmployee('fullName', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>CPF *</Label>
+                      <Input
+                        value={editingEmployee.cpf || ''}
+                        onChange={(e) => updateEditingEmployee('cpf', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Matricula</Label>
+                      <Input
+                        value={editingEmployee.employeeCode || ''}
+                        onChange={(e) => updateEditingEmployee('employeeCode', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>RG</Label>
+                      <Input
+                        value={editingEmployee.rg || ''}
+                        onChange={(e) => updateEditingEmployee('rg', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Orgao emissor RG</Label>
+                      <Input
+                        value={editingEmployee.rgIssuer || ''}
+                        onChange={(e) => updateEditingEmployee('rgIssuer', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>UF RG</Label>
+                      <Input
+                        value={editingEmployee.rgIssuerState || ''}
+                        onChange={(e) => updateEditingEmployee('rgIssuerState', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Data emissao RG</Label>
+                      <Input
+                        type="date"
+                        value={editingEmployee.rgIssueDate || ''}
+                        onChange={(e) => updateEditingEmployee('rgIssueDate', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Data nascimento</Label>
+                      <Input
+                        type="date"
+                        value={editingEmployee.birthDate || ''}
+                        onChange={(e) => updateEditingEmployee('birthDate', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Nome social</Label>
+                      <Input
+                        value={editingEmployee.socialName || ''}
+                        onChange={(e) => updateEditingEmployee('socialName', e.target.value)}
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <Label>Nome da mae</Label>
+                      <Input
+                        value={editingEmployee.motherName || ''}
+                        onChange={(e) => updateEditingEmployee('motherName', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-3">Contato e endereco</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>Email</Label>
+                      <Input
+                        type="email"
+                        value={editingEmployee.email || ''}
+                        onChange={(e) => updateEditingEmployee('email', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Telefone</Label>
+                      <Input
+                        value={editingEmployee.phone || ''}
+                        onChange={(e) => updateEditingEmployee('phone', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>CEP</Label>
+                      <Input
+                        value={editingEmployee.address?.zipCode || ''}
+                        onChange={(e) => updateEditingAddress('zipCode', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Logradouro</Label>
+                      <Input
+                        value={editingEmployee.address?.street || ''}
+                        onChange={(e) => updateEditingAddress('street', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Numero</Label>
+                      <Input
+                        value={editingEmployee.address?.number || ''}
+                        onChange={(e) => updateEditingAddress('number', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Complemento</Label>
+                      <Input
+                        value={editingEmployee.address?.complement || ''}
+                        onChange={(e) => updateEditingAddress('complement', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Bairro</Label>
+                      <Input
+                        value={editingEmployee.address?.neighborhood || ''}
+                        onChange={(e) => updateEditingAddress('neighborhood', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Cidade</Label>
+                      <Input
+                        value={editingEmployee.address?.city || ''}
+                        onChange={(e) => updateEditingAddress('city', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>UF</Label>
+                      <Input
+                        value={editingEmployee.address?.state || ''}
+                        onChange={(e) => updateEditingAddress('state', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Cod municipio IBGE</Label>
+                      <Input
+                        value={editingEmployee.cityCode || ''}
+                        onChange={(e) => updateEditingEmployee('cityCode', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-3">Dados trabalhistas</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>Cargo *</Label>
+                      <Input
+                        value={editingEmployee.position || ''}
+                        onChange={(e) => updateEditingEmployee('position', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Departamento</Label>
+                      <Input
+                        value={editingEmployee.department || ''}
+                        onChange={(e) => updateEditingEmployee('department', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Data admissao</Label>
+                      <Input
+                        type="date"
+                        value={editingEmployee.admissionDate || ''}
+                        onChange={(e) => updateEditingEmployee('admissionDate', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Tipo salario</Label>
+                      <Select
+                        value={editingEmployee.salaryType || 'monthly'}
+                        onValueChange={(value) => updateEditingEmployee('salaryType', value as Employee['salaryType'])}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Mensal</SelectItem>
+                          <SelectItem value="hourly">Hora</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Salario base</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editingEmployee.baseSalary ?? ''}
+                        onChange={(e) => updateEditingEmployee('baseSalary', e.target.value ? Number(e.target.value) : undefined)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Valor hora</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editingEmployee.hourlyRate ?? ''}
+                        onChange={(e) => updateEditingEmployee('hourlyRate', e.target.value ? Number(e.target.value) : undefined)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Horas semanais</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editingEmployee.weeklyHours ?? ''}
+                        onChange={(e) => updateEditingEmployee('weeklyHours', e.target.value ? Number(e.target.value) : undefined)}
+                      />
+                    </div>
+                    <div>
+                      <Label>PIS/NIS</Label>
+                      <Input
+                        value={editingEmployee.pis || ''}
+                        onChange={(e) => updateEditingEmployee('pis', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>CTPS</Label>
+                      <Input
+                        value={editingEmployee.ctps || ''}
+                        onChange={(e) => updateEditingEmployee('ctps', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>CTPS numero</Label>
+                      <Input
+                        value={editingEmployee.ctpsNumber || ''}
+                        onChange={(e) => updateEditingEmployee('ctpsNumber', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>CTPS serie</Label>
+                      <Input
+                        value={editingEmployee.ctpsSeries || ''}
+                        onChange={(e) => updateEditingEmployee('ctpsSeries', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>CTPS UF</Label>
+                      <Input
+                        value={editingEmployee.ctpsState || ''}
+                        onChange={(e) => updateEditingEmployee('ctpsState', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-3">Campos minimos eSocial</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>Sexo</Label>
+                      <Input
+                        value={editingEmployee.gender || ''}
+                        onChange={(e) => updateEditingEmployee('gender', e.target.value)}
+                        placeholder="M, F ou N"
+                      />
+                    </div>
+                    <div>
+                      <Label>Raca/cor</Label>
+                      <Input
+                        value={editingEmployee.raceColor || ''}
+                        onChange={(e) => updateEditingEmployee('raceColor', e.target.value)}
+                        placeholder="1..6"
+                      />
+                    </div>
+                    <div>
+                      <Label>Estado civil</Label>
+                      <Input
+                        value={editingEmployee.maritalStatus || ''}
+                        onChange={(e) => updateEditingEmployee('maritalStatus', e.target.value)}
+                        placeholder="1..5"
+                      />
+                    </div>
+                    <div>
+                      <Label>Grau instrucao</Label>
+                      <Input
+                        value={editingEmployee.educationLevel || ''}
+                        onChange={(e) => updateEditingEmployee('educationLevel', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Pais nacionalidade</Label>
+                      <Input
+                        value={editingEmployee.nationalityCode || ''}
+                        onChange={(e) => updateEditingEmployee('nationalityCode', e.target.value)}
+                        placeholder="105"
+                      />
+                    </div>
+                    <div>
+                      <Label>Pais nascimento</Label>
+                      <Input
+                        value={editingEmployee.birthCountryCode || ''}
+                        onChange={(e) => updateEditingEmployee('birthCountryCode', e.target.value)}
+                        placeholder="105"
+                      />
+                    </div>
+                    <div>
+                      <Label>UF nascimento</Label>
+                      <Input
+                        value={editingEmployee.birthState || ''}
+                        onChange={(e) => updateEditingEmployee('birthState', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Cod municipio nascimento</Label>
+                      <Input
+                        value={editingEmployee.birthCityCode || ''}
+                        onChange={(e) => updateEditingEmployee('birthCityCode', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Cod categoria eSocial</Label>
+                      <Input
+                        value={editingEmployee.esocialCategoryCode || ''}
+                        onChange={(e) => updateEditingEmployee('esocialCategoryCode', e.target.value)}
+                        placeholder="101"
+                      />
+                    </div>
+                    <div>
+                      <Label>Tipo regime trab</Label>
+                      <Input
+                        value={editingEmployee.esocialRegistrationType || ''}
+                        onChange={(e) => updateEditingEmployee('esocialRegistrationType', e.target.value)}
+                        placeholder="1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Tipo regime prev</Label>
+                      <Input
+                        value={editingEmployee.esocialRegimeType || ''}
+                        onChange={(e) => updateEditingEmployee('esocialRegimeType', e.target.value)}
+                        placeholder="1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Tipo admissao</Label>
+                      <Input
+                        value={editingEmployee.esocialAdmissionType || ''}
+                        onChange={(e) => updateEditingEmployee('esocialAdmissionType', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Indicativo admissao</Label>
+                      <Input
+                        value={editingEmployee.esocialAdmissionIndicator || ''}
+                        onChange={(e) => updateEditingEmployee('esocialAdmissionIndicator', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Natureza atividade</Label>
+                      <Input
+                        value={editingEmployee.esocialActivityNature || ''}
+                        onChange={(e) => updateEditingEmployee('esocialActivityNature', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>CNPJ sindicato</Label>
+                      <Input
+                        value={editingEmployee.esocialUnionCnpj || ''}
+                        onChange={(e) => updateEditingEmployee('esocialUnionCnpj', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Unidade salario fixo</Label>
+                      <Input
+                        value={editingEmployee.esocialSalaryUnit || ''}
+                        onChange={(e) => updateEditingEmployee('esocialSalaryUnit', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Tipo contrato</Label>
+                      <Input
+                        value={editingEmployee.esocialContractType || ''}
+                        onChange={(e) => updateEditingEmployee('esocialContractType', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Fim contrato</Label>
+                      <Input
+                        type="date"
+                        value={editingEmployee.esocialContractEndDate || ''}
+                        onChange={(e) => updateEditingEmployee('esocialContractEndDate', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Horas semanais eSocial</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editingEmployee.esocialWeeklyHours ?? ''}
+                        onChange={(e) => updateEditingEmployee('esocialWeeklyHours', e.target.value ? Number(e.target.value) : undefined)}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Descricao jornada</Label>
+                      <Input
+                        value={editingEmployee.esocialWorkSchedule || ''}
+                        onChange={(e) => updateEditingEmployee('esocialWorkSchedule', e.target.value)}
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2 pt-6">
+                      <Checkbox
+                        checked={editingEmployee.esocialHasDisability === true}
+                        onCheckedChange={(checked) => updateEditingEmployee('esocialHasDisability', checked === true)}
+                      />
+                      <Label>Possui deficiencia</Label>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Tipo deficiencia</Label>
+                      <Input
+                        value={editingEmployee.esocialDisabilityType || ''}
+                        onChange={(e) => updateEditingEmployee('esocialDisabilityType', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <Button onClick={handleUpdateEmployee} disabled={savingEmployee} className="flex-1">
+                    {savingEmployee ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Edit className="h-4 w-4 mr-2" />}
+                    Salvar alteracoes
+                  </Button>
+                  <Button variant="outline" onClick={() => setEditingEmployee(null)}>
                     Cancelar
                   </Button>
                 </div>
@@ -1001,6 +1532,10 @@ const AdminEmployeesPage: React.FC = () => {
                       </Button>
                     </>
                   )}
+                  <Button variant="outline" onClick={() => openEditEmployee(selectedEmployee)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
                   <Button variant="outline" onClick={() => setSelectedEmployee(null)}>
                     Fechar
                   </Button>
@@ -1015,4 +1550,5 @@ const AdminEmployeesPage: React.FC = () => {
 };
 
 export default AdminEmployeesPage;
+
 
