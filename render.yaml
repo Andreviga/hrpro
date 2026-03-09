@@ -1,0 +1,66 @@
+databases:
+  - name: hrpro-postgres
+    databaseName: hrpro
+    user: hrpro
+
+services:
+  - type: keyvalue
+    name: hrpro-redis
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: public
+
+  - type: web
+    name: hrpro-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm ci && npm run prisma:generate && npm run build
+    preDeployCommand: npx prisma migrate deploy && npm run prisma:seed:js
+    startCommand: node dist/main.js
+    healthCheckPath: /docs
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hrpro-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: hrpro-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+
+  - type: worker
+    name: hrpro-worker
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci && npm run prisma:generate && npm run build
+    startCommand: node dist/worker.js
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hrpro-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: hrpro-redis
+          property: connectionString
+
+  - type: web
+    name: hrpro-web
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: HRPRO_API_URL
+        fromService:
+          type: web
+          name: hrpro-api
+          envVarKey: RENDER_EXTERNAL_URL

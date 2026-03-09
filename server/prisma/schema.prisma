@@ -1,0 +1,605 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  rh
+  manager
+  employee
+  intern
+}
+
+enum EmployeeStatus {
+  active
+  inactive
+  pending_approval
+  dismissed
+}
+
+enum SalaryType {
+  hourly
+  monthly
+}
+
+enum PayrollStatus {
+  draft
+  calculated
+  closed
+}
+
+enum PayrollEventType {
+  earning
+  deduction
+}
+
+enum ContractType {
+  clt
+  temporary
+  intern
+}
+
+enum ContractStatus {
+  draft
+  pending
+  active
+  inactive
+}
+
+enum BenefitType {
+  transport
+  meal
+  other
+}
+
+enum RubricAssignmentType {
+  fixed
+  variable
+}
+
+enum ApprovalStatus {
+  draft
+  pending
+  approved
+  rejected
+}
+
+enum ImportStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum ImportItemStatus {
+  ok
+  error
+}
+
+enum TimeBankEntryType {
+  credit
+  debit
+}
+
+enum DocumentType {
+  trct
+  termo_quitacao
+  aviso_previo
+  recibo_ferias
+  aviso_ferias
+  holerite
+  recibo_13
+  recibo_plr
+  outros
+}
+
+enum DocumentStatus {
+  draft
+  review
+  approved
+  signed
+  finalized
+  reopened
+}
+
+enum SignatureType {
+  digital
+  token
+  biometric
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  cnpj      String   @unique
+  createdAt DateTime @default(now())
+
+  users     User[]
+  employees Employee[]
+  employeeContracts EmployeeContract[]
+  employeeSalaryHistory EmployeeSalaryHistory[]
+  costCenters CostCenter[]
+  rubrics   Rubric[]
+  payrollRuns PayrollRun[]
+  taxTableInss TaxTableInss[]
+  taxTableIrrf TaxTableIrrf[]
+  importBatches ImportBatch[]
+  auditLogs AuditLog[]
+  documentTemplates DocumentTemplate[]
+  employeeDocuments EmployeeDocument[]
+  documentVersions DocumentVersion[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  companyId    String
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+  employeeId   String?
+  createdAt    DateTime @default(now())
+
+  company  Company @relation(fields: [companyId], references: [id])
+  employee Employee? @relation(fields: [employeeId], references: [id])
+  auditLogs AuditLog[]
+  documentSignatures DocumentSignature[]
+}
+
+model Employee {
+  id           String         @id @default(cuid())
+  companyId    String
+  fullName     String
+  cpf          String         @unique
+  rg           String?
+  birthDate    DateTime?
+  motherName   String?
+  email        String?
+  phone        String?
+  addressLine  String?
+  city         String?
+  state        String?
+  zipCode      String?
+  employeeCode String?
+  admissionDate DateTime?
+  ctps         String?
+  pis          String?
+  position     String
+  department   String
+  status       EmployeeStatus @default(pending_approval)
+  salaryType   SalaryType
+  baseSalary   Decimal?
+  hourlyRate   Decimal?
+  weeklyHours  Decimal?
+  dependents   Int            @default(0)
+  unionFee     Boolean        @default(false)
+  transportVoucherValue Decimal? 
+  mealVoucherValue Decimal?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+  deletedBy    String?
+  deletedReason String?
+
+  company      Company @relation(fields: [companyId], references: [id])
+  payrollResults PayrollResult[]
+  timeBankEntries TimeBankEntry[]
+  timeBankCloses  TimeBankClose[]
+  dependentsList   EmployeeDependent[]
+  contracts    EmployeeContract[]
+  salaryHistory EmployeeSalaryHistory[]
+  benefits     EmployeeBenefit[]
+  rubricAssignments EmployeeRubric[]
+  attachments  EmployeeAttachment[]
+  users          User[]
+  documents      EmployeeDocument[]
+  documentSignatures DocumentSignature[]
+}
+
+model CostCenter {
+  id        String   @id @default(cuid())
+  companyId String
+  code      String
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id])
+  contracts EmployeeContract[]
+
+  @@unique([companyId, code])
+}
+
+model EmployeeDependent {
+  id         String   @id @default(cuid())
+  employeeId String
+  fullName   String
+  cpf        String?
+  birthDate  DateTime?
+  relationship String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+}
+
+model EmployeeContract {
+  id          String        @id @default(cuid())
+  companyId   String
+  employeeId  String
+  costCenterId String?
+  contractType ContractType
+  position    String
+  department  String
+  salaryType  SalaryType
+  baseSalary  Decimal?
+  hourlyRate  Decimal?
+  weeklyHours Decimal?
+  effectiveFrom DateTime
+  effectiveTo DateTime?
+  status      ContractStatus @default(draft)
+  approvalStatus ApprovalStatus @default(draft)
+  approvedBy  String?
+  approvedAt  DateTime?
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  company   Company @relation(fields: [companyId], references: [id])
+  employee  Employee @relation(fields: [employeeId], references: [id])
+  costCenter CostCenter? @relation(fields: [costCenterId], references: [id])
+}
+
+model EmployeeSalaryHistory {
+  id          String        @id @default(cuid())
+  companyId   String
+  employeeId  String
+  salaryType  SalaryType
+  baseSalary  Decimal?
+  hourlyRate  Decimal?
+  weeklyHours Decimal?
+  effectiveFrom DateTime
+  effectiveTo DateTime?
+  approvalStatus ApprovalStatus @default(draft)
+  approvedBy  String?
+  approvedAt  DateTime?
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+}
+
+model EmployeeBenefit {
+  id          String      @id @default(cuid())
+  employeeId  String
+  type        BenefitType
+  amount      Decimal
+  effectiveFrom DateTime
+  effectiveTo DateTime?
+  approvalStatus ApprovalStatus @default(draft)
+  approvedBy  String?
+  approvedAt  DateTime?
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+}
+
+model Rubric {
+  id          String   @id @default(cuid())
+  companyId   String
+  code        String
+  name        String
+  description String?
+  type        PayrollEventType
+  formula     String?
+  percentage  Decimal?
+  fixedValue  Decimal?
+  baseRubric  String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  assignments EmployeeRubric[]
+
+  @@unique([companyId, code])
+}
+
+model EmployeeRubric {
+  id          String   @id @default(cuid())
+  employeeId  String
+  rubricId    String
+  assignmentType RubricAssignmentType
+  amount      Decimal
+  effectiveFrom DateTime
+  effectiveTo DateTime?
+  active      Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+  rubric   Rubric   @relation(fields: [rubricId], references: [id])
+}
+
+model EmployeeAttachment {
+  id          String   @id @default(cuid())
+  employeeId  String
+  fileName    String
+  mimeType    String
+  storagePath String
+  description String?
+  uploadedBy  String?
+  uploadedAt  DateTime @default(now())
+  deletedAt   DateTime?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+}
+
+model PayrollRun {
+  id        String        @id @default(cuid())
+  companyId String
+  month     Int
+  year      Int
+  status    PayrollStatus @default(draft)
+  version   Int           @default(1)
+  createdAt DateTime      @default(now())
+  closedAt  DateTime?
+
+  company   Company @relation(fields: [companyId], references: [id])
+  results   PayrollResult[]
+  documents EmployeeDocument[]
+
+  @@unique([companyId, month, year, version])
+}
+
+model PayrollResult {
+  id              String   @id @default(cuid())
+  payrollRunId    String
+  employeeId      String
+  grossSalary     Decimal
+  totalDeductions Decimal
+  netSalary       Decimal
+  fgts            Decimal
+  createdAt       DateTime @default(now())
+
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id])
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+  events     PayrollEvent[]
+
+  @@unique([payrollRunId, employeeId])
+}
+
+model PayrollEvent {
+  id              String           @id @default(cuid())
+  payrollResultId String
+  code            String
+  description     String
+  type            PayrollEventType
+  amount          Decimal
+
+  payrollResult PayrollResult @relation(fields: [payrollResultId], references: [id])
+}
+
+model TaxTableInss {
+  id        String   @id @default(cuid())
+  companyId String
+  month     Int
+  year      Int
+  minValue  Decimal
+  maxValue  Decimal
+  rate      Decimal
+  deduction Decimal
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, month, year, minValue])
+}
+
+model TaxTableIrrf {
+  id                String   @id @default(cuid())
+  companyId         String
+  month             Int
+  year              Int
+  minValue          Decimal
+  maxValue          Decimal
+  rate              Decimal
+  deduction         Decimal
+  dependentDeduction Decimal
+  createdAt         DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, month, year, minValue])
+}
+
+model TimeBankEntry {
+  id         String            @id @default(cuid())
+  employeeId String
+  date       DateTime
+  minutes    Int
+  type       TimeBankEntryType
+  note       String?
+  createdAt  DateTime          @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+}
+
+model TimeBankClose {
+  id         String   @id @default(cuid())
+  employeeId String
+  month      Int
+  year       Int
+  balanceMinutes Int
+  approvedBy String?
+  createdAt  DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, month, year])
+}
+
+model ImportBatch {
+  id            String        @id @default(cuid())
+  companyId     String
+  fileName      String
+  status        ImportStatus  @default(pending)
+  processedRows Int           @default(0)
+  failedRows    Int           @default(0)
+  createdAt     DateTime      @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  items   ImportItem[]
+}
+
+model ImportItem {
+  id         String           @id @default(cuid())
+  batchId    String
+  sheet      String
+  rowNumber  Int
+  status     ImportItemStatus
+  message    String
+  createdAt  DateTime @default(now())
+
+  batch ImportBatch @relation(fields: [batchId], references: [id])
+}
+
+model DocumentTemplate {
+  id        String        @id @default(cuid())
+  companyId String
+  type      DocumentType
+  name      String
+  description String?
+  content   String
+  version   Int           @default(1)
+  status    DocumentStatus @default(draft)
+  placeholders Json?
+  requiredPlaceholders Json?
+  createdBy String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  deletedAt DateTime?
+  deletedBy String?
+  deletedReason String?
+
+  company Company @relation(fields: [companyId], references: [id])
+  documents EmployeeDocument[]
+  versions DocumentVersion[]
+
+  @@index([companyId, type])
+}
+
+model EmployeeDocument {
+  id        String        @id @default(cuid())
+  companyId String
+  employeeId String
+  templateId String?
+  payrollRunId String?
+  type      DocumentType
+  title     String
+  status    DocumentStatus @default(draft)
+  content   String
+  placeholders Json?
+  requiredPlaceholders Json?
+  month     Int?
+  year      Int?
+  eventDate DateTime?
+  createdBy String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  finalizedAt DateTime?
+  reopenedAt DateTime?
+  deletedAt DateTime?
+  deletedBy String?
+  deletedReason String?
+
+  company  Company @relation(fields: [companyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+  template DocumentTemplate? @relation(fields: [templateId], references: [id])
+  payrollRun PayrollRun? @relation(fields: [payrollRunId], references: [id])
+  approvals DocumentApproval[]
+  signatures DocumentSignature[]
+  versions DocumentVersion[]
+
+  @@index([companyId, employeeId])
+  @@index([companyId, type, status])
+  @@index([payrollRunId, employeeId, type])
+}
+
+model DocumentVersion {
+  id        String   @id @default(cuid())
+  companyId String
+  templateId String?
+  documentId String?
+  action    String
+  reason    String?
+  before    Json?
+  after     Json?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  company  Company @relation(fields: [companyId], references: [id])
+  template DocumentTemplate? @relation(fields: [templateId], references: [id])
+  document EmployeeDocument? @relation(fields: [documentId], references: [id])
+
+  @@index([templateId])
+  @@index([documentId])
+}
+
+model DocumentApproval {
+  id        String        @id @default(cuid())
+  documentId String
+  status    DocumentStatus
+  reviewerRole UserRole?
+  reviewerId String?
+  reason    String?
+  createdAt DateTime      @default(now())
+  decidedAt DateTime?
+
+  document EmployeeDocument @relation(fields: [documentId], references: [id])
+}
+
+model DocumentSignature {
+  id        String        @id @default(cuid())
+  documentId String
+  employeeId String?
+  userId    String?
+  signatureType SignatureType
+  tokenHash String?
+  ipAddress String?
+  deviceInfo String?
+  isValid   Boolean       @default(true)
+  signedAt  DateTime      @default(now())
+
+  document EmployeeDocument @relation(fields: [documentId], references: [id])
+  employee Employee? @relation(fields: [employeeId], references: [id])
+  user     User?     @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  reason    String?
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+}

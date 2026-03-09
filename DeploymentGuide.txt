@@ -1,0 +1,86 @@
+🚀 Guia de Implantação de Sites
+===========================
+
+📋 Preparação:
+Certifique-se de já ter o diretório dist/ — este contém a versão final do seu site
+
+💡 Implantar em Plataformas na Nuvem (Recomendado):
+
+🌟 Vercel (vercel.com) – Mais Fácil
+1. Acesse vercel.com e cadastre-se
+2. Clique em "New Project"
+3. Selecione "Browse All Templates" → "Static"
+4. Arraste e solte a pasta dist/ na área de upload
+5. Insira um nome para o projeto, clique em "Deploy"
+6. Obtenha um URL HTTPS gratuito em minutos!
+
+☁️ Cloudflare Pages (pages.cloudflare.com) – Mais Rápido
+1. Acesse pages.cloudflare.com e faça login
+2. Clique em "Create a project" → "Upload assets"
+3. Compacte a pasta dist/
+4. Faça o upload do arquivo zip
+5. Defina um nome para o projeto, clique em "Deploy site"
+6. Aproveite a aceleração global do CDN!
+
+🔥 Netlify (netlify.com) – Amigável ao Usuário
+1. Acesse netlify.com e cadastre-se
+2. Arraste e solte a pasta dist/ na área de upload da página inicial
+3. Aguarde a conclusão do upload
+4. Você receberá um domínio aleatório (pode ser personalizado nas configurações)
+
+📘 GitHub Pages (pages.github.com) – Gratuito e Confiável
+1. Crie um novo repositório no GitHub
+2. Faça o upload do conteúdo da pasta dist/ para o repositório
+3. Vá para Configurações do repositório → Pages
+4. Selecione "Deploy from a branch" → branch principal
+5. Acesse seu site em username.github.io/nome-do-repositorio
+
+---
+
+🔧 Implantação Avançada (Para Desenvolvedores):
+
+Implantação Automática Baseada em Git
+1. Envie todo o projeto (incluindo o código-fonte) para o GitHub/GitLab
+2. Conecte seu repositório com Vercel/Netlify
+3. Configure as configurações de build:
+   - Comando de build: npm run build
+   - Diretório de publicação: dist
+   - Versão do Node.js: 16.x ou superior
+4. Cada envio acionará automaticamente o build e a implantação
+
+Implantação em Servidor Tradicional
+Se você tiver seu próprio servidor:
+1. Faça o upload de todos os arquivos dentro do diretório dist/ para o diretório raiz da web do seu servidor
+2. Certifique-se de que o servidor suporta hospedagem de arquivos estáticos
+3. Acesse seu site através do seu domínio
+
+---
+
+💰 Informações de Preço:
+- Vercel: O plano gratuito é suficiente para uso pessoal
+- Cloudflare Pages: Completamente gratuito, sem limites
+- Netlify: O plano gratuito inclui 100GB de largura de banda/mês
+- GitHub Pages: Completamente gratuito, 100GB de largura de banda/mês
+
+---
+
+🎯 Recomendações:
+- Iniciantes: Vercel ou Netlify (upload por arrastar e soltar)
+- Foco em velocidade: Cloudflare Pages
+- Projetos de longo prazo: GitHub Pages
+- Desenvolvedores: Implantação Automática Baseada em Git
+
+---
+
+⚡ Dicas:
+- Todas as plataformas fornecem certificados HTTPS gratuitos
+- Você pode vincular domínios personalizados (alguns exigem planos pagos)
+- Após a implantação, teste seu site em diferentes dispositivos
+
+---
+
+🆘 Solução de Problemas:
+1. Certifique-se de fazer o upload do conteúdo de dist/, não do projeto inteiro
+2. Verifique se o index.html está no diretório raiz
+3. Revise os logs de erro na plataforma de hospedagem
+4. Certifique-se de que todos os arquivos foram carregados corretamente
