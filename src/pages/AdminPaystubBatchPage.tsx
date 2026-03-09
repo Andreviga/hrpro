@@ -58,8 +58,8 @@ const AdminPaystubBatchPage: React.FC = () => {
       setRuns(sorted);
     } catch (error) {
       toast({
-        title: 'Falha ao carregar competencias',
-        description: getFriendlyError(error, 'Nao foi possivel carregar as competencias informadas.')
+        title: 'Falha ao carregar competências',
+        description: getFriendlyError(error, 'Não foi possível carregar as competências informadas.')
       });
       setRuns([]);
     } finally {
@@ -80,17 +80,17 @@ const AdminPaystubBatchPage: React.FC = () => {
       );
 
       const summary = result.skippedCount > 0
-        ? `${result.createdCount} novos e ${result.skippedCount} ja existentes.`
+        ? `${result.createdCount} novos e ${result.skippedCount} já existentes.`
         : `${result.createdCount} holerites emitidos.`;
 
       toast({
-        title: 'Emissao concluida',
-        description: `Competencia ${run.month}/${run.year}: ${summary}`
+        title: 'Emissão concluída',
+        description: `Competência ${run.month}/${run.year}: ${summary}`
       });
     } catch (error) {
       toast({
         title: 'Falha ao emitir holerites',
-        description: getFriendlyError(error, 'Nao foi possivel emitir os holerites da competencia.')
+        description: getFriendlyError(error, 'Não foi possível emitir os holerites da competência.')
       });
     } finally {
       setEmittingId(null);
@@ -107,7 +107,7 @@ const AdminPaystubBatchPage: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Emitir Holerites</h1>
-            <p className="text-gray-600 mt-1">Escolha a competencia e emita em lote com um clique.</p>
+            <p className="text-gray-600 mt-1">Escolha a competência e emita em lote com um clique.</p>
           </div>
           <Button variant="outline" onClick={() => void loadRuns()} disabled={loading}>
             <RefreshCcw className="h-4 w-4 mr-2" />
@@ -119,16 +119,16 @@ const AdminPaystubBatchPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Emissao Rapida
+              Emissão Rápida
             </CardTitle>
             <CardDescription>
-              A emissao usa reprocessamento idempotente para evitar duplicidade de holerites.
+              A emissão usa reprocessamento idempotente para evitar duplicidade de holerites.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <Label>Mes</Label>
+                <Label>Mês</Label>
                 <Input
                   type="number"
                   min={1}
@@ -150,7 +150,7 @@ const AdminPaystubBatchPage: React.FC = () => {
                 />
               </div>
               <Button onClick={() => void loadRuns()} disabled={loading || !month || !year}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar competencia'}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar competência'}
               </Button>
             </div>
 
@@ -160,15 +160,15 @@ const AdminPaystubBatchPage: React.FC = () => {
                 Carregando...
               </div>
             ) : runs.length === 0 ? (
-              <div className="text-sm text-gray-500">Nenhuma competencia encontrada para o periodo informado.</div>
+              <div className="text-sm text-gray-500">Nenhuma competência encontrada para o período informado.</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Competencia</TableHead>
+                    <TableHead>Competência</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Versao</TableHead>
-                    <TableHead>Acoes</TableHead>
+                    <TableHead>Versão</TableHead>
+                    <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -210,4 +210,5 @@ const AdminPaystubBatchPage: React.FC = () => {
 };
 
 export default AdminPaystubBatchPage;
+
 
