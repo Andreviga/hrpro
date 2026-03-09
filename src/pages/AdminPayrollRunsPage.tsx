@@ -52,6 +52,7 @@ const AdminPayrollRunsPage: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'close' | 'reopen' | null>(null);
   const [actionRun, setActionRun] = useState<PayrollRun | null>(null);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
 
   const getFriendlyError = (error: unknown, fallback: string) => {
     if (error instanceof Error) {
@@ -97,7 +98,7 @@ const AdminPayrollRunsPage: React.FC = () => {
       const created = await payrollApi.openRun(Number(openForm.month), Number(openForm.year));
       toast({
         title: 'Competência aberta',
-        description: `Folha ${created.month}/${created.year} pronta para calculo.`
+        description: `Folha ${created.month}/${created.year} pronta para cálculo.`
       });
       await loadRuns();
     } catch (error) {
@@ -112,7 +113,7 @@ const AdminPayrollRunsPage: React.FC = () => {
     if (!summaryForm.month || !summaryForm.year) {
       toast({
         title: 'Dados incompletos',
-        description: 'Informe mes e ano para carregar o resumo.'
+        description: 'Informe mês e ano para carregar o resumo.'
       });
       return;
     }
@@ -167,7 +168,22 @@ const AdminPayrollRunsPage: React.FC = () => {
   };
 
   const handleGenerateHolerites = async (run: PayrollRun) => {
+    setGeneratingId(run.id);
     try {
+      let status = run.status;
+      if (status === 'draft') {
+        toast({
+          title: 'Calculando folha',
+          description: `Competência ${run.month}/${run.year} em processamento antes da emissão.`
+        });
+        const calculatedRun = await payrollApi.calculatePayrollRun(run.id);
+        status = calculatedRun.status;
+      }
+
+      if (status === 'draft') {
+        throw new Error('A folha permanece em rascunho após tentativa de cálculo.');
+      }
+
       const result = await payrollApi.generateDocumentsFromRun(
         run.id,
         {
@@ -185,14 +201,17 @@ const AdminPayrollRunsPage: React.FC = () => {
         title: 'Holerites emitidos',
         description: `Competência ${run.month}/${run.year}: ${summary}`
       });
+
+      await loadRuns();
     } catch (error) {
       toast({
         title: 'Falha ao emitir holerites',
         description: getFriendlyError(error, 'Não foi possível emitir os holerites da competência.')
       });
+    } finally {
+      setGeneratingId(null);
     }
   };
-
   const formatDate = (value?: string | null) => {
     if (!value) return '--';
     return new Date(value).toLocaleDateString('pt-BR');
@@ -232,7 +251,7 @@ const AdminPayrollRunsPage: React.FC = () => {
                 <CalendarCheck className="h-5 w-5" />
                 <span>Abrir competência</span>
               </CardTitle>
-              <CardDescription>Crie ou reutilize a folha do mes.</CardDescription>
+              <CardDescription>Crie ou reutilize a folha do mês.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -322,7 +341,7 @@ const AdminPayrollRunsPage: React.FC = () => {
                     <p className="text-xs text-blue-500 mt-2">FGTS: {formatCurrency(summary.totals.fgts)}</p>
                   </div>
                   <div className="rounded-lg bg-emerald-50 p-4">
-                    <p className="text-xs text-emerald-600">Total liquido</p>
+                    <p className="text-xs text-emerald-600">Total líquido</p>
                     <p className="text-lg font-semibold text-emerald-700">
                       {formatCurrency(summary.totals.netSalary)}
                     </p>
@@ -445,10 +464,10 @@ const AdminPayrollRunsPage: React.FC = () => {
                               size="sm"
                               variant="outline"
                               onClick={() => void handleGenerateHolerites(run)}
-                              disabled={run.status === 'draft'}
+                              disabled={generatingId === run.id}
                             >
                               <FileText className="h-4 w-4 mr-1" />
-                              Emitir holerites
+                              {generatingId === run.id ? 'Processando...' : run.status === 'draft' ? 'Calcular + emitir' : 'Emitir holerites'}
                             </Button>
                           </div>
                         </TableCell>

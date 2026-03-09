@@ -27,7 +27,8 @@ export interface PayrollRunSummary {
 
 export const payrollApi = {
   async createPayrollRun(month: number, year: number): Promise<PayrollRun> {
-    return request<PayrollRun>('/payroll-runs', {
+    // Idempotent open endpoint avoids duplicate run errors for the same competency.
+    return request<PayrollRun>('/payroll/runs/open', {
       method: 'POST',
       body: JSON.stringify({ month, year })
     });
@@ -97,4 +98,5 @@ export const payrollApi = {
     return request<PayrollRunSummary>(`/payroll/runs/summary?${params.toString()}`);
   }
 };
+
 

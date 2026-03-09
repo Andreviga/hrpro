@@ -23,9 +23,8 @@ export class PayrollService {
   }
 
   async createRun(companyId: string, month: number, year: number) {
-    return this.prisma.payrollRun.create({
-      data: { companyId, month, year }
-    });
+    // Keep create endpoint backward compatible but idempotent.
+    return this.openRun(companyId, month, year);
   }
 
   async listRuns(companyId: string, filters: { month?: number; year?: number; status?: 'draft' | 'calculated' | 'closed' }) {

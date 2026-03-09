@@ -70,6 +70,20 @@ const AdminPaystubBatchPage: React.FC = () => {
   const handleEmitPaystubs = async (run: PayrollRun) => {
     setEmittingId(run.id);
     try {
+      let status = run.status;
+      if (status === 'draft') {
+        toast({
+          title: 'Calculando folha',
+          description: `Competência ${run.month}/${run.year} em processamento antes da emissão.`
+        });
+        const calculatedRun = await payrollApi.calculatePayrollRun(run.id);
+        status = calculatedRun.status;
+      }
+
+      if (status === 'draft') {
+        throw new Error('A folha permanece em rascunho após tentativa de cálculo.');
+      }
+
       const result = await payrollApi.generateDocumentsFromRun(
         run.id,
         {
@@ -87,6 +101,8 @@ const AdminPaystubBatchPage: React.FC = () => {
         title: 'Emissão concluída',
         description: `Competência ${run.month}/${run.year}: ${summary}`
       });
+
+      await loadRuns();
     } catch (error) {
       toast({
         title: 'Falha ao emitir holerites',
@@ -96,7 +112,6 @@ const AdminPaystubBatchPage: React.FC = () => {
       setEmittingId(null);
     }
   };
-
   useEffect(() => {
     void loadRuns();
   }, []);
@@ -185,7 +200,7 @@ const AdminPaystubBatchPage: React.FC = () => {
                         <Button
                           size="sm"
                           onClick={() => void handleEmitPaystubs(run)}
-                          disabled={run.status === 'draft' || emittingId === run.id}
+                          disabled={emittingId === run.id}
                         >
                           {emittingId === run.id ? (
                             <>
@@ -193,7 +208,7 @@ const AdminPaystubBatchPage: React.FC = () => {
                               Emitindo...
                             </>
                           ) : (
-                            'Emitir holerites'
+                            run.status === 'draft' ? 'Calcular + emitir' : 'Emitir holerites'
                           )}
                         </Button>
                       </TableCell>
