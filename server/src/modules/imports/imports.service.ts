@@ -86,6 +86,7 @@ const rubricAliases: Record<string, { code: string; type: 'earning' | 'deduction
 };
 
 const rubricAliasEntries = Object.entries(rubricAliases).sort((a, b) => b[0].length - a[0].length);
+const strictRubricAliases = new Set(['salario', 'valor']);
 
 const findHeader = (headers: string[], field: keyof typeof headerAliases) => {
   const aliases = headerAliases[field].map((alias) => normalizeText(alias));
@@ -298,6 +299,10 @@ const matchesRubricAlias = (normalizedHeader: string, alias: string) => {
   const normalizedAlias = normalizeText(alias);
   if (!normalizedAlias) return false;
 
+  if (strictRubricAliases.has(normalizedAlias)) {
+    return normalizedHeader === normalizedAlias;
+  }
+
   if (normalizedHeader === normalizedAlias) return true;
 
   if (!normalizedHeader.includes(normalizedAlias)) return false;
@@ -311,7 +316,7 @@ const matchesRubricAlias = (normalizedHeader: string, alias: string) => {
   return true;
 };
 
-const findRubricMapping = (header: string) => {
+export const findRubricMapping = (header: string) => {
   const normalizedHeader = normalizeText(header);
   return rubricAliasEntries.find(([alias]) => matchesRubricAlias(normalizedHeader, alias));
 };
@@ -1229,5 +1234,6 @@ export class ImportsService {
     };
   }
 }
+
 
 
