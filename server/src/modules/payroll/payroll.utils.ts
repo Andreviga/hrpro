@@ -52,7 +52,7 @@ const applyIrrfReduction2026 = (params: {
   return irrfBeforeReduction;
 };
 
-const hasFgtsContributionByCategory = (employee: Employee) => {
+export const hasFgtsContributionByCategory = (employee: Employee) => {
   const code = String(employee.esocialCategoryCode ?? '').trim();
 
   // eSocial categories in 7xx (contribuinte individual/TSVE) generally do not calculate FGTS,

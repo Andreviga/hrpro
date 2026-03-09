@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PayrollService } from './payroll.service';
 import PDFDocument from 'pdfkit';
@@ -159,6 +159,24 @@ export class PayrollController {
     return this.payroll.getPaystubDetail(id);
   }
 
+  @Patch('paystubs/:id/events/:eventId')
+  @Roles('admin', 'rh', 'manager')
+  async updatePaystubEvent(
+    @Param('id') id: string,
+    @Param('eventId') eventId: string,
+    @Body() body: { amount?: number; description?: string; reason?: string },
+    @Req() req: { user: { companyId: string; sub: string } }
+  ) {
+    return this.payroll.updatePaystubEvent({
+      paystubId: id,
+      eventId,
+      companyId: req.user.companyId,
+      userId: req.user.sub,
+      amount: body.amount,
+      description: body.description,
+      reason: body.reason
+    });
+  }
   @Get('paystubs/:id/pdf')
   async paystubPdf(@Param('id') id: string, @Res() res: Response) {
     const detail = await this.payroll.getPaystubDetail(id);

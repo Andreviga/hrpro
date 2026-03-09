@@ -1,8 +1,8 @@
 /**
- * Serviços de API para comunicação com o backend
- * Contém funções para autenticação, holerites e upload de arquivos
+ * API services for backend communication.
  */
 import { request, getAuthToken, API_BASE } from './http';
+
 export interface PaystubSummary {
   id: string;
   employeeId?: string;
@@ -53,6 +53,7 @@ export interface PaystubDetail {
     fgtsDeposit: number;
   };
   events?: Array<{
+    id: string;
     code: string;
     description: string;
     type: 'earning' | 'deduction';
@@ -66,24 +67,43 @@ export interface PaystubDetail {
   };
 }
 
+export interface UpdatePaystubEventPayload {
+  amount?: number;
+  description?: string;
+  reason?: string;
+}
+
 export const apiService = {
-  /**
-   * Busca lista simplificada de holerites do usuário
-   */
   async getPaystubs(): Promise<PaystubSummary[]> {
     return request<PaystubSummary[]>('/paystubs');
   },
 
-  /**
-   * Busca detalhes completos de um holerite específico
-   */
   async getPaystubDetail(id: string): Promise<PaystubDetail | null> {
     return request<PaystubDetail>(`/paystubs/${id}`);
   },
 
-  /**
-   * Upload de planilha de folha de pagamento (admin)
-   */
+  async updatePaystubEvent(paystubId: string, eventId: string, payload: UpdatePaystubEventPayload) {
+    return request<{
+      paystubId: string;
+      event: {
+        id: string;
+        code: string;
+        type: 'earning' | 'deduction';
+        description: string;
+        amount: number;
+      };
+      summary: {
+        grossSalary: number;
+        totalDeductions: number;
+        netSalary: number;
+        fgtsDeposit: number;
+      };
+    }>(`/paystubs/${paystubId}/events/${eventId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  },
+
   async uploadPayroll(file: File): Promise<{
     success: boolean;
     message: string;
@@ -131,4 +151,3 @@ export const apiService = {
     return response.json();
   }
 };
-

@@ -9,7 +9,8 @@ const payrollServiceMock = {
   closeRun: jest.fn(),
   listPaystubsByEmployee: jest.fn(),
   listPaystubsByCompany: jest.fn(),
-  removeEmployeeFromRun: jest.fn()
+  removeEmployeeFromRun: jest.fn(),
+  updatePaystubEvent: jest.fn()
 };
 
 describe('PayrollController', () => {
@@ -185,6 +186,33 @@ describe('PayrollController', () => {
       companyId: 'c1',
       userId: 'u1',
       reason: 'ajuste'
+    });
+  });
+  it('updates a paystub event via controller', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PayrollController],
+      providers: [{ provide: PayrollService, useValue: payrollServiceMock }]
+    }).compile();
+
+    const controller = moduleRef.get(PayrollController);
+    payrollServiceMock.updatePaystubEvent.mockResolvedValueOnce({ paystubId: 'p1' });
+
+    const result = await controller.updatePaystubEvent(
+      'p1',
+      'ev1',
+      { amount: 200, description: 'Ajuste' },
+      { user: { companyId: 'c1', sub: 'u1' } } as any
+    );
+
+    expect(result).toEqual({ paystubId: 'p1' });
+    expect(payrollServiceMock.updatePaystubEvent).toHaveBeenCalledWith({
+      paystubId: 'p1',
+      eventId: 'ev1',
+      companyId: 'c1',
+      userId: 'u1',
+      amount: 200,
+      description: 'Ajuste',
+      reason: undefined
     });
   });
   it('closes a payroll run', async () => {

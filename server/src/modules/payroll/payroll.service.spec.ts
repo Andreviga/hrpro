@@ -23,10 +23,12 @@ describe('PayrollService document generation', () => {
       aggregate: jest.fn(),
       count: jest.fn(),
       findUnique: jest.fn(),
-      delete: jest.fn()
+      delete: jest.fn(),
+      update: jest.fn()
     },
     payrollEvent: {
-      deleteMany: jest.fn()
+      deleteMany: jest.fn(),
+      update: jest.fn()
     },
     employeeDocument: {
       findMany: jest.fn(),
@@ -399,6 +401,79 @@ describe('PayrollService document generation', () => {
       removed: true,
       removedPayrollResult: false,
       deletedDocumentsCount: 1
+    });
+  });
+  it('updates paystub event and recalculates totals', async () => {
+    prisma.payrollResult.findUnique.mockResolvedValue({
+      id: 'pay-1',
+      grossSalary: 1000,
+      totalDeductions: 200,
+      netSalary: 800,
+      fgts: 80,
+      payrollRun: { id: 'run-1', companyId: 'c1', status: 'draft', month: 2, year: 2026 },
+      employee: { esocialCategoryCode: null },
+      events: [
+        { id: 'ev-earn', code: 'BASE', description: 'Base', type: 'earning', amount: 1000 },
+        { id: 'ev-ded', code: 'INSS', description: 'INSS', type: 'deduction', amount: 200 }
+      ]
+    });
+
+    prisma.payrollEvent.update.mockResolvedValue({ id: 'ev-ded' });
+    prisma.payrollResult.update.mockResolvedValue({ id: 'pay-1' });
+
+    const service = new PayrollService(prisma, audit, documents);
+
+    const result = await service.updatePaystubEvent({
+      paystubId: 'pay-1',
+      eventId: 'ev-ded',
+      companyId: 'c1',
+      userId: 'u1',
+      amount: 150,
+      description: 'INSS ajustado'
+    });
+
+    expect(result.summary).toMatchObject({
+      grossSalary: 1000,
+      totalDeductions: 150,
+      netSalary: 850,
+      fgtsDeposit: 80
+    });
+
+    expect(prisma.payrollResult.update).toHaveBeenCalledWith({
+      where: { id: 'pay-1' },
+      data: {
+        grossSalary: 1000,
+        totalDeductions: 150,
+        netSalary: 850,
+        fgts: 80
+      }
+    });
+
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'update_paystub_event' })
+    );
+  });
+
+  it('blocks paystub event update when payroll run is closed', async () => {
+    prisma.payrollResult.findUnique.mockResolvedValue({
+      id: 'pay-2',
+      payrollRun: { id: 'run-2', companyId: 'c1', status: 'closed', month: 2, year: 2026 },
+      employee: { esocialCategoryCode: null },
+      events: [{ id: 'ev-1', code: 'BASE', description: 'Base', type: 'earning', amount: 1000 }]
+    });
+
+    const service = new PayrollService(prisma, audit, documents);
+
+    await expect(
+      service.updatePaystubEvent({
+        paystubId: 'pay-2',
+        eventId: 'ev-1',
+        companyId: 'c1',
+        userId: 'u1',
+        amount: 900
+      })
+    ).rejects.toMatchObject({
+      response: { code: 'PAYROLL_COMPETENCE_CLOSED' }
     });
   });
   it('auto-generates documents on close', async () => {

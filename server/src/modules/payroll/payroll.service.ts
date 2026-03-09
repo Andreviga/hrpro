@@ -1,9 +1,9 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
-import { calculatePayrollForEmployee } from './payroll.utils';
+import { calculatePayrollForEmployee, hasFgtsContributionByCategory } from './payroll.utils';
 import { DocumentsService } from '../documents/documents.service';
 
 @Injectable()
@@ -619,6 +619,140 @@ export class PayrollService {
     };
   }
 
+  async updatePaystubEvent(params: {
+    paystubId: string;
+    eventId: string;
+    companyId: string;
+    userId?: string;
+    amount?: number;
+    description?: string;
+    reason?: string;
+  }) {
+    const paystub = await this.prisma.payrollResult.findUnique({
+      where: { id: params.paystubId },
+      include: {
+        payrollRun: true,
+        employee: true,
+        events: true
+      }
+    });
+
+    if (!paystub || paystub.payrollRun.companyId !== params.companyId) {
+      throw new NotFoundException('Paystub not found');
+    }
+
+    if (paystub.payrollRun.status === 'closed') {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'Competencia fechada. Reabra a folha antes de editar holerite.',
+        code: 'PAYROLL_COMPETENCE_CLOSED',
+        details: { payrollRunId: paystub.payrollRun.id, month: paystub.payrollRun.month, year: paystub.payrollRun.year }
+      });
+    }
+
+    const currentEvent = paystub.events.find((item) => item.id === params.eventId);
+    if (!currentEvent) {
+      throw new NotFoundException('Payroll event not found');
+    }
+
+    const parsedAmount = params.amount === undefined ? Number(currentEvent.amount) : Number(params.amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      throw new BadRequestException('Invalid amount');
+    }
+
+    const nextAmount = Math.round(parsedAmount * 100) / 100;
+    const nextDescription = params.description === undefined ? currentEvent.description : String(params.description).trim();
+    if (!nextDescription) {
+      throw new BadRequestException('Description is required');
+    }
+
+    await this.prisma.payrollEvent.update({
+      where: { id: params.eventId },
+      data: {
+        amount: nextAmount,
+        description: nextDescription
+      }
+    });
+
+    const mergedEvents = paystub.events.map((item) =>
+      item.id === params.eventId
+        ? { ...item, amount: nextAmount, description: nextDescription }
+        : item
+    );
+
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const grossSalary = round(
+      mergedEvents
+        .filter((item) => item.type === 'earning')
+        .reduce((acc, item) => acc + Number(item.amount), 0)
+    );
+
+    const totalDeductions = round(
+      mergedEvents
+        .filter((item) => item.type === 'deduction')
+        .reduce((acc, item) => acc + Number(item.amount), 0)
+    );
+
+    const netSalary = round(grossSalary - totalDeductions);
+    const fgts = hasFgtsContributionByCategory(paystub.employee) ? round(grossSalary * 0.08) : 0;
+
+    await this.prisma.payrollResult.update({
+      where: { id: params.paystubId },
+      data: {
+        grossSalary,
+        totalDeductions,
+        netSalary,
+        fgts
+      }
+    });
+
+    await this.audit.log({
+      companyId: params.companyId,
+      userId: params.userId,
+      action: 'update_paystub_event',
+      entity: 'paystub',
+      entityId: params.paystubId,
+      reason: params.reason,
+      before: {
+        eventId: currentEvent.id,
+        code: currentEvent.code,
+        description: currentEvent.description,
+        amount: Number(currentEvent.amount),
+        grossSalary: Number(paystub.grossSalary),
+        totalDeductions: Number(paystub.totalDeductions),
+        netSalary: Number(paystub.netSalary),
+        fgts: Number(paystub.fgts)
+      },
+      after: {
+        eventId: currentEvent.id,
+        code: currentEvent.code,
+        description: nextDescription,
+        amount: nextAmount,
+        grossSalary,
+        totalDeductions,
+        netSalary,
+        fgts
+      }
+    });
+
+    return {
+      paystubId: params.paystubId,
+      event: {
+        id: currentEvent.id,
+        code: currentEvent.code,
+        type: currentEvent.type,
+        description: nextDescription,
+        amount: nextAmount
+      },
+      summary: {
+        grossSalary,
+        totalDeductions,
+        netSalary,
+        fgtsDeposit: fgts
+      }
+    };
+  }
   private normalizeEventLabel(value: string) {
     return String(value || '')
       .normalize('NFD')
