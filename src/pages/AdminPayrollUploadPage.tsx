@@ -1,5 +1,5 @@
 /**
- * Página administrativa para upload e processamento de planilhas de folha de pagamento
+ * PÃ¡gina administrativa para upload e processamento de planilhas de folha de pagamento
  * Permite que administradores importem dados de Excel para o sistema
  */
 import React, { useState } from 'react';
@@ -76,7 +76,7 @@ const AdminPayrollUploadPage: React.FC = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validar se é um arquivo Excel
+      // Validar se Ã© um arquivo Excel
       const validTypes = [
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.ms-excel',
@@ -87,7 +87,7 @@ const AdminPayrollUploadPage: React.FC = () => {
         setSelectedFile(file);
         setUploadResult(null);
       } else {
-        alert('Por favor, selecione um arquivo Excel válido (.xlsx, .xls ou .xlsm)');
+        alert('Por favor, selecione um arquivo Excel vÃ¡lido (.xlsx, .xls ou .xlsm)');
         event.target.value = '';
       }
     }
@@ -130,7 +130,7 @@ const AdminPayrollUploadPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Upload de Folha de Pagamento</h1>
             <p className="text-gray-600 mt-1">
-              Faça o upload de planilhas Excel para processar a folha de pagamento dos funcionários
+              FaÃ§a o upload de planilhas Excel para processar a folha de pagamento dos funcionÃ¡rios
             </p>
           </div>
 
@@ -139,16 +139,16 @@ const AdminPayrollUploadPage: React.FC = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2 text-blue-800">
                 <Info className="h-5 w-5" />
-                <span>Instruções de Upload</span>
+                <span>InstruÃ§Ãµes de Upload</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="text-blue-700">
               <ul className="space-y-2 text-sm">
-                <li>• O arquivo deve estar no formato Excel (.xlsx ou .xls)</li>
-                <li>• A primeira linha deve conter os cabeçalhos das colunas</li>
-                <li>• Certifique-se de que os CPFs dos funcionários estão corretos</li>
-                <li>• Os valores devem estar em formato numérico (sem símbolos de moeda)</li>
-                <li>• Funcionários não cadastrados no sistema serão ignorados</li>
+                <li>â¢ O arquivo deve estar no formato Excel (.xlsx ou .xls)</li>
+                <li>â¢ A primeira linha deve conter os cabeÃ§alhos das colunas</li>
+                <li>â¢ Certifique-se de que os CPFs dos funcionÃ¡rios estÃ£o corretos</li>
+                <li>â¢ Os valores devem estar em formato numÃ©rico (sem sÃ­mbolos de moeda)</li>
+                <li>â¢ FuncionÃ¡rios nÃ£o cadastrados no sistema serÃ£o ignorados</li>
               </ul>
             </CardContent>
           </Card>
@@ -274,12 +274,12 @@ const AdminPayrollUploadPage: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <AlertTriangle className="h-5 w-5 text-orange-600" />
-                      <span className="font-medium text-orange-800">Avisos de Importa��o</span>
+                      <span className="font-medium text-orange-800">Avisos de Importação</span>
                     </div>
                     <div className="bg-orange-50 p-4 rounded-lg max-h-40 overflow-y-auto">
                       <ul className="space-y-1 text-sm text-orange-800">
                         {uploadResult.warnings?.map((warning, index) => (
-                          <li key={index}>• {warning}</li>
+                          <li key={index}>â¢ {warning}</li>
                         ))}
                       </ul>
                     </div>
@@ -288,12 +288,12 @@ const AdminPayrollUploadPage: React.FC = () => {
 
                 {(uploadResult.guideSummaries?.length ?? 0) > 0 && (
                   <div className="space-y-3">
-                    <div className="font-medium text-slate-800">Resumo das Guias por Compet�ncia</div>
+                    <div className="font-medium text-slate-800">Resumo das Guias por Competência</div>
                     <div className="grid grid-cols-1 gap-3">
                       {uploadResult.guideSummaries?.map((summary) => (
                         <div key={summary.payrollRunId} className="border rounded-lg p-4 bg-slate-50 space-y-2">
                           <div className="font-medium text-slate-900">
-                            Compet�ncia {String(summary.month).padStart(2, '0')}/{summary.year} � {summary.employeesCount} funcion�rio(s)
+                            Competência {String(summary.month).padStart(2, '0')}/{summary.year}  {summary.employeesCount} funcionário(s)
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-slate-700">
                             <div>INSS: {formatCurrency(summary.guides.inss)}</div>
@@ -301,9 +301,9 @@ const AdminPayrollUploadPage: React.FC = () => {
                             <div>FGTS: {formatCurrency(summary.guides.fgts)}</div>
                             <div>VT: {formatCurrency(summary.guides.transportVoucher)}</div>
                             <div>VA: {formatCurrency(summary.guides.mealVoucher)}</div>
-                            <div>Empr�stimo: {formatCurrency(summary.guides.loanConsigned)}</div>
-                            <div>Sal�rio-fam�lia: {formatCurrency(summary.guides.salaryFamily)}</div>
-                            <div>L�quido total: {formatCurrency(summary.totals.netSalary)}</div>
+                            <div>Empréstimo: {formatCurrency(summary.guides.loanConsigned)}</div>
+                            <div>Salário-família: {formatCurrency(summary.guides.salaryFamily)}</div>
+                            <div>Líquido total: {formatCurrency(summary.totals.netSalary)}</div>
                           </div>
                         </div>
                       ))}
@@ -320,7 +320,7 @@ const AdminPayrollUploadPage: React.FC = () => {
                     <div className="bg-yellow-50 p-4 rounded-lg max-h-40 overflow-y-auto">
                       <ul className="space-y-1 text-sm text-yellow-800">
                         {uploadResult.errors.map((error, index) => (
-                          <li key={index}>• {error}</li>
+                          <li key={index}>â¢ {error}</li>
                         ))}
                       </ul>
                     </div>
@@ -353,9 +353,9 @@ const AdminPayrollUploadPage: React.FC = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-3 py-2 text-left">CPF</th>
-                      <th className="px-3 py-2 text-left">Mês</th>
+                      <th className="px-3 py-2 text-left">MÃªs</th>
                       <th className="px-3 py-2 text-left">Ano</th>
-                      <th className="px-3 py-2 text-left">Salário Base</th>
+                      <th className="px-3 py-2 text-left">SalÃ¡rio Base</th>
                       <th className="px-3 py-2 text-left">Horas Extras</th>
                       <th className="px-3 py-2 text-left">INSS</th>
                       <th className="px-3 py-2 text-left">IRRF</th>

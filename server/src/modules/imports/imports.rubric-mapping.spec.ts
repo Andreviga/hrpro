@@ -3,7 +3,7 @@ import { findRubricMapping } from './imports.service';
 describe('findRubricMapping', () => {
   it('does not map salary liquid header to BASE', () => {
     expect(findRubricMapping('Salario liquido')).toBeUndefined();
-    expect(findRubricMapping('Salário líquido')).toBeUndefined();
+    expect(findRubricMapping('SalÃ¡rio lÃ­quido')).toBeUndefined();
   });
 
   it('maps salary gross header to BASE', () => {

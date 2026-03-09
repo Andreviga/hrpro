@@ -235,7 +235,7 @@ const DocumentsCenterPage: React.FC = () => {
 
   const openDocumentDialog = (document?: Document) => {
     if (document && document.payrollRun?.status === 'closed') {
-      setError('Competência fechada. Documento não pode ser editado.');
+      setError('CompetÃªncia fechada. Documento nÃ£o pode ser editado.');
       return;
     }
 
@@ -331,7 +331,7 @@ const DocumentsCenterPage: React.FC = () => {
 
       if (!documentForm.id) {
         if (!documentForm.templateId || !documentForm.employeeId.trim()) {
-          setError('Template e funcionário são obrigatórios.');
+          setError('Template e funcionÃ¡rio sÃ£o obrigatÃ³rios.');
           return;
         }
         await documentsApi.createDocument({
@@ -361,7 +361,7 @@ const DocumentsCenterPage: React.FC = () => {
 
   const handleChangeStatus = async (document: Document, status: DocumentStatus) => {
     if (document.payrollRun?.status === 'closed') {
-      setError('Competência fechada. Documento não pode ter status alterado.');
+      setError('CompetÃªncia fechada. Documento nÃ£o pode ter status alterado.');
       return;
     }
 
@@ -493,7 +493,7 @@ const DocumentsCenterPage: React.FC = () => {
                     <FileText className="h-5 w-5" />
                     <span>Filtros</span>
                   </CardTitle>
-                  <CardDescription>Refine por período, status ou colaborador.</CardDescription>
+                  <CardDescription>Refine por perÃ­odo, status ou colaborador.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <div>
@@ -501,11 +501,11 @@ const DocumentsCenterPage: React.FC = () => {
                     <Input
                       value={docFilters.employeeId}
                       onChange={(event) => setDocFilters({ ...docFilters, employeeId: event.target.value })}
-                      placeholder="ID do funcionário"
+                      placeholder="ID do funcionÃ¡rio"
                     />
                   </div>
                   <div>
-                    <Label>Mês</Label>
+                    <Label>MÃªs</Label>
                     <Input
                       type="number"
                       value={docFilters.month}
@@ -581,7 +581,7 @@ const DocumentsCenterPage: React.FC = () => {
                           <TableHead>Tipo</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Referencia</TableHead>
-                          <TableHead>Ações</TableHead>
+                          <TableHead>AÃ§Ãµes</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -757,8 +757,8 @@ const DocumentsCenterPage: React.FC = () => {
                           <TableHead>Template</TableHead>
                           <TableHead>Tipo</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Versão</TableHead>
-                          <TableHead>Ações</TableHead>
+                          <TableHead>VersÃ£o</TableHead>
+                          <TableHead>AÃ§Ãµes</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1014,7 +1014,7 @@ const DocumentsCenterPage: React.FC = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label>ID do funcionário</Label>
+                  <Label>ID do funcionÃ¡rio</Label>
                   <Input
                     value={documentForm.employeeId}
                     onChange={(event) => setDocumentForm({ ...documentForm, employeeId: event.target.value })}
@@ -1031,7 +1031,7 @@ const DocumentsCenterPage: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Mês</Label>
+                    <Label>MÃªs</Label>
                     <Input
                       type="number"
                       value={documentForm.month}

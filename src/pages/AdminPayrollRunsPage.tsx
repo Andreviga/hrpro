@@ -1,5 +1,5 @@
 /**
- * Página administrativa para abertura, fechamento e reabertura de folhas por competência.
+ * PÃ¡gina administrativa para abertura, fechamento e reabertura de folhas por competÃªncia.
  */
 import React, { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
@@ -77,7 +77,7 @@ const AdminPayrollRunsPage: React.FC = () => {
     } catch (error) {
       toast({
         title: 'Falha ao carregar',
-        description: getFriendlyError(error, 'Não foi possível carregar as folhas.')
+        description: getFriendlyError(error, 'NÃ£o foi possÃ­vel carregar as folhas.')
       });
     } finally {
       setLoading(false);
@@ -88,7 +88,7 @@ const AdminPayrollRunsPage: React.FC = () => {
     if (!openForm.month || !openForm.year) {
       toast({
         title: 'Dados incompletos',
-        description: 'Informe mês e ano para abrir a competência.'
+        description: 'Informe mÃªs e ano para abrir a competÃªncia.'
       });
       return;
     }
@@ -96,14 +96,14 @@ const AdminPayrollRunsPage: React.FC = () => {
     try {
       const created = await payrollApi.openRun(Number(openForm.month), Number(openForm.year));
       toast({
-        title: 'Competência aberta',
+        title: 'CompetÃªncia aberta',
         description: `Folha ${created.month}/${created.year} pronta para calculo.`
       });
       await loadRuns();
     } catch (error) {
       toast({
         title: 'Falha ao abrir',
-        description: getFriendlyError(error, 'Não foi possível abrir a competência.')
+        description: getFriendlyError(error, 'NÃ£o foi possÃ­vel abrir a competÃªncia.')
       });
     }
   };
@@ -125,7 +125,7 @@ const AdminPayrollRunsPage: React.FC = () => {
       setSummary(null);
       toast({
         title: 'Falha ao carregar resumo',
-        description: getFriendlyError(error, 'Não foi possível obter o resumo.')
+        description: getFriendlyError(error, 'NÃ£o foi possÃ­vel obter o resumo.')
       });
     } finally {
       setSummaryLoading(false);
@@ -146,20 +146,20 @@ const AdminPayrollRunsPage: React.FC = () => {
         await payrollApi.closeRun(actionRun.id);
         toast({
           title: 'Folha fechada',
-          description: `Competência ${actionRun.month}/${actionRun.year} fechada com sucesso.`
+          description: `CompetÃªncia ${actionRun.month}/${actionRun.year} fechada com sucesso.`
         });
       } else {
         await payrollApi.reopenRun(actionRun.id);
         toast({
           title: 'Folha reaberta',
-          description: `Competência ${actionRun.month}/${actionRun.year} reaberta.`
+          description: `CompetÃªncia ${actionRun.month}/${actionRun.year} reaberta.`
         });
       }
       await loadRuns();
     } catch (error) {
       toast({
-        title: 'Falha na operação',
-        description: getFriendlyError(error, 'Não foi possível concluir a operação.')
+        title: 'Falha na operaÃ§Ã£o',
+        description: getFriendlyError(error, 'NÃ£o foi possÃ­vel concluir a operaÃ§Ã£o.')
       });
     } finally {
       setDialogOpen(false);
@@ -178,17 +178,17 @@ const AdminPayrollRunsPage: React.FC = () => {
       );
 
       const summary = result.skippedCount > 0
-        ? `${result.createdCount} gerados e ${result.skippedCount} já existentes.`
+        ? `${result.createdCount} gerados e ${result.skippedCount} jÃ¡ existentes.`
         : `${result.createdCount} gerados com sucesso.`;
 
       toast({
         title: 'Holerites emitidos',
-        description: `Competência ${run.month}/${run.year}: ${summary}`
+        description: `CompetÃªncia ${run.month}/${run.year}: ${summary}`
       });
     } catch (error) {
       toast({
         title: 'Falha ao emitir holerites',
-        description: getFriendlyError(error, 'Não foi possível emitir os holerites da competência.')
+        description: getFriendlyError(error, 'NÃ£o foi possÃ­vel emitir os holerites da competÃªncia.')
       });
     }
   };
@@ -214,7 +214,7 @@ const AdminPayrollRunsPage: React.FC = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Fechamento por Competência</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Fechamento por CompetÃªncia</h1>
             <p className="text-gray-600 mt-1">
               Controle de abertura, fechamento e reabertura da folha.
             </p>
@@ -230,14 +230,14 @@ const AdminPayrollRunsPage: React.FC = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <CalendarCheck className="h-5 w-5" />
-                <span>Abrir competência</span>
+                <span>Abrir competÃªncia</span>
               </CardTitle>
               <CardDescription>Crie ou reutilize a folha do mes.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Mês</Label>
+                  <Label>MÃªs</Label>
                   <Input
                     type="number"
                     min={1}
@@ -260,7 +260,7 @@ const AdminPayrollRunsPage: React.FC = () => {
                 </div>
               </div>
               <Button className="w-full" onClick={() => void handleOpenRun()}>
-                Abrir competência
+                Abrir competÃªncia
               </Button>
             </CardContent>
           </Card>
@@ -269,14 +269,14 @@ const AdminPayrollRunsPage: React.FC = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <BarChart3 className="h-5 w-5" />
-                <span>Resumo por competência</span>
+                <span>Resumo por competÃªncia</span>
               </CardTitle>
               <CardDescription>Totais calculados da folha.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap items-end gap-3">
                 <div>
-                  <Label>Mês</Label>
+                  <Label>MÃªs</Label>
                   <Input
                     type="number"
                     min={1}
@@ -340,13 +340,13 @@ const AdminPayrollRunsPage: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Competências registradas</CardTitle>
+            <CardTitle>CompetÃªncias registradas</CardTitle>
             <CardDescription>Filtre por mes, ano ou status.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <Label>Mês</Label>
+                <Label>MÃªs</Label>
                 <Input
                   type="number"
                   min={1}
@@ -393,18 +393,18 @@ const AdminPayrollRunsPage: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Competência</TableHead>
+                    <TableHead>CompetÃªncia</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Criada em</TableHead>
                     <TableHead>Fechada em</TableHead>
-                    <TableHead>Ações</TableHead>
+                    <TableHead>AÃ§Ãµes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {runs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-sm text-gray-500">
-                        Nenhuma competência encontrada.
+                        Nenhuma competÃªncia encontrada.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -470,7 +470,7 @@ const AdminPayrollRunsPage: React.FC = () => {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {actionRun
-                ? `Competência ${actionRun.month}/${actionRun.year}. Deseja continuar?`
+                ? `CompetÃªncia ${actionRun.month}/${actionRun.year}. Deseja continuar?`
                 : 'Deseja continuar?'}
             </AlertDialogDescription>
           </AlertDialogHeader>

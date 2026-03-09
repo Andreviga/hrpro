@@ -58,8 +58,8 @@ const AdminPaystubBatchPage: React.FC = () => {
       setRuns(sorted);
     } catch (error) {
       toast({
-        title: 'Falha ao carregar competências',
-        description: getFriendlyError(error, 'Não foi possível carregar as competências informadas.')
+        title: 'Falha ao carregar competÃªncias',
+        description: getFriendlyError(error, 'NÃ£o foi possÃ­vel carregar as competÃªncias informadas.')
       });
       setRuns([]);
     } finally {
@@ -80,17 +80,17 @@ const AdminPaystubBatchPage: React.FC = () => {
       );
 
       const summary = result.skippedCount > 0
-        ? `${result.createdCount} novos e ${result.skippedCount} já existentes.`
+        ? `${result.createdCount} novos e ${result.skippedCount} jÃ¡ existentes.`
         : `${result.createdCount} holerites emitidos.`;
 
       toast({
-        title: 'Emissão concluída',
-        description: `Competência ${run.month}/${run.year}: ${summary}`
+        title: 'EmissÃ£o concluÃ­da',
+        description: `CompetÃªncia ${run.month}/${run.year}: ${summary}`
       });
     } catch (error) {
       toast({
         title: 'Falha ao emitir holerites',
-        description: getFriendlyError(error, 'Não foi possível emitir os holerites da competência.')
+        description: getFriendlyError(error, 'NÃ£o foi possÃ­vel emitir os holerites da competÃªncia.')
       });
     } finally {
       setEmittingId(null);
@@ -107,7 +107,7 @@ const AdminPaystubBatchPage: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Emitir Holerites</h1>
-            <p className="text-gray-600 mt-1">Escolha a competência e emita em lote com um clique.</p>
+            <p className="text-gray-600 mt-1">Escolha a competÃªncia e emita em lote com um clique.</p>
           </div>
           <Button variant="outline" onClick={() => void loadRuns()} disabled={loading}>
             <RefreshCcw className="h-4 w-4 mr-2" />
@@ -119,16 +119,16 @@ const AdminPaystubBatchPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Emissão Rápida
+              EmissÃ£o RÃ¡pida
             </CardTitle>
             <CardDescription>
-              A emissão usa reprocessamento idempotente para evitar duplicidade de holerites.
+              A emissÃ£o usa reprocessamento idempotente para evitar duplicidade de holerites.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <Label>Mês</Label>
+                <Label>MÃªs</Label>
                 <Input
                   type="number"
                   min={1}
@@ -150,7 +150,7 @@ const AdminPaystubBatchPage: React.FC = () => {
                 />
               </div>
               <Button onClick={() => void loadRuns()} disabled={loading || !month || !year}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar competência'}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar competÃªncia'}
               </Button>
             </div>
 
@@ -160,15 +160,15 @@ const AdminPaystubBatchPage: React.FC = () => {
                 Carregando...
               </div>
             ) : runs.length === 0 ? (
-              <div className="text-sm text-gray-500">Nenhuma competência encontrada para o período informado.</div>
+              <div className="text-sm text-gray-500">Nenhuma competÃªncia encontrada para o perÃ­odo informado.</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Competência</TableHead>
+                    <TableHead>CompetÃªncia</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Versão</TableHead>
-                    <TableHead>Ações</TableHead>
+                    <TableHead>VersÃ£o</TableHead>
+                    <TableHead>AÃ§Ãµes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
