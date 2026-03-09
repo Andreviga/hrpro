@@ -52,6 +52,50 @@ const applyIrrfReduction2026 = (params: {
   return irrfBeforeReduction;
 };
 
+const hasFgtsContributionByCategory = (employee: Employee) => {
+  const code = String(employee.esocialCategoryCode ?? '').trim();
+
+  // eSocial categories in 7xx (contribuinte individual/TSVE) generally do not calculate FGTS,
+  // except category 721 (diretor nao empregado, com FGTS).
+  if (/^7\d\d$/.test(code)) {
+    return code === '721';
+  }
+
+  return true;
+};
+const getWorkedDaysFactor = (params: { employee: Employee; month?: number; year?: number }) => {
+  const { employee, month, year } = params;
+  if (!month || !year) return 1;
+
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  const totalDays = lastDay.getDate();
+
+  const normalize = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
+
+  let start = normalize(firstDay);
+  let end = normalize(lastDay);
+
+  if (employee.admissionDate) {
+    const admission = normalize(new Date(employee.admissionDate));
+    if (admission > start) start = admission;
+  }
+
+  if (employee.esocialContractEndDate) {
+    const contractEnd = normalize(new Date(employee.esocialContractEndDate));
+    if (contractEnd < end) end = contractEnd;
+  }
+
+  if (end < start) {
+    return 0;
+  }
+
+  const millisPerDay = 24 * 60 * 60 * 1000;
+  const workedDays = Math.floor((end.getTime() - start.getTime()) / millisPerDay) + 1;
+
+  return Math.min(1, Math.max(0, workedDays / totalDays));
+};
+
 export function calculatePayrollForEmployee(params: {
   employee: Employee;
   inssTable: TaxTableInss[];
@@ -59,11 +103,13 @@ export function calculatePayrollForEmployee(params: {
   month?: number;
   year?: number;
 }) {
-  const { employee, inssTable, irrfTable, year } = params;
+  const { employee, inssTable, irrfTable, month, year } = params;
 
   let baseSalary = 0;
   let dsr = 0;
   let hourActivity = 0;
+
+  const workedDaysFactor = getWorkedDaysFactor({ employee, month, year });
 
   if (employee.salaryType === 'hourly') {
     const weeklyHours = Number(employee.weeklyHours ?? 0);
@@ -72,10 +118,11 @@ export function calculatePayrollForEmployee(params: {
     // Professor horista: base proporcional + 5% hora-atividade + DSR (1/6 de base+hora-atividade).
     const importedBase = Number(employee.baseSalary ?? 0);
     baseSalary = importedBase > 0 ? importedBase : weeklyHours * hourlyRate * 4.5;
+    baseSalary = baseSalary * workedDaysFactor;
     hourActivity = baseSalary * 0.05;
     dsr = (baseSalary + hourActivity) / 6;
   } else {
-    baseSalary = Number(employee.baseSalary ?? 0);
+    baseSalary = Number(employee.baseSalary ?? 0) * workedDaysFactor;
   }
 
   const grossSalary = round(baseSalary + dsr + hourActivity);
@@ -105,7 +152,7 @@ export function calculatePayrollForEmployee(params: {
 
   const totalDeductions = round(inssValue + irrfValue + transportVoucher + mealVoucher + unionFee);
   const netSalary = round(grossSalary - totalDeductions);
-  const fgts = round(grossSalary * 0.08);
+  const fgts = hasFgtsContributionByCategory(employee) ? round(grossSalary * 0.08) : 0;
 
   return {
     earnings: [

@@ -5,6 +5,8 @@
 import { request, getAuthToken, API_BASE } from './http';
 export interface PaystubSummary {
   id: string;
+  employeeId?: string;
+  employeeName?: string;
   month: number;
   year: number;
   netSalary: number;

@@ -1,6 +1,6 @@
 /**
- * Página para listagem de holerites do funcionário
- * Exibe lista de holerites com navegação para detalhes
+ * Pagina para listagem de holerites do funcionario
+ * Exibe lista de holerites com navegacao para detalhes
  */
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
@@ -9,9 +9,9 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { apiService, PaystubSummary } from '../services/api';
 import { API_BASE } from '../services/http';
-import { 
-  FileText, 
-  Download, 
+import {
+  FileText,
+  Download,
   Calendar,
   DollarSign,
   Loader2
@@ -23,7 +23,7 @@ const PaystubsPage: React.FC = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadPaystubs();
+    void loadPaystubs();
   }, []);
 
   const loadPaystubs = async () => {
@@ -31,7 +31,7 @@ const PaystubsPage: React.FC = () => {
       setLoading(true);
       const data = await apiService.getPaystubs();
       setPaystubs(data);
-    } catch (err) {
+    } catch {
       setError('Erro ao carregar holerites');
     } finally {
       setLoading(false);
@@ -47,7 +47,7 @@ const PaystubsPage: React.FC = () => {
 
   const formatMonthYear = (month: number, year: number) => {
     const monthNames = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
     return `${monthNames[month - 1]} ${year}`;
@@ -81,7 +81,7 @@ const PaystubsPage: React.FC = () => {
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Erro ao carregar</h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={loadPaystubs}>Tentar novamente</Button>
+          <Button onClick={() => void loadPaystubs()}>Tentar novamente</Button>
         </div>
       </Layout>
     );
@@ -90,7 +90,6 @@ const PaystubsPage: React.FC = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Meus Holerites</h1>
@@ -100,17 +99,16 @@ const PaystubsPage: React.FC = () => {
           </div>
           <div className="flex items-center space-x-2">
             <Badge variant="secondary" className="text-sm">
-              {paystubs.length} holerites disponíveis
+              {paystubs.length} holerites disponiveis
             </Badge>
           </div>
         </div>
 
-        {/* Summary Card */}
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-blue-900">Último Holerite</h3>
+                <h3 className="text-lg font-semibold text-blue-900">Ultimo Holerite</h3>
                 {paystubs.length > 0 && (
                   <div className="mt-2">
                     <p className="text-2xl font-bold text-blue-600">
@@ -129,17 +127,16 @@ const PaystubsPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Paystubs List */}
         <div className="grid gap-4">
           {paystubs.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
                 <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Nenhum holerite disponível
+                  Nenhum holerite disponivel
                 </h3>
                 <p className="text-gray-600">
-                  Seus holerites aparecerão aqui quando estiverem disponíveis.
+                  Seus holerites aparecerao aqui quando estiverem disponiveis.
                 </p>
               </CardContent>
             </Card>
@@ -156,6 +153,9 @@ const PaystubsPage: React.FC = () => {
                         <h3 className="text-lg font-semibold text-gray-900">
                           Holerite - {formatMonthYear(paystub.month, paystub.year)}
                         </h3>
+                        {paystub.employeeName && (
+                          <p className="text-sm text-gray-600 mt-1">Funcionario: {paystub.employeeName}</p>
+                        )}
                         <div className="flex items-center space-x-4 mt-1">
                           <span className="flex items-center text-sm text-gray-600">
                             <Calendar className="h-4 w-4 mr-1" />
@@ -168,7 +168,7 @@ const PaystubsPage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       {paystub.filePath && (
                         <Button
@@ -194,12 +194,11 @@ const PaystubsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Help Section */}
         <Card className="bg-yellow-50 border-yellow-200">
           <CardHeader>
             <CardTitle className="text-yellow-800">Precisa de ajuda?</CardTitle>
             <CardDescription className="text-yellow-700">
-              Se você não encontrou o holerite que procura ou tem dúvidas sobre os valores, 
+              Se voce nao encontrou o holerite que procura ou tem duvidas sobre os valores,
               entre em contato com o RH.
             </CardDescription>
           </CardHeader>

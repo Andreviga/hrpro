@@ -88,6 +88,32 @@ export class PayrollService {
     const payrollRun = await this.prisma.payrollRun.findUnique({ where: { id: payrollRunId } });
     if (!payrollRun) throw new NotFoundException('Payroll run not found');
 
+    const existingResultsCount = await this.prisma.payrollResult.count({
+      where: { payrollRunId }
+    });
+
+    if (payrollRun.status === 'draft' && existingResultsCount > 0) {
+      const updatedFromExisting = await this.prisma.payrollRun.update({
+        where: { id: payrollRunId },
+        data: { status: 'calculated' }
+      });
+
+      await this.audit.log({
+        companyId: payrollRun.companyId,
+        userId,
+        action: 'calculate',
+        entity: 'payroll_run',
+        entityId: payrollRunId,
+        after: {
+          status: updatedFromExisting.status,
+          source: 'existing_results',
+          existingResultsCount
+        }
+      });
+
+      return updatedFromExisting;
+    }
+
     const employees = await this.prisma.employee.findMany({
       where: { companyId: payrollRun.companyId, status: 'active' }
     });
@@ -348,17 +374,104 @@ export class PayrollService {
   async listPaystubsByEmployee(employeeId: string) {
     const results = await this.prisma.payrollResult.findMany({
       where: { employeeId },
-      include: { payrollRun: true },
+      include: { payrollRun: true, employee: true },
       orderBy: [{ payrollRun: { year: 'desc' } }, { payrollRun: { month: 'desc' } }]
     });
 
     return results.map((result) => ({
       id: result.id,
+      employeeId: result.employeeId,
+      employeeName: result.employee.fullName,
       month: result.payrollRun.month,
       year: result.payrollRun.year,
       netSalary: Number(result.netSalary),
       filePath: `/paystubs/${result.id}/pdf`
     }));
+  }
+
+  async listPaystubsByCompany(companyId: string) {
+    const results = await this.prisma.payrollResult.findMany({
+      where: {
+        payrollRun: {
+          is: { companyId }
+        }
+      },
+      include: { payrollRun: true, employee: true },
+      orderBy: [{ payrollRun: { year: 'desc' } }, { payrollRun: { month: 'desc' } }, { employee: { fullName: 'asc' } }]
+    });
+
+    return results.map((result) => ({
+      id: result.id,
+      employeeId: result.employeeId,
+      employeeName: result.employee.fullName,
+      month: result.payrollRun.month,
+      year: result.payrollRun.year,
+      netSalary: Number(result.netSalary),
+      filePath: `/paystubs/${result.id}/pdf`
+    }));
+  }
+
+  async removeEmployeeFromRun(params: {
+    payrollRunId: string;
+    employeeId: string;
+    companyId: string;
+    userId?: string;
+    reason?: string;
+  }) {
+    const payrollRun = await this.prisma.payrollRun.findUnique({ where: { id: params.payrollRunId } });
+    if (!payrollRun || payrollRun.companyId !== params.companyId) {
+      throw new NotFoundException('Payroll run not found');
+    }
+
+    if (payrollRun.status === 'closed') {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'Competencia fechada. Nao e possivel remover funcionario da folha.',
+        code: 'PAYROLL_RUN_CLOSED',
+        details: { payrollRunId: params.payrollRunId }
+      });
+    }
+
+    const payrollResult = await this.prisma.payrollResult.findUnique({
+      where: {
+        payrollRunId_employeeId: {
+          payrollRunId: params.payrollRunId,
+          employeeId: params.employeeId
+        }
+      },
+      include: { employee: true }
+    });
+
+    if (!payrollResult) {
+      return { removed: false, message: 'Funcionario nao encontrado nesta competencia.' };
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.payrollEvent.deleteMany({ where: { payrollResultId: payrollResult.id } }),
+      this.prisma.payrollResult.delete({ where: { id: payrollResult.id } })
+    ]);
+
+    await this.audit.log({
+      companyId: params.companyId,
+      userId: params.userId,
+      action: 'remove_employee_from_run',
+      entity: 'payroll_run',
+      entityId: params.payrollRunId,
+      reason: params.reason,
+      after: {
+        payrollRunId: params.payrollRunId,
+        employeeId: params.employeeId,
+        employeeName: payrollResult.employee.fullName
+      }
+    });
+
+    return {
+      removed: true,
+      payrollRunId: params.payrollRunId,
+      employeeId: params.employeeId,
+      employeeName: payrollResult.employee.fullName
+    };
   }
 
   async previewCalculation(companyId: string, employeeId: string, month: number, year: number) {

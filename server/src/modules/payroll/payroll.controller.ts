@@ -47,6 +47,23 @@ export class PayrollController {
     return this.payroll.reopenRun(id, req.user.sub);
   }
 
+  @Post('payroll/runs/:id/employees/:employeeId/remove')
+  @Roles('admin', 'rh', 'manager')
+  async removeEmployeeFromRun(
+    @Param('id') id: string,
+    @Param('employeeId') employeeId: string,
+    @Body() body: { reason?: string },
+    @Req() req: { user: { companyId: string; sub: string } }
+  ) {
+    return this.payroll.removeEmployeeFromRun({
+      payrollRunId: id,
+      employeeId,
+      companyId: req.user.companyId,
+      userId: req.user.sub,
+      reason: body?.reason
+    });
+  }
+
   @Get('payroll/runs/summary')
   @Roles('admin', 'rh', 'manager')
   async runSummary(
@@ -125,9 +142,16 @@ export class PayrollController {
   }
 
   @Get('paystubs')
-  async listPaystubs(@Req() req: { user: { employeeId?: string } }) {
-    if (!req.user.employeeId) return [];
-    return this.payroll.listPaystubsByEmployee(req.user.employeeId);
+  async listPaystubs(@Req() req: { user: { employeeId?: string; companyId: string; role: string } }) {
+    if (['admin', 'rh', 'manager'].includes(req.user.role)) {
+      return this.payroll.listPaystubsByCompany(req.user.companyId);
+    }
+
+    if (req.user.employeeId) {
+      return this.payroll.listPaystubsByEmployee(req.user.employeeId);
+    }
+
+    return [];
   }
 
   @Get('paystubs/:id')

@@ -93,6 +93,16 @@ export const payrollApi = {
     });
   },
 
+  async removeEmployeeFromRun(payrollRunId: string, employeeId: string, reason?: string) {
+    return request<{ removed: boolean; message?: string }>(
+      `/payroll/runs/${payrollRunId}/employees/${employeeId}/remove`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+      }
+    );
+  },
+
   async getSummary(month: number, year: number) {
     const params = new URLSearchParams({ month: String(month), year: String(year) });
     return request<PayrollRunSummary>(`/payroll/runs/summary?${params.toString()}`);
