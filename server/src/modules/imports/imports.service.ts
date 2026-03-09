@@ -22,8 +22,8 @@ const headerAliases: Record<string, string[]> = {
   email: ['email', 'e-mail'],
   phone: ['telefone', 'celular'],
   birthDate: ['nascimento', 'data de nascimento'],
-  motherName: ['nome da mae', 'mãe', 'nome da mãe'],
-  addressLine: ['endereco', 'endereço', 'logradouro'],
+  motherName: ['nome da mae', 'mae', 'nome da mae'],
+  addressLine: ['endereco', 'logradouro'],
   neighborhood: ['bairro'],
   cityState: ['cidade/uf', 'cidade', 'cidade uf'],
   zipCode: ['cep'],
@@ -106,7 +106,7 @@ const findHeader = (headers: string[], field: keyof typeof headerAliases) => {
   });
 };
 
-const parseNumber = (value: any) => {
+export const parseNumber = (value: any) => {
   if (value === null || value === undefined || value === '') return null;
 
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -114,16 +114,63 @@ const parseNumber = (value: any) => {
   }
 
   const text = String(value).trim();
-  const isPercent = text.includes('%');
-  const raw = text.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '');
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed)) return null;
+  if (!text || text === '-' || normalizeText(text) === 'r$ -') return null;
 
-  if (isPercent) {
-    return parsed / 100;
+  const isPercent = text.includes('%');
+  const isNegative = /\(.*\)/.test(text) || /^-/.test(text) || /-\s*\d/.test(text);
+
+  let numericText = text
+    .replace(/[^\d,.\-()]/g, '')
+    .replace(/[()]/g, '')
+    .replace(/-/g, '');
+
+  if (!numericText || !/\d/.test(numericText)) return null;
+
+  const dotCount = (numericText.match(/\./g) ?? []).length;
+  const commaCount = (numericText.match(/,/g) ?? []).length;
+  let decimalSeparator: '.' | ',' | null = null;
+
+  if (dotCount > 0 && commaCount > 0) {
+    decimalSeparator = numericText.lastIndexOf('.') > numericText.lastIndexOf(',') ? '.' : ',';
+  } else if (dotCount > 0 || commaCount > 0) {
+    const separator = dotCount > 0 ? '.' : ',';
+    const separatorCount = separator === '.' ? dotCount : commaCount;
+    if (separatorCount === 1) {
+      const lastIndex = numericText.lastIndexOf(separator);
+      const digitsAfter = numericText.length - lastIndex - 1;
+      if (digitsAfter > 0 && digitsAfter <= 2) {
+        decimalSeparator = separator;
+      } else if (isPercent && digitsAfter > 0 && digitsAfter <= 4) {
+        decimalSeparator = separator;
+      }
+    }
   }
 
-  return parsed;
+  if (decimalSeparator) {
+    const thousandsSeparator = decimalSeparator === '.' ? ',' : '.';
+    numericText = numericText.split(thousandsSeparator).join('');
+
+    if (decimalSeparator === ',') {
+      const lastComma = numericText.lastIndexOf(',');
+      numericText =
+        numericText.slice(0, lastComma).replace(/,/g, '') +
+        '.' +
+        numericText.slice(lastComma + 1);
+    }
+  } else {
+    numericText = numericText.replace(/[.,]/g, '');
+  }
+
+  const parsed = Number(numericText.replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(parsed)) return null;
+
+  const withSignal = isNegative ? -Math.abs(parsed) : parsed;
+
+  if (isPercent) {
+    return withSignal / 100;
+  }
+
+  return withSignal;
 };
 
 type SheetProfile = 'cadastro' | 'tab_auxilio' | 'quantidade_aula' | 'folha' | 'generic';
@@ -376,6 +423,11 @@ const isNonEmployeeRowLabel = (value: string) => {
   const blockedKeywords = [
     'total',
     'totalizador',
+    'total (',
+    'salario bruto total',
+    'salario brutos totais',
+    'salario liquido total',
+    'salario liquidos totais',
     'inss centro',
     'inss recreacao',
     'irpf centro',
@@ -530,6 +582,20 @@ export class ImportsService {
       return employeesByName.get(normalizedName);
     };
 
+    const deactivateTemporaryNonEmployee = async (fullName: string, sheetName: string, rowNumber: number) => {
+      const normalizedName = normalizeText(fullName);
+      const cached = employeesByName.get(normalizedName);
+      if (!cached || !isTemporaryEmployeeCode(cached.cpf)) return;
+
+      const updated = await this.prisma.employee.update({
+        where: { id: cached.id },
+        data: { status: 'inactive' }
+      });
+
+      upsertCache(updated);
+      warnings.push(`Aba ${sheetName} linha ${rowNumber}: registro nao-funcionario "${fullName}" foi desativado automaticamente.`);
+    };
+
     const orderedSheetNames = [...workbook.SheetNames].sort((left, right) => {
       const leftProfile = getSheetProfile(normalizeText(left));
       const rightProfile = getSheetProfile(normalizeText(right));
@@ -667,6 +733,26 @@ export class ImportsService {
 
         payrollRunId = payrollRun.id;
         importedRunIds.add(payrollRun.id);
+
+        const existingRunResults = await this.prisma.payrollResult.findMany({
+          where: { payrollRunId: payrollRun.id },
+          select: { id: true }
+        });
+
+        if (existingRunResults.length > 0) {
+          await this.prisma.$transaction([
+            this.prisma.payrollEvent.deleteMany({
+              where: {
+                payrollResultId: { in: existingRunResults.map((item) => item.id) }
+              }
+            }),
+            this.prisma.payrollResult.deleteMany({
+              where: { payrollRunId: payrollRun.id }
+            })
+          ]);
+
+          warnings.push(`Competencia ${competency.month}/${competency.year}: resultados anteriores removidos para reimportacao completa.`);
+        }
       }
 
       for (let index = 0; index < rows.length; index += 1) {
@@ -859,7 +945,10 @@ export class ImportsService {
           const fullName = nameHeader ? normalizeEmployeeName(row[nameHeader]) : '';
           const cpf = cpfHeader ? sanitizeCpf(row[cpfHeader]) : '';
           if (!fullName && !cpf) continue;
-          if (fullName && isNonEmployeeRowLabel(fullName)) continue;
+          if (fullName && isNonEmployeeRowLabel(fullName)) {
+            await deactivateTemporaryNonEmployee(fullName, sheetName, rowNumber);
+            continue;
+          }
 
           let employee = findEmployeeInCache({ cpf, fullName });
           if (!employee && fullName) {
@@ -916,7 +1005,10 @@ export class ImportsService {
           const fullName = nameHeader ? normalizeEmployeeName(row[nameHeader]) : '';
           const cpf = cpfHeader ? sanitizeCpf(row[cpfHeader]) : '';
           if (!fullName && !cpf) continue;
-          if (fullName && isNonEmployeeRowLabel(fullName)) continue;
+          if (fullName && isNonEmployeeRowLabel(fullName)) {
+            await deactivateTemporaryNonEmployee(fullName, sheetName, rowNumber);
+            continue;
+          }
 
           let employee = findEmployeeInCache({ cpf, fullName });
           if (!employee && fullName) {
