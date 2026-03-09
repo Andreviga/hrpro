@@ -762,7 +762,7 @@ const AdminEmployeesPage: React.FC = () => {
                         type="email"
                         value={newEmployee.email || ''}
                         onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
-                        placeholder="funcionario@email.com"
+                        placeholder="funcionário@email.com"
                       />
                     </div>
                     <div>
@@ -1015,3 +1015,4 @@ const AdminEmployeesPage: React.FC = () => {
 };
 
 export default AdminEmployeesPage;
+
