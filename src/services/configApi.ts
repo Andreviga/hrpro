@@ -2,6 +2,7 @@
  * API para configurações administrativas do sistema
  * Permite personalizar fórmulas, tabelas e valores
  */
+import { request } from './http';
 
 export interface HourlyRateConfig {
   level: string;
@@ -283,7 +284,14 @@ export const configApi = {
    * Busca configuração atual do sistema
    */
   async getSystemConfig(): Promise<SystemConfig> {
-    await new Promise(resolve => setTimeout(resolve, 300));
+    try {
+      const remote = await request<SystemConfig | null>('/system-config');
+      if (remote) {
+        Object.assign(currentConfig, remote);
+      }
+    } catch {
+      // fallback to in-memory defaults
+    }
     return currentConfig;
   },
 
@@ -291,11 +299,15 @@ export const configApi = {
    * Atualiza configuração do sistema
    */
   async updateSystemConfig(config: Partial<SystemConfig>): Promise<SystemConfig> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Merge das configurações
     Object.assign(currentConfig, config);
-    
+    try {
+      await request<SystemConfig>('/system-config', {
+        method: 'PATCH',
+        body: JSON.stringify(config)
+      });
+    } catch {
+      // persist failure is non-fatal; in-memory state is still updated
+    }
     return currentConfig;
   },
 
@@ -303,8 +315,8 @@ export const configApi = {
    * Atualiza apenas os valores das horas aula
    */
   async updateHourlyRates(rates: HourlyRateConfig[]): Promise<HourlyRateConfig[]> {
-    await new Promise(resolve => setTimeout(resolve, 400));
     currentConfig.hourlyRates = rates;
+    await this.updateSystemConfig({ hourlyRates: rates });
     return rates;
   },
 
@@ -312,8 +324,8 @@ export const configApi = {
    * Atualiza tabela do INSS
    */
   async updateINSSTable(table: INSSConfig[]): Promise<INSSConfig[]> {
-    await new Promise(resolve => setTimeout(resolve, 400));
     currentConfig.inssTable = table;
+    await this.updateSystemConfig({ inssTable: table });
     return table;
   },
 
@@ -321,8 +333,8 @@ export const configApi = {
    * Atualiza tabela do IRRF
    */
   async updateIRRFTable(table: IRRFConfig[]): Promise<IRRFConfig[]> {
-    await new Promise(resolve => setTimeout(resolve, 400));
     currentConfig.irrfTable = table;
+    await this.updateSystemConfig({ irrfTable: table });
     return table;
   },
 
@@ -330,8 +342,8 @@ export const configApi = {
    * Atualiza fórmulas de cálculo
    */
   async updateFormulas(formulas: FormulaConfig[]): Promise<FormulaConfig[]> {
-    await new Promise(resolve => setTimeout(resolve, 400));
     currentConfig.formulas = formulas;
+    await this.updateSystemConfig({ formulas });
     return formulas;
   },
 
@@ -339,8 +351,8 @@ export const configApi = {
    * Atualiza configurações de benefícios
    */
   async updateBenefits(benefits: BenefitsConfig): Promise<BenefitsConfig> {
-    await new Promise(resolve => setTimeout(resolve, 400));
     currentConfig.benefits = benefits;
+    await this.updateSystemConfig({ benefits });
     return benefits;
   },
 
@@ -390,23 +402,30 @@ export const configApi = {
    * Exporta configuração para backup
    */
   async exportConfig(): Promise<string> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return JSON.stringify(currentConfig, null, 2);
+    const config = await this.getSystemConfig();
+    return JSON.stringify(config, null, 2);
   },
 
   /**
    * Importa configuração de backup
    */
   async importConfig(configData: string): Promise<SystemConfig> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
+    let importedConfig: SystemConfig;
     try {
-      const importedConfig = JSON.parse(configData);
-      Object.assign(currentConfig, importedConfig);
-      return currentConfig;
-    } catch (error) {
+      importedConfig = JSON.parse(configData);
+    } catch {
       throw new Error('Arquivo de configuração inválido');
     }
+    Object.assign(currentConfig, importedConfig);
+    try {
+      await request<SystemConfig>('/system-config', {
+        method: 'PUT',
+        body: JSON.stringify(importedConfig)
+      });
+    } catch {
+      // non-fatal
+    }
+    return currentConfig;
   },
 
   /**

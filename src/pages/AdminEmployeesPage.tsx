@@ -377,7 +377,7 @@ const AdminEmployeesPage: React.FC = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
             <TabsTrigger value="employees">Funcionários</TabsTrigger>
             <TabsTrigger value="pending">Pendentes ({pendingEmployees.length})</TabsTrigger>
             <TabsTrigger value="payroll">Folha de Pagamento</TabsTrigger>
@@ -389,7 +389,7 @@ const AdminEmployeesPage: React.FC = () => {
             {/* Filtros */}
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-4">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center space-x-2">
                     <Filter className="h-4 w-4 text-gray-500" />
                     <Select value={filters.status} onValueChange={(value) => setFilters({...filters, status: value})}>
@@ -602,7 +602,7 @@ const AdminEmployeesPage: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-4">
+                <div className="flex flex-wrap items-end gap-3">
                   <div>
                     <Label htmlFor="payroll-month">Mês</Label>
                     <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
@@ -721,7 +721,7 @@ const AdminEmployeesPage: React.FC = () => {
                                 <h4 className="font-medium">{calc.employee.fullName}</h4>
                                 <p className="text-sm text-gray-600">{calc.employee.position}</p>
                               </div>
-                              <div className="grid grid-cols-4 gap-4 text-sm text-right">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-right">
                                 <div>
                                   <p className="text-gray-500">Bruto</p>
                                   <p className="font-medium text-green-600">

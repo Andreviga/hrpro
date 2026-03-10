@@ -7,7 +7,7 @@ import LoginPage from '../pages/LoginPage';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRole?: 'employee' | 'intern' | 'admin';
+  requiredRole?: 'employee' | 'intern' | 'admin' | 'rh' | 'manager';
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {

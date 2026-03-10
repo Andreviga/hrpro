@@ -364,6 +364,7 @@ const AdminFormulasPage: React.FC = () => {
                     <p className="text-sm mt-1">Clique em "Criar Padrões" para iniciar com as rubricas padrão do sistema.</p>
                   </div>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -434,6 +435,7 @@ const AdminFormulasPage: React.FC = () => {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
 
                 {/* Rubric Edit Form */}

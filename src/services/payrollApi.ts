@@ -35,13 +35,7 @@ export const payrollApi = {
   },
 
   async calculatePayrollRun(payrollRunId: string): Promise<PayrollRun> {
-    return request<PayrollRun>(`/payroll-runs/${payrollRunId}/calculate-sync`, {
-      method: 'POST'
-    });
-  },
-
-  async closePayrollRun(payrollRunId: string) {
-    return request(`/payroll-runs/${payrollRunId}/close`, {
+    return request<PayrollRun>(`/payroll/runs/${payrollRunId}/calculate-sync`, {
       method: 'POST'
     });
   },
@@ -85,8 +79,8 @@ export const payrollApi = {
     reprocess = false
   ) {
     const endpoint = reprocess
-      ? `/payroll-runs/${payrollRunId}/documents/reprocess`
-      : `/payroll-runs/${payrollRunId}/documents`;
+      ? `/payroll/runs/${payrollRunId}/documents/reprocess`
+      : `/payroll/runs/${payrollRunId}/documents`;
 
     return request<{ createdCount: number; skippedCount: number; regeneratedFromPreviousCount?: number }>(endpoint, {
       method: 'POST',

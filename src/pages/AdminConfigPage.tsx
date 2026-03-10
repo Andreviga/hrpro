@@ -212,7 +212,7 @@ const AdminConfigPage: React.FC = () => {
         </Alert>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
             <TabsTrigger value="hourly-rates">Horas Aula</TabsTrigger>
             <TabsTrigger value="inss">INSS</TabsTrigger>
             <TabsTrigger value="irrf">IRRF</TabsTrigger>
@@ -304,7 +304,7 @@ const AdminConfigPage: React.FC = () => {
               <CardContent>
                 <div className="space-y-4">
                   {tempConfig.inssTable.map((bracket, index) => (
-                    <div key={index} className="grid grid-cols-5 gap-4 p-4 border rounded-lg">
+                    <div key={index} className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 border rounded-lg">
                       <div>
                         <Label>De</Label>
                         <Input
@@ -382,7 +382,7 @@ const AdminConfigPage: React.FC = () => {
               <CardContent>
                 <div className="space-y-4">
                   {tempConfig.irrfTable.map((bracket, index) => (
-                    <div key={index} className="grid grid-cols-5 gap-4 p-4 border rounded-lg">
+                    <div key={index} className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 border rounded-lg">
                       <div>
                         <Label>De</Label>
                         <Input
@@ -444,7 +444,7 @@ const AdminConfigPage: React.FC = () => {
 
                 <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
                   <h4 className="font-medium text-yellow-800 mb-2">💡 Dedução por Dependente</h4>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex flex-wrap items-center gap-3">
                     <Label>Valor por dependente:</Label>
                     <Input
                       type="number"

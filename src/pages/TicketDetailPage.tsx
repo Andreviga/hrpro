@@ -37,7 +37,7 @@ const TicketDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (id) {
-      loadTicket(parseInt(id));
+      loadTicket(id);
     }
   }, [id]);
 
@@ -45,7 +45,7 @@ const TicketDetailPage: React.FC = () => {
     scrollToBottom();
   }, [ticket?.messages]);
 
-  const loadTicket = async (ticketId: number) => {
+  const loadTicket = async (ticketId: string) => {
     try {
       setLoading(true);
       const data = await supportApi.getTicket(ticketId);
@@ -204,7 +204,7 @@ const TicketDetailPage: React.FC = () => {
                 <User className="h-4 w-4 text-gray-500" />
                 <span className="text-sm font-medium">Solicitante</span>
               </div>
-              <p className="text-sm">{ticket.employeeName}</p>
+              <p className="text-sm">{ticket.employeeId ?? 'Funcionário'}</p>
             </CardContent>
           </Card>
 
@@ -242,7 +242,7 @@ const TicketDetailPage: React.FC = () => {
                         {message.senderName}
                       </span>
                       <span className="text-xs opacity-75">
-                        {formatDateTime(message.timestamp)}
+                        {formatDateTime(message.createdAt)}
                       </span>
                     </div>
                     <p className="text-sm whitespace-pre-wrap">{message.message}</p>

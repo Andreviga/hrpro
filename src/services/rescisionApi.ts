@@ -2,9 +2,10 @@
  * API para cálculos de rescisão trabalhista
  * Baseado na CCT Sinprosp 2024/2025 e legislação trabalhista
  */
+import { employeeApi } from './employeeApi';
 
 export interface Employee {
-  id: number;
+  id: string;
   name: string;
   cpf: string;
   rg: string;
@@ -64,115 +65,51 @@ export interface RescisionCalculation {
   };
 }
 
-// Mock data para testes
-const mockEmployees: Employee[] = [
-  {
-    id: 1,
-    name: 'ALEXANDRE FALCÃO SANSEVERINO',
-    cpf: '289.888.478-22',
-    rg: '304296053',
-    birthDate: '1981-09-01',
-    motherName: 'CLEONICE FALCÃO SANSEVERINO',
-    admissionDate: '2025-01-24',
-    position: 'Professor de Português',
-    ctps: '28988847822',
-    pis: '12939814815',
-    address: {
-      street: 'AVENIDA WALDEMAR TIETZ',
-      number: '1331',
-      complement: 'APARTAMENTO 233',
-      neighborhood: 'COHAB PADRE JOSÉ ANCHIETA',
-      city: 'SÃO PAULO',
-      state: 'SP',
-      zipCode: '03589-001'
-    },
-    bankData: {
-      bank: 'ITAU',
-      agency: '7908',
-      account: '176345',
-      accountType: 'corrente',
-      pixKey: 'PIX'
-    },
-    salary: {
-      type: 'hourly',
-      value: 31.44,
-      weeklyHours: 12
-    }
-  },
-  {
-    id: 2,
-    name: 'AMAURI HERNANDES JUNIOR',
-    cpf: '481.584.208-69',
-    rg: '521915910',
-    birthDate: '1995-10-26',
-    motherName: 'Cassia Regina da Conceição Hernandes',
-    admissionDate: '2022-01-27',
-    position: 'Professor de História',
-    ctps: '12345678901',
-    pis: '12939814815',
-    address: {
-      street: 'Rua Professor Pedreira de Freitas',
-      number: '980',
-      complement: 'Apto 131',
-      neighborhood: 'Tatuapé',
-      city: 'São Paulo',
-      state: 'SP',
-      zipCode: '03423-000'
-    },
-    bankData: {
-      bank: 'BRADESCO',
-      agency: '1788',
-      account: '2609401',
-      accountType: 'corrente',
-      pixKey: 'PIX'
-    },
-    salary: {
-      type: 'hourly',
-      value: 31.44,
-      weeklyHours: 8
-    }
-  },
-  {
-    id: 3,
-    name: 'MARGARETH GOMES DOS SANTOS DA SILVA',
-    cpf: '100.084.478-10',
-    rg: '486807758',
-    birthDate: '1964-02-14',
-    motherName: 'Maria Gorete Soares Rosa da Silva',
-    admissionDate: '2021-02-08',
-    position: 'Auxiliar de limpeza',
-    ctps: '98765432109',
-    pis: '98765432101',
-    address: {
-      street: 'Rua Igarapé Peixoto',
-      number: '04',
-      neighborhood: 'Conjunto Habitacional Inácio Monte',
-      city: 'São Paulo',
-      state: 'SP',
-      zipCode: '08472-301'
-    },
-    bankData: {
-      bank: 'CAIXA',
-      agency: '1086',
-      account: '7468430463',
-      accountType: 'corrente',
-      pixKey: 'PIX'
-    },
-    salary: {
-      type: 'monthly',
-      value: 1958.20
-    }
-  }
-];
-
 export const rescisionApi = {
   /**
-   * Busca funcionário por CPF
+   * Busca funcionário por CPF via API de funcionários
    */
   async searchEmployeeByCPF(cpf: string): Promise<Employee | null> {
-    await new Promise(resolve => setTimeout(resolve, 300));
     const normalizedCpf = cpf.replace(/\D/g, '');
-    return mockEmployees.find(emp => emp.cpf.replace(/\D/g, '') === normalizedCpf) || null;
+    const emp = await employeeApi.getEmployeeByCPF(normalizedCpf);
+    if (!emp) return null;
+    const ctpsFormatted = emp.ctpsNumber
+      ? `${emp.ctpsNumber}-${emp.ctpsSeries ?? ''}/${emp.ctpsState ?? ''}`
+      : (emp.ctps ?? '');
+    return {
+      id: emp.id,
+      name: emp.fullName,
+      cpf: emp.cpf,
+      rg: emp.rg ?? '',
+      birthDate: emp.birthDate ?? '',
+      motherName: emp.motherName ?? '',
+      admissionDate: emp.admissionDate ?? '',
+      position: emp.position,
+      ctps: ctpsFormatted,
+      pis: emp.pis ?? '',
+      address: {
+        street: emp.address?.street ?? '',
+        number: emp.address?.number ?? '',
+        complement: emp.address?.complement,
+        neighborhood: emp.address?.neighborhood ?? '',
+        city: emp.address?.city ?? '',
+        state: emp.address?.state ?? '',
+        zipCode: emp.address?.zipCode ?? ''
+      },
+      bankData: emp.bankData
+        ? {
+            bank: emp.bankData.bank,
+            agency: emp.bankData.agency,
+            account: emp.bankData.account,
+            accountType: emp.bankData.accountType,
+            pixKey: emp.bankData.pixKey
+          }
+        : { bank: '', agency: '', account: '', accountType: 'corrente' },
+      salary:
+        emp.salaryType === 'hourly'
+          ? { type: 'hourly', value: emp.hourlyRate ?? 0, weeklyHours: emp.weeklyHours }
+          : { type: 'monthly', value: emp.baseSalary ?? 0 }
+    };
   },
 
   /**

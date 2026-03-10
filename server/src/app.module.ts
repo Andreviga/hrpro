@@ -10,6 +10,8 @@ import { AuditModule } from './modules/audit/audit.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { RubricsModule } from './modules/rubrics/rubrics.module';
 import { TaxTablesModule } from './modules/tax-tables/tax-tables.module';
+import { SupportModule } from './modules/support/support.module';
+import { SystemConfigModule } from './modules/system-config/system-config.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { TaxTablesModule } from './modules/tax-tables/tax-tables.module';
     DocumentsModule,
     RubricsModule,
     TaxTablesModule,
+    SupportModule,
+    SystemConfigModule,
   ]
 })
 export class AppModule {}

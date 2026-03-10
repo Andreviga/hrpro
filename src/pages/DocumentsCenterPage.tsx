@@ -574,6 +574,7 @@ const DocumentsCenterPage: React.FC = () => {
                       Carregando documentos...
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -663,6 +664,7 @@ const DocumentsCenterPage: React.FC = () => {
                         )}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -751,6 +753,7 @@ const DocumentsCenterPage: React.FC = () => {
                       Carregando templates...
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -815,6 +818,7 @@ const DocumentsCenterPage: React.FC = () => {
                         )}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>

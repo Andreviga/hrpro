@@ -83,7 +83,7 @@ const SupportPage: React.FC = () => {
     });
   };
 
-  const handleTicketClick = (ticketId: number) => {
+  const handleTicketClick = (ticketId: string) => {
     window.location.href = `#/support/tickets/${ticketId}`;
   };
 

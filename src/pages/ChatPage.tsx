@@ -118,7 +118,7 @@ const ChatPage: React.FC = () => {
     const groups: { [key: string]: ChatMessage[] } = {};
     
     messages.forEach(message => {
-      const dateKey = new Date(message.timestamp).toDateString();
+      const dateKey = new Date(message.createdAt).toDateString();
       if (!groups[dateKey]) {
         groups[dateKey] = [];
       }
@@ -178,7 +178,7 @@ const ChatPage: React.FC = () => {
                   <div className="flex items-center my-4">
                     <div className="flex-1 border-t border-gray-200"></div>
                     <span className="px-3 text-xs text-gray-500 bg-white">
-                      {formatDate(dayMessages[0].timestamp)}
+                      {formatDate(dayMessages[0].createdAt)}
                     </span>
                     <div className="flex-1 border-t border-gray-200"></div>
                   </div>
@@ -203,7 +203,7 @@ const ChatPage: React.FC = () => {
                         <p className="text-sm">{message.message}</p>
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-xs opacity-75">
-                            {formatTime(message.timestamp)}
+                            {formatTime(message.createdAt)}
                           </span>
                           {message.sender === 'employee' && (
                             <CheckCheck className={`h-3 w-3 ${

@@ -110,15 +110,23 @@ export class PayrollController {
     return this.payroll.enqueueCalculate(id, req.user.sub);
   }
 
+  /** @deprecated use POST payroll/runs/:id/calculate-sync */
   @Post('payroll-runs/:id/calculate-sync')
   async calculateSync(@Param('id') id: string, @Req() req: { user: { sub: string } }) {
     return this.payroll.calculateRun(id, req.user.sub);
   }
 
+  /** @deprecated use POST payroll/runs/:id/close */
   @Post('payroll-runs/:id/close')
   @Roles('admin', 'rh', 'manager')
   async closeRun(@Param('id') id: string, @Req() req: { user: { sub: string } }) {
     return this.payroll.closeRun(id, req.user.sub);
+  }
+
+  // ── v2 canonical routes ───────────────────────────────────────────────
+  @Post('payroll/runs/:id/calculate-sync')
+  async calculateSyncV2(@Param('id') id: string, @Req() req: { user: { sub: string } }) {
+    return this.payroll.calculateRun(id, req.user.sub);
   }
 
   @Post('payroll/preview')
@@ -529,5 +537,64 @@ export class PayrollController {
       forceRegenerate: body.forceRegenerate
     });
   }
+
+  // ── v2 alias routes para documentos ───────────────────────────────────
+  @Post('payroll/runs/:id/documents')
+  @Roles('admin', 'rh', 'manager')
+  async generateDocumentsV2(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      documentType: 'trct' | 'recibo_ferias' | 'holerite';
+      templateId?: string;
+      employeeIds?: string[];
+      extraPlaceholders?: Record<string, string>;
+      reason?: string;
+      forceRegenerate?: boolean;
+    },
+    @Req() req: { user: { companyId: string; sub: string } }
+  ) {
+    return this.payroll.generateDocumentsForRun({
+      payrollRunId: id,
+      companyId: req.user.companyId,
+      userId: req.user.sub,
+      documentType: body.documentType,
+      templateId: body.templateId,
+      employeeIds: body.employeeIds,
+      extraPlaceholders: body.extraPlaceholders,
+      reason: body.reason,
+      forceRegenerate: body.forceRegenerate
+    });
+  }
+
+  @Post('payroll/runs/:id/documents/reprocess')
+  @Roles('admin', 'rh', 'manager')
+  async reprocessDocumentsV2(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      documentType: 'trct' | 'recibo_ferias' | 'holerite';
+      templateId?: string;
+      employeeIds?: string[];
+      extraPlaceholders?: Record<string, string>;
+      reason?: string;
+      forceRegenerate?: boolean;
+    },
+    @Req() req: { user: { companyId: string; sub: string } }
+  ) {
+    return this.payroll.reprocessDocumentsForRun({
+      payrollRunId: id,
+      companyId: req.user.companyId,
+      userId: req.user.sub,
+      documentType: body.documentType,
+      templateId: body.templateId,
+      employeeIds: body.employeeIds,
+      extraPlaceholders: body.extraPlaceholders,
+      reason: body.reason,
+      forceRegenerate: body.forceRegenerate
+    });
+  }
 }
+
+// helper
 

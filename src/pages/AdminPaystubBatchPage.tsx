@@ -217,6 +217,7 @@ const AdminPaystubBatchPage: React.FC = () => {
             ) : runs.length === 0 ? (
               <div className="text-sm text-gray-500">Nenhuma competencia encontrada para o periodo informado.</div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -282,6 +283,7 @@ const AdminPaystubBatchPage: React.FC = () => {
                   })}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

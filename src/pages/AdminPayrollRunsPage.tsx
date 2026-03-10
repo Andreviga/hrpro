@@ -409,6 +409,7 @@ const AdminPayrollRunsPage: React.FC = () => {
                 Carregando folhas...
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -476,6 +477,7 @@ const AdminPayrollRunsPage: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

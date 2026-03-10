@@ -3,7 +3,15 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
+const INSECURE_SECRETS = new Set(['dev-secret-change', 'change-me', 'secret', 'changeme', '']);
+
 async function bootstrap() {
+  const jwtSecret = process.env.JWT_SECRET ?? '';
+  if (process.env.NODE_ENV === 'production' && INSECURE_SECRETS.has(jwtSecret)) {
+    console.error('FATAL: JWT_SECRET is not set or uses an insecure default value in production. Set a strong secret and restart.');
+    process.exit(1);
+  }
+
   const app = await NestFactory.create(AppModule, { cors: true });
   const config = new DocumentBuilder()
     .setTitle('HRPro API')
