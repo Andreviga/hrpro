@@ -1,5 +1,5 @@
 /**
- * Page to show full paystub details.
+ * Página para mostrar detalhes completos do holerite.
  */
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router';
@@ -9,7 +9,6 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
 import { apiService, PaystubDetail } from '../services/api';
-import { API_BASE } from '../services/http';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
 import {
@@ -76,10 +75,10 @@ const PaystubDetailPage: React.FC = () => {
         setPaystub(data);
         setError('');
       } else {
-        setError('Holerite nao encontrado');
+        setError('Holerite não encontrado.');
       }
     } catch {
-      setError('Erro ao carregar detalhes do holerite');
+      setError('Erro ao carregar detalhes do holerite.');
     } finally {
       setLoading(false);
     }
@@ -94,7 +93,7 @@ const PaystubDetailPage: React.FC = () => {
 
   const formatMonthYear = (month: number, year: number) => {
     const monthNames = [
-      'Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
     return `${monthNames[month - 1]} ${year}`;
@@ -104,9 +103,17 @@ const PaystubDetailPage: React.FC = () => {
     window.location.href = '#/paystubs';
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!paystub) return;
-    window.open(`${API_BASE}/paystubs/${paystub.id}/pdf`, '_blank');
+
+    try {
+      await apiService.openPaystubPdf(paystub.id);
+    } catch (downloadError) {
+      toast({
+        title: 'Falha ao baixar PDF',
+        description: getFriendlyError(downloadError, 'Não foi possível abrir o PDF deste holerite.')
+      });
+    }
   };
 
   const handleEditEvent = async (eventItem: NonNullable<PaystubDetail['events']>[number]) => {
@@ -122,13 +129,13 @@ const PaystubDetailPage: React.FC = () => {
     const parsedAmount = parseAmountInput(amountInput);
     if (parsedAmount === null) {
       toast({
-        title: 'Valor invalido',
-        description: 'Informe um valor numerico maior ou igual a zero.'
+        title: 'Valor inválido',
+        description: 'Informe um valor numérico maior ou igual a zero.'
       });
       return;
     }
 
-    const descriptionInput = window.prompt('Nova descricao (opcional)', eventItem.description);
+    const descriptionInput = window.prompt('Nova descrição (opcional)', eventItem.description);
     if (descriptionInput === null) return;
 
     try {
@@ -147,7 +154,7 @@ const PaystubDetailPage: React.FC = () => {
     } catch (updateError) {
       toast({
         title: 'Falha ao atualizar',
-        description: getFriendlyError(updateError, 'Nao foi possivel editar o evento deste holerite.')
+        description: getFriendlyError(updateError, 'Não foi possível editar o evento deste holerite.')
       });
     } finally {
       setUpdatingEventId(null);
@@ -173,7 +180,7 @@ const PaystubDetailPage: React.FC = () => {
             <FileText className="h-12 w-12 mx-auto" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Erro ao carregar</h3>
-          <p className="text-gray-600 mb-4">{error || 'Holerite nao encontrado'}</p>
+          <p className="text-gray-600 mb-4">{error || 'Holerite não encontrado.'}</p>
           <Button onClick={handleBack}>Voltar</Button>
         </div>
       </Layout>
@@ -181,18 +188,18 @@ const PaystubDetailPage: React.FC = () => {
   }
 
   const earningsItems = [
-    { label: 'Salario Base', value: paystub.earnings.baseSalary },
+    { label: 'Salário Base', value: paystub.earnings.baseSalary },
     { label: 'Horas Extras', value: paystub.earnings.overtimeValue },
     { label: 'Adicional Noturno', value: paystub.earnings.nightShiftBonus },
     { label: 'Adicional de Feriados', value: paystub.earnings.holidaysBonus },
-    { label: 'Outros Bonus', value: paystub.earnings.otherBonuses },
+    { label: 'Outros Bônus', value: paystub.earnings.otherBonuses },
   ].filter(item => item.value > 0);
 
   const deductionsItems = [
     { label: 'INSS', value: paystub.deductions.inssDeduction },
     { label: 'IRRF', value: paystub.deductions.irrfDeduction },
     { label: 'Vale Transporte', value: paystub.deductions.transportVoucherDeduction },
-    { label: 'Vale Refeicao', value: paystub.deductions.mealVoucherDeduction },
+    { label: 'Vale Refeição', value: paystub.deductions.mealVoucherDeduction },
     { label: 'Taxa Sindical', value: paystub.deductions.syndicateFee },
     { label: 'Outros Descontos', value: paystub.deductions.otherDeductions },
   ].filter(item => item.value > 0);
@@ -212,12 +219,12 @@ const PaystubDetailPage: React.FC = () => {
               </h1>
               <div className="flex items-center space-x-2 mt-1">
                 <Calendar className="h-4 w-4 text-gray-500" />
-                <span className="text-gray-600">Referencia: {paystub.month}/{paystub.year}</span>
-                {canEdit && <Badge variant="secondary">Edicao liberada</Badge>}
+                <span className="text-gray-600">Referência: {paystub.month}/{paystub.year}</span>
+                {canEdit && <Badge variant="secondary">Edição liberada</Badge>}
               </div>
             </div>
           </div>
-          <Button onClick={handleDownload}>
+          <Button onClick={() => void handleDownload()}>
             <Download className="h-4 w-4 mr-2" />
             Baixar PDF
           </Button>
@@ -228,7 +235,7 @@ const PaystubDetailPage: React.FC = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-700">Salario Bruto</p>
+                  <p className="text-sm font-medium text-green-700">Salário Bruto</p>
                   <p className="text-2xl font-bold text-green-600">
                     {formatCurrency(paystub.summary.grossSalary)}
                   </p>
@@ -260,7 +267,7 @@ const PaystubDetailPage: React.FC = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-700">Salario Liquido</p>
+                  <p className="text-sm font-medium text-blue-700">Salário Líquido</p>
                   <p className="text-2xl font-bold text-blue-600">
                     {formatCurrency(paystub.summary.netSalary)}
                   </p>
@@ -383,7 +390,7 @@ const PaystubDetailPage: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-700">Salario Bruto</span>
+                <span className="text-gray-700">Salário Bruto</span>
                 <span className="font-semibold">
                   {formatCurrency(paystub.summary.grossSalary)}
                 </span>
@@ -396,7 +403,7 @@ const PaystubDetailPage: React.FC = () => {
               </div>
               <Separator />
               <div className="flex justify-between items-center py-2 bg-blue-100 px-3 rounded">
-                <span className="font-bold text-blue-800">Salario Liquido</span>
+                <span className="font-bold text-blue-800">Salário Líquido</span>
                 <span className="font-bold text-blue-600 text-xl">
                   {formatCurrency(paystub.summary.netSalary)}
                 </span>
@@ -406,23 +413,23 @@ const PaystubDetailPage: React.FC = () => {
 
           <Card className="bg-gradient-to-r from-purple-50 to-violet-50 border-purple-200">
             <CardHeader>
-              <CardTitle className="text-purple-800">Informacoes Adicionais</CardTitle>
+              <CardTitle className="text-purple-800">Informações Adicionais</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-700">Deposito FGTS (8%)</span>
+                <span className="text-gray-700">Depósito FGTS (8%)</span>
                 <span className="font-semibold text-purple-600">
                   {formatCurrency(paystub.summary.fgtsDeposit)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-700">Base de Calculo FGTS</span>
+                <span className="text-gray-700">Base de Cálculo FGTS</span>
                 <span className="font-semibold">
                   {formatCurrency(paystub.summary.fgtsDeposit * 12.5)}
                 </span>
               </div>
               <div className="text-xs text-gray-500 mt-2">
-                O FGTS e depositado mensalmente na conta vinculada quando aplicavel.
+                O FGTS é depositado mensalmente na conta vinculada quando aplicável.
               </div>
             </CardContent>
           </Card>

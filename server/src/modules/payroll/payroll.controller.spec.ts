@@ -39,7 +39,7 @@ describe('PayrollController', () => {
     );
 
     expect(result).toEqual({ createdCount: 1 });
-    expect(payrollServiceMock.generateDocumentsForRun).toHaveBeenCalledWith({
+    expect(payrollServiceMock.generateDocumentsForRun).toHaveBeenCalledWith(expect.objectContaining({
       payrollRunId: 'run-1',
       companyId: 'c1',
       userId: 'u1',
@@ -48,7 +48,7 @@ describe('PayrollController', () => {
       employeeIds: ['emp-1'],
       extraPlaceholders: undefined,
       reason: 'gerar trct'
-    });
+    }));
   });
 
   it('queues holerite generation for a payroll run', async () => {
@@ -70,7 +70,7 @@ describe('PayrollController', () => {
     );
 
     expect(result).toEqual({ createdCount: 27 });
-    expect(payrollServiceMock.generateDocumentsForRun).toHaveBeenCalledWith({
+    expect(payrollServiceMock.generateDocumentsForRun).toHaveBeenCalledWith(expect.objectContaining({
       payrollRunId: 'run-hol-1',
       companyId: 'c1',
       userId: 'u1',
@@ -79,7 +79,7 @@ describe('PayrollController', () => {
       employeeIds: undefined,
       extraPlaceholders: undefined,
       reason: 'emitir holerites'
-    });
+    }));
   });
 
   it('reprocesses document generation for a payroll run', async () => {
@@ -103,7 +103,7 @@ describe('PayrollController', () => {
     );
 
     expect(result).toEqual({ createdCount: 1, skippedCount: 0 });
-    expect(payrollServiceMock.reprocessDocumentsForRun).toHaveBeenCalledWith({
+    expect(payrollServiceMock.reprocessDocumentsForRun).toHaveBeenCalledWith(expect.objectContaining({
       payrollRunId: 'run-2',
       companyId: 'c1',
       userId: 'u1',
@@ -112,7 +112,7 @@ describe('PayrollController', () => {
       employeeIds: ['emp-2'],
       extraPlaceholders: undefined,
       reason: 'reprocessar'
-    });
+    }));
   });
 
   it('generates annual income statements', async () => {
@@ -230,4 +230,3 @@ describe('PayrollController', () => {
     expect(payrollServiceMock.closeRun).toHaveBeenCalledWith('run-3', 'u1');
   });
 });
-

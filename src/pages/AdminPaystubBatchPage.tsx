@@ -31,6 +31,7 @@ const AdminPaystubBatchPage: React.FC = () => {
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [loading, setLoading] = useState(false);
   const [emittingId, setEmittingId] = useState<string | null>(null);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
 
   const getFriendlyError = (error: unknown, fallback: string) => {
     if (error instanceof Error) {
@@ -58,8 +59,8 @@ const AdminPaystubBatchPage: React.FC = () => {
       setRuns(sorted);
     } catch (error) {
       toast({
-        title: 'Falha ao carregar competências',
-        description: getFriendlyError(error, 'Não foi possível carregar as competências informadas.')
+        title: 'Falha ao carregar competencias',
+        description: getFriendlyError(error, 'Nao foi possivel carregar as competencias informadas.')
       });
       setRuns([]);
     } finally {
@@ -67,22 +68,26 @@ const AdminPaystubBatchPage: React.FC = () => {
     }
   };
 
+  const ensureCalculated = async (run: PayrollRun) => {
+    if (run.status !== 'draft') return run.status;
+
+    toast({
+      title: 'Calculando folha',
+      description: `Competencia ${run.month}/${run.year} em processamento antes da emissao.`
+    });
+
+    const calculatedRun = await payrollApi.calculatePayrollRun(run.id);
+    if (calculatedRun.status === 'draft') {
+      throw new Error('A folha permanece em rascunho apos tentativa de calculo.');
+    }
+
+    return calculatedRun.status;
+  };
+
   const handleEmitPaystubs = async (run: PayrollRun) => {
     setEmittingId(run.id);
     try {
-      let status = run.status;
-      if (status === 'draft') {
-        toast({
-          title: 'Calculando folha',
-          description: `Competência ${run.month}/${run.year} em processamento antes da emissão.`
-        });
-        const calculatedRun = await payrollApi.calculatePayrollRun(run.id);
-        status = calculatedRun.status;
-      }
-
-      if (status === 'draft') {
-        throw new Error('A folha permanece em rascunho após tentativa de cálculo.');
-      }
+      await ensureCalculated(run);
 
       const result = await payrollApi.generateDocumentsFromRun(
         run.id,
@@ -94,24 +99,59 @@ const AdminPaystubBatchPage: React.FC = () => {
       );
 
       const summary = result.skippedCount > 0
-        ? `${result.createdCount} novos e ${result.skippedCount} já existentes.`
+        ? `${result.createdCount} novos e ${result.skippedCount} ja existentes.`
         : `${result.createdCount} holerites emitidos.`;
 
       toast({
-        title: 'Emissão concluída',
-        description: `Competência ${run.month}/${run.year}: ${summary}`
+        title: 'Emissao concluida',
+        description: `Competencia ${run.month}/${run.year}: ${summary}`
       });
 
       await loadRuns();
     } catch (error) {
       toast({
         title: 'Falha ao emitir holerites',
-        description: getFriendlyError(error, 'Não foi possível emitir os holerites da competência.')
+        description: getFriendlyError(error, 'Nao foi possivel emitir os holerites da competencia.')
       });
     } finally {
       setEmittingId(null);
     }
   };
+
+  const handleRegeneratePaystubs = async (run: PayrollRun) => {
+    const confirmed = window.confirm(
+      `Regerar todos os holerites da competencia ${run.month}/${run.year}?\n\nOs holerites atuais serao desativados e novos arquivos serao criados.`
+    );
+
+    if (!confirmed) return;
+
+    setRegeneratingId(run.id);
+    try {
+      await ensureCalculated(run);
+
+      const result = await payrollApi.generateDocumentsFromRun(run.id, {
+        documentType: 'holerite',
+        reason: `regeracao_holerites_${run.month}_${run.year}`,
+        forceRegenerate: true
+      });
+
+      const regenerated = result.regeneratedFromPreviousCount ?? 0;
+      toast({
+        title: 'Regeracao concluida',
+        description: `Competencia ${run.month}/${run.year}: ${result.createdCount} novos, ${regenerated} anteriores desativados.`
+      });
+
+      await loadRuns();
+    } catch (error) {
+      toast({
+        title: 'Falha ao regerar holerites',
+        description: getFriendlyError(error, 'Nao foi possivel regerar os holerites desta competencia.')
+      });
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
+
   useEffect(() => {
     void loadRuns();
   }, []);
@@ -122,7 +162,7 @@ const AdminPaystubBatchPage: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Emitir Holerites</h1>
-            <p className="text-gray-600 mt-1">Escolha a competência e emita em lote com um clique.</p>
+            <p className="text-gray-600 mt-1">Escolha a competencia e emita ou regera com um clique.</p>
           </div>
           <Button variant="outline" onClick={() => void loadRuns()} disabled={loading}>
             <RefreshCcw className="h-4 w-4 mr-2" />
@@ -134,16 +174,16 @@ const AdminPaystubBatchPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Emissão Rápida
+              Emissao Rapida
             </CardTitle>
             <CardDescription>
-              A emissão usa reprocessamento idempotente para evitar duplicidade de holerites.
+              Emissao padrao evita duplicidade. Regerar substitui os holerites existentes da competencia.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <Label>Mês</Label>
+                <Label>Mes</Label>
                 <Input
                   type="number"
                   min={1}
@@ -165,7 +205,7 @@ const AdminPaystubBatchPage: React.FC = () => {
                 />
               </div>
               <Button onClick={() => void loadRuns()} disabled={loading || !month || !year}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar competência'}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar competencia'}
               </Button>
             </div>
 
@@ -175,45 +215,71 @@ const AdminPaystubBatchPage: React.FC = () => {
                 Carregando...
               </div>
             ) : runs.length === 0 ? (
-              <div className="text-sm text-gray-500">Nenhuma competência encontrada para o período informado.</div>
+              <div className="text-sm text-gray-500">Nenhuma competencia encontrada para o periodo informado.</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Competência</TableHead>
+                    <TableHead>Competencia</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Versão</TableHead>
-                    <TableHead>Ações</TableHead>
+                    <TableHead>Versao</TableHead>
+                    <TableHead>Acoes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runs.map((run) => (
-                    <TableRow key={run.id}>
-                      <TableCell>{run.month}/{run.year}</TableCell>
-                      <TableCell>
-                        <Badge className={statusBadgeClass[run.status]}>
-                          {statusLabels[run.status]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>v{run.version}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          onClick={() => void handleEmitPaystubs(run)}
-                          disabled={emittingId === run.id}
-                        >
-                          {emittingId === run.id ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              Emitindo...
-                            </>
-                          ) : (
-                            run.status === 'draft' ? 'Calcular + emitir' : 'Emitir holerites'
-                          )}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {runs.map((run) => {
+                    const isEmitting = emittingId === run.id;
+                    const isRegenerating = regeneratingId === run.id;
+                    const isBusy = isEmitting || isRegenerating;
+
+                    return (
+                      <TableRow key={run.id}>
+                        <TableCell>{run.month}/{run.year}</TableCell>
+                        <TableCell>
+                          <Badge className={statusBadgeClass[run.status]}>
+                            {statusLabels[run.status]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>v{run.version}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => void handleEmitPaystubs(run)}
+                              disabled={isBusy}
+                            >
+                              {isEmitting ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  Emitindo...
+                                </>
+                              ) : run.status === 'draft' ? (
+                                'Calcular + emitir'
+                              ) : (
+                                'Emitir holerites'
+                              )}
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleRegeneratePaystubs(run)}
+                              disabled={isBusy}
+                            >
+                              {isRegenerating ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  Regerando...
+                                </>
+                              ) : (
+                                'Regerar tudo'
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -225,5 +291,3 @@ const AdminPaystubBatchPage: React.FC = () => {
 };
 
 export default AdminPaystubBatchPage;
-
-

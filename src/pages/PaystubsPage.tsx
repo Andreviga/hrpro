@@ -1,6 +1,6 @@
 /**
- * Pagina para listagem de holerites do funcionario
- * Exibe lista de holerites com navegacao para detalhes
+ * Pagina para listagem de holerites do funcionario.
+ * Exibe lista de holerites com navegacao para detalhes.
  */
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { apiService, PaystubSummary } from '../services/api';
-import { API_BASE } from '../services/http';
+import { useToast } from '../hooks/use-toast';
 import {
   FileText,
   Download,
@@ -17,10 +17,22 @@ import {
   Loader2
 } from 'lucide-react';
 
+const getFriendlyError = (error: unknown, fallback: string) => {
+  if (error instanceof Error) {
+    try {
+      const parsed = JSON.parse(error.message);
+      if (parsed?.message) return String(parsed.message);
+    } catch {
+      return error.message || fallback;
+    }
+  }
+  return fallback;
+};
 const PaystubsPage: React.FC = () => {
   const [paystubs, setPaystubs] = useState<PaystubSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { toast } = useToast();
 
   useEffect(() => {
     void loadPaystubs();
@@ -31,8 +43,9 @@ const PaystubsPage: React.FC = () => {
       setLoading(true);
       const data = await apiService.getPaystubs();
       setPaystubs(data);
+      setError('');
     } catch {
-      setError('Erro ao carregar holerites');
+      setError('Erro ao carregar holerites.');
     } finally {
       setLoading(false);
     }
@@ -57,8 +70,15 @@ const PaystubsPage: React.FC = () => {
     window.location.href = `#/paystubs/${id}`;
   };
 
-  const handleDownload = (filePath: string) => {
-    window.open(`${API_BASE}${filePath}`, '_blank');
+  const handleDownload = async (paystubId: string) => {
+    try {
+      await apiService.openPaystubPdf(paystubId);
+    } catch (downloadError) {
+      toast({
+        title: 'Falha ao baixar PDF',
+        description: getFriendlyError(downloadError, 'Nao foi possivel baixar o PDF do holerite. Faca login novamente e tente de novo.')
+      });
+    }
   };
 
   if (loading) {
@@ -94,7 +114,7 @@ const PaystubsPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Meus Holerites</h1>
             <p className="text-gray-600 mt-1">
-              Consulte e baixe seus comprovantes de pagamento
+              Consulte e baixe seus comprovantes de pagamento.
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -174,7 +194,7 @@ const PaystubsPage: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDownload(paystub.filePath!)}
+                          onClick={() => void handleDownload(paystub.id)}
                         >
                           <Download className="h-4 w-4 mr-1" />
                           PDF

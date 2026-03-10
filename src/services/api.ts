@@ -30,6 +30,12 @@ export interface PaystubDetail {
     employeeCode?: string;
     pis?: string;
     dependents?: number;
+    salaryType?: string;
+    baseSalary?: number | null;
+    hourlyRate?: number | null;
+    weeklyHours?: number | null;
+    transportVoucherValue?: number | null;
+    mealVoucherValue?: number | null;
   };
   earnings: {
     baseSalary: number;
@@ -73,6 +79,11 @@ export interface UpdatePaystubEventPayload {
   reason?: string;
 }
 
+const buildAuthHeaders = () => {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : undefined;
+};
+
 export const apiService = {
   async getPaystubs(): Promise<PaystubSummary[]> {
     return request<PaystubSummary[]>('/paystubs');
@@ -102,6 +113,36 @@ export const apiService = {
       method: 'PATCH',
       body: JSON.stringify(payload)
     });
+  },
+
+  async fetchPaystubPdf(paystubId: string): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/paystubs/${paystubId}/pdf`, {
+      headers: buildAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Falha ao carregar PDF do holerite');
+    }
+
+    return response.blob();
+  },
+
+  async openPaystubPdf(paystubId: string): Promise<void> {
+    const blob = await apiService.fetchPaystubPdf(paystubId);
+    const blobUrl = window.URL.createObjectURL(blob);
+    const popup = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+
+    if (!popup) {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `holerite-${paystubId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
   },
 
   async uploadPayroll(file: File): Promise<{
@@ -136,11 +177,10 @@ export const apiService = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const token = getAuthToken();
     const response = await fetch(`${API_BASE}/imports/xlsx`, {
       method: 'POST',
       body: formData,
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      headers: buildAuthHeaders()
     });
 
     if (!response.ok) {

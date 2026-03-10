@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+﻿import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PayrollService } from './payroll.service';
 import PDFDocument from 'pdfkit';
@@ -155,8 +155,11 @@ export class PayrollController {
   }
 
   @Get('paystubs/:id')
-  async getPaystub(@Param('id') id: string) {
-    return this.payroll.getPaystubDetail(id);
+  async getPaystub(
+    @Param('id') id: string,
+    @Req() req: { user: { employeeId?: string | null; companyId: string; role: string } }
+  ) {
+    return this.payroll.getPaystubDetail(id, req.user);
   }
 
   @Patch('paystubs/:id/events/:eventId')
@@ -177,9 +180,14 @@ export class PayrollController {
       reason: body.reason
     });
   }
+
   @Get('paystubs/:id/pdf')
-  async paystubPdf(@Param('id') id: string, @Res() res: Response) {
-    const detail = await this.payroll.getPaystubDetail(id);
+  async paystubPdf(
+    @Param('id') id: string,
+    @Req() req: { user: { employeeId?: string | null; companyId: string; role: string } },
+    @Res() res: Response
+  ) {
+    const detail = await this.payroll.getPaystubDetail(id, req.user);
 
     const formatCurrency = (value: number) => `R$ ${Number(value ?? 0).toFixed(2).replace('.', ',')}`;
     const formatDate = (value?: string | Date | null) => {
@@ -187,133 +195,285 @@ export class PayrollController {
       const parsed = new Date(value);
       return Number.isNaN(parsed.getTime()) ? '--' : parsed.toLocaleDateString('pt-BR');
     };
+    const formatNumber = (value: number | null | undefined, decimals = 2) => {
+      if (value === null || value === undefined || !Number.isFinite(Number(value))) return '--';
+      return Number(value).toFixed(decimals).replace('.', ',');
+    };
+    const formatHours = (value: number | null | undefined) => {
+      if (value === null || value === undefined || !Number.isFinite(Number(value))) return '--';
+      return `${formatNumber(Number(value), 2)}h`;
+    };
+
+    const salaryTypeLabel = detail.employee?.salaryType === 'hourly'
+      ? 'Horista / Professor(a)'
+      : detail.employee?.salaryType === 'monthly'
+        ? 'Mensalista'
+        : '--';
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename=holerite-${detail.year}-${detail.month}.pdf`);
 
-    const doc = new PDFDocument({ size: 'A4', margin: 28 });
+    const doc = new PDFDocument({ size: 'A4', margin: 24 });
     doc.pipe(res);
 
+    const xStart = doc.page.margins.left;
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const pageBottom = doc.page.height - doc.page.margins.bottom;
+    const competence = `${String(detail.month).padStart(2, '0')}/${detail.year}`;
 
-    doc.fontSize(13).text('DEMONSTRATIVO DE PAGAMENTO', { align: 'center' });
-    doc.moveDown(0.35);
-    doc.fontSize(10).text(detail.company?.name ?? 'EMPRESA NAO INFORMADA');
+    doc.font('Helvetica-Bold').fontSize(13).text('DEMONSTRATIVO DE PAGAMENTO', { align: 'center' });
+    doc.moveDown(0.2);
     doc
-      .fontSize(9)
-      .text(`CNPJ: ${detail.company?.cnpj ?? '--'}   Competencia: ${String(detail.month).padStart(2, '0')}/${detail.year}`);
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .text(detail.company?.name ?? 'EMPRESA NAO INFORMADA', xStart, doc.y, { width: pageWidth });
+    doc
+      .font('Helvetica')
+      .fontSize(8.5)
+      .text(`CNPJ: ${detail.company?.cnpj ?? '--'}    Competencia: ${competence}`, xStart, doc.y + 1, {
+        width: pageWidth
+      });
 
-    doc.moveDown(0.35);
+    const employeeBlockTop = doc.y + 8;
+    doc.rect(xStart, employeeBlockTop, pageWidth, 58).stroke();
     doc
-      .fontSize(9)
-      .text(`Funcionario: ${detail.employee?.fullName ?? '--'}`)
-      .text(`CPF: ${detail.employee?.cpf ?? '--'}   Cargo: ${detail.employee?.position ?? '--'}`)
+      .font('Helvetica')
+      .fontSize(8.5)
+      .text(`Funcionario: ${detail.employee?.fullName ?? '--'}`, xStart + 8, employeeBlockTop + 8, {
+        width: pageWidth - 16
+      })
       .text(
-        `Matricula: ${detail.employee?.employeeCode ?? '--'}   PIS: ${detail.employee?.pis ?? '--'}   Admissao: ${formatDate(
-          detail.employee?.admissionDate
-        )}`
+        `Codigo: ${detail.employee?.employeeCode ?? '--'}    CPF: ${detail.employee?.cpf ?? '--'}    PIS: ${detail.employee?.pis ?? '--'}`,
+        xStart + 8,
+        employeeBlockTop + 24,
+        { width: pageWidth - 16 }
+      )
+      .text(
+        `Cargo: ${detail.employee?.position ?? '--'}    Departamento: ${detail.employee?.department ?? '--'}    Admissao: ${formatDate(detail.employee?.admissionDate)}`,
+        xStart + 8,
+        employeeBlockTop + 40,
+        { width: pageWidth - 16 }
       );
 
-    doc.moveDown(0.45);
+    let y = employeeBlockTop + 66;
 
-    const codeWidth = 60;
-    const descWidth = 250;
-    const amountWidth = (pageWidth - codeWidth - descWidth) / 2;
-    const xStart = doc.page.margins.left;
+    const contractHeight = 42;
+    const contractCellWidth = pageWidth / 4;
+    doc.rect(xStart, y, pageWidth, contractHeight).stroke();
+    for (let index = 1; index < 4; index += 1) {
+      const xLine = xStart + contractCellWidth * index;
+      doc.moveTo(xLine, y).lineTo(xLine, y + contractHeight).stroke();
+    }
 
-    let y = doc.y;
+    const estimatedMonthlyHours =
+      detail.employee?.weeklyHours === null || detail.employee?.weeklyHours === undefined
+        ? null
+        : Number(detail.employee.weeklyHours) * 5;
+
+    const contractItems = [
+      { label: 'Tipo Salario', value: salaryTypeLabel },
+      { label: 'Salario Base', value: formatCurrency(Number(detail.employee?.baseSalary ?? 0)) },
+      { label: 'Valor Hora/Aula', value: formatCurrency(Number(detail.employee?.hourlyRate ?? 0)) },
+      { label: 'Carga Semanal', value: `${formatHours(detail.employee?.weeklyHours)} (Mes est.: ${formatHours(estimatedMonthlyHours)})` }
+    ];
+
+    contractItems.forEach((item, index) => {
+      const xCell = xStart + contractCellWidth * index;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7.5)
+        .text(item.label, xCell + 6, y + 6, { width: contractCellWidth - 12 });
+      doc
+        .font('Helvetica')
+        .fontSize(8)
+        .text(item.value, xCell + 6, y + 20, { width: contractCellWidth - 12 });
+    });
+
+    y += contractHeight + 10;
+
+    const colCode = 52;
+    const colDesc = 214;
+    const colRef = 70;
+    const colEarnings = 100;
+    const colDeductions = pageWidth - colCode - colDesc - colRef - colEarnings;
+    const rowHeight = 18;
+
+    const drawGrid = (currentY: number, height: number) => {
+      doc.rect(xStart, currentY, pageWidth, height).stroke();
+      let currentX = xStart + colCode;
+      doc.moveTo(currentX, currentY).lineTo(currentX, currentY + height).stroke();
+      currentX += colDesc;
+      doc.moveTo(currentX, currentY).lineTo(currentX, currentY + height).stroke();
+      currentX += colRef;
+      doc.moveTo(currentX, currentY).lineTo(currentX, currentY + height).stroke();
+      currentX += colEarnings;
+      doc.moveTo(currentX, currentY).lineTo(currentX, currentY + height).stroke();
+    };
 
     const drawTableHeader = () => {
-      doc.rect(xStart, y, codeWidth + descWidth + amountWidth * 2, 20).stroke();
+      drawGrid(y, rowHeight);
       doc
-        .fontSize(9)
-        .text('Codigo', xStart + 6, y + 6, { width: codeWidth - 8 })
-        .text('Descricao', xStart + codeWidth + 6, y + 6, { width: descWidth - 8 })
-        .text('Proventos', xStart + codeWidth + descWidth + 6, y + 6, { width: amountWidth - 8, align: 'right' })
-        .text('Descontos', xStart + codeWidth + descWidth + amountWidth + 6, y + 6, {
-          width: amountWidth - 8,
+        .font('Helvetica-Bold')
+        .fontSize(8)
+        .text('Codigo', xStart + 5, y + 5, { width: colCode - 10 })
+        .text('Descricao', xStart + colCode + 5, y + 5, { width: colDesc - 10 })
+        .text('Referencia', xStart + colCode + colDesc + 5, y + 5, { width: colRef - 10 })
+        .text('Proventos', xStart + colCode + colDesc + colRef + 5, y + 5, {
+          width: colEarnings - 10,
+          align: 'right'
+        })
+        .text('Descontos', xStart + colCode + colDesc + colRef + colEarnings + 5, y + 5, {
+          width: colDeductions - 10,
           align: 'right'
         });
-
-      y += 20;
+      y += rowHeight;
     };
 
     const ensureSpace = (requiredHeight: number) => {
-      if (y + requiredHeight < doc.page.height - doc.page.margins.bottom) return;
+      if (y + requiredHeight <= pageBottom) return;
       doc.addPage();
       y = doc.page.margins.top;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .text(`DEMONSTRATIVO DE PAGAMENTO - ${detail.employee?.fullName ?? '--'} (${competence})`, xStart, y, {
+          width: pageWidth
+        });
+      y = doc.y + 6;
       drawTableHeader();
     };
 
     drawTableHeader();
 
-    const rows = (detail.events ?? []).map((event: any) => ({
-      code: event.code,
-      description: event.description,
-      provento: event.type === 'earning' ? Number(event.amount) : 0,
-      desconto: event.type === 'deduction' ? Number(event.amount) : 0
-    }));
+    const rows = (detail.events ?? []).map((event: any) => {
+      let reference = '--';
+      if (event.code === 'BASE') {
+        reference = detail.employee?.salaryType === 'monthly' ? 'MES' : formatHours(detail.employee?.weeklyHours);
+      } else if (event.code === 'EXTRA' || event.code === 'HORA_ATV') {
+        reference = formatHours(detail.employee?.weeklyHours);
+      }
+
+      return {
+        code: event.code,
+        description: event.description,
+        reference,
+        provento: event.type === 'earning' ? Number(event.amount) : 0,
+        desconto: event.type === 'deduction' ? Number(event.amount) : 0
+      };
+    });
 
     for (const row of rows) {
-      ensureSpace(18);
-      doc.rect(xStart, y, codeWidth + descWidth + amountWidth * 2, 18).stroke();
+      ensureSpace(rowHeight + 2);
+      drawGrid(y, rowHeight);
       doc
-        .fontSize(8.5)
-        .text(String(row.code ?? ''), xStart + 6, y + 5, { width: codeWidth - 8 })
-        .text(String(row.description ?? ''), xStart + codeWidth + 6, y + 5, { width: descWidth - 10 })
-        .text(row.provento ? formatCurrency(row.provento) : '', xStart + codeWidth + descWidth + 6, y + 5, {
-          width: amountWidth - 8,
+        .font('Helvetica')
+        .fontSize(8)
+        .text(String(row.code ?? ''), xStart + 5, y + 5, { width: colCode - 10 })
+        .text(String(row.description ?? ''), xStart + colCode + 5, y + 5, { width: colDesc - 10 })
+        .text(String(row.reference ?? '--'), xStart + colCode + colDesc + 5, y + 5, { width: colRef - 10 })
+        .text(row.provento ? formatCurrency(row.provento) : '', xStart + colCode + colDesc + colRef + 5, y + 5, {
+          width: colEarnings - 10,
           align: 'right'
         })
-        .text(row.desconto ? formatCurrency(row.desconto) : '', xStart + codeWidth + descWidth + amountWidth + 6, y + 5, {
-          width: amountWidth - 8,
+        .text(row.desconto ? formatCurrency(row.desconto) : '', xStart + colCode + colDesc + colRef + colEarnings + 5, y + 5, {
+          width: colDeductions - 10,
           align: 'right'
         });
-      y += 18;
+      y += rowHeight;
     }
 
-    ensureSpace(86);
+    ensureSpace(120);
 
-    doc.moveTo(xStart, y + 6).lineTo(xStart + codeWidth + descWidth + amountWidth * 2, y + 6).stroke();
-    y += 12;
+    const totalsTop = y + 6;
+    const totalsHeight = 26;
+    const totalsColumnWidth = pageWidth / 3;
+
+    doc.rect(xStart, totalsTop, pageWidth, totalsHeight).stroke();
+    doc
+      .moveTo(xStart + totalsColumnWidth, totalsTop)
+      .lineTo(xStart + totalsColumnWidth, totalsTop + totalsHeight)
+      .stroke();
+    doc
+      .moveTo(xStart + totalsColumnWidth * 2, totalsTop)
+      .lineTo(xStart + totalsColumnWidth * 2, totalsTop + totalsHeight)
+      .stroke();
 
     doc
-      .fontSize(10)
-      .text(`Salario Bruto: ${formatCurrency(detail.summary.grossSalary)}`, xStart, y)
-      .text(`Total Descontos: ${formatCurrency(detail.summary.totalDeductions)}`, xStart + 220, y)
-      .fontSize(11)
-      .text(`Salario Liquido: ${formatCurrency(detail.summary.netSalary)}`, xStart + 430, y, {
-        width: 120,
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('Salario Bruto', xStart + 6, totalsTop + 4, { width: totalsColumnWidth - 12 })
+      .text('Total Descontos', xStart + totalsColumnWidth + 6, totalsTop + 4, { width: totalsColumnWidth - 12 })
+      .text('Salario Liquido', xStart + totalsColumnWidth * 2 + 6, totalsTop + 4, { width: totalsColumnWidth - 12 });
+
+    doc
+      .font('Helvetica')
+      .fontSize(9)
+      .text(formatCurrency(detail.summary.grossSalary), xStart + 6, totalsTop + 14, {
+        width: totalsColumnWidth - 12,
+        align: 'right'
+      })
+      .text(formatCurrency(detail.summary.totalDeductions), xStart + totalsColumnWidth + 6, totalsTop + 14, {
+        width: totalsColumnWidth - 12,
+        align: 'right'
+      })
+      .text(formatCurrency(detail.summary.netSalary), xStart + totalsColumnWidth * 2 + 6, totalsTop + 14, {
+        width: totalsColumnWidth - 12,
         align: 'right'
       });
 
-    y += 24;
+    y = totalsTop + totalsHeight + 6;
+
+    const basesTop = y;
+    const basesHeight = 30;
+    const baseColumnWidth = pageWidth / 4;
+
+    doc.rect(xStart, basesTop, pageWidth, basesHeight).stroke();
+    for (let index = 1; index < 4; index += 1) {
+      const xLine = xStart + baseColumnWidth * index;
+      doc.moveTo(xLine, basesTop).lineTo(xLine, basesTop + basesHeight).stroke();
+    }
+
+    const baseItems = [
+      { label: 'Base INSS', value: formatCurrency(detail.bases?.inssBase ?? detail.summary.grossSalary) },
+      { label: 'Base FGTS', value: formatCurrency(detail.bases?.fgtsBase ?? detail.summary.grossSalary) },
+      { label: 'Base IRRF', value: formatCurrency(detail.bases?.irrfBase ?? 0) },
+      { label: 'FGTS (8%)', value: formatCurrency(detail.summary.fgtsDeposit) }
+    ];
+
+    baseItems.forEach((item, index) => {
+      const xCell = xStart + baseColumnWidth * index;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7.5)
+        .text(item.label, xCell + 6, basesTop + 5, { width: baseColumnWidth - 12 });
+      doc
+        .font('Helvetica')
+        .fontSize(8.5)
+        .text(item.value, xCell + 6, basesTop + 16, { width: baseColumnWidth - 12, align: 'right' });
+    });
+
+    y = basesTop + basesHeight + 12;
 
     doc
-      .fontSize(9)
-      .text(
-        `Bases -> INSS: ${formatCurrency(detail.bases?.inssBase ?? detail.summary.grossSalary)} | FGTS: ${formatCurrency(
-          detail.bases?.fgtsBase ?? detail.summary.grossSalary
-        )} | IRRF: ${formatCurrency(detail.bases?.irrfBase ?? 0)}`,
-        xStart,
-        y
-      )
-      .text(`FGTS (8%): ${formatCurrency(detail.summary.fgtsDeposit)}`, xStart, y + 14);
-
-    y += 42;
-
-    doc
+      .font('Helvetica')
       .fontSize(8.5)
-      .text(
-        'Recebi da empresa acima identificada a importancia liquida deste demonstrativo de pagamento.',
-        xStart,
-        y,
-        { width: pageWidth }
-      );
+      .text('Recebi da empresa acima identificada a importancia liquida deste demonstrativo de pagamento.', xStart, y, {
+        width: pageWidth
+      });
+
+    const signatureY = y + 24;
+    doc.moveTo(xStart + 20, signatureY).lineTo(xStart + 220, signatureY).stroke();
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .text('Assinatura do(a) colaborador(a)', xStart + 58, signatureY + 4, { width: 130, align: 'center' })
+      .text(`Emitido em ${formatDate(new Date())}`, xStart + pageWidth - 150, signatureY + 4, {
+        width: 150,
+        align: 'right'
+      });
 
     doc.end();
   }
-
   @Post('payroll-runs/:id/documents')
   @Roles('admin', 'rh', 'manager')
   async generateDocuments(
@@ -325,6 +485,7 @@ export class PayrollController {
       employeeIds?: string[];
       extraPlaceholders?: Record<string, string>;
       reason?: string;
+      forceRegenerate?: boolean;
     },
     @Req() req: { user: { companyId: string; sub: string } }
   ) {
@@ -336,7 +497,8 @@ export class PayrollController {
       templateId: body.templateId,
       employeeIds: body.employeeIds,
       extraPlaceholders: body.extraPlaceholders,
-      reason: body.reason
+      reason: body.reason,
+      forceRegenerate: body.forceRegenerate
     });
   }
 
@@ -351,6 +513,7 @@ export class PayrollController {
       employeeIds?: string[];
       extraPlaceholders?: Record<string, string>;
       reason?: string;
+      forceRegenerate?: boolean;
     },
     @Req() req: { user: { companyId: string; sub: string } }
   ) {
@@ -362,7 +525,8 @@ export class PayrollController {
       templateId: body.templateId,
       employeeIds: body.employeeIds,
       extraPlaceholders: body.extraPlaceholders,
-      reason: body.reason
+      reason: body.reason,
+      forceRegenerate: body.forceRegenerate
     });
   }
 }

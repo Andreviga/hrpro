@@ -37,6 +37,9 @@ describe('PayrollService document generation', () => {
     company: {
       findUnique: jest.fn()
     },
+    taxTableIrrf: {
+      findFirst: jest.fn()
+    },
     $transaction: jest.fn()
   } as any;
 
@@ -165,6 +168,64 @@ describe('PayrollService document generation', () => {
     );
   });
 
+
+  it('force regenerates payroll documents by replacing previous files', async () => {
+    prisma.payrollRun.findUnique.mockResolvedValue({
+      id: 'run-force-1',
+      companyId: 'c1',
+      month: 2,
+      year: 2026
+    });
+
+    documents.ensurePaystubTemplate.mockResolvedValue({
+      created: false,
+      template: {
+        id: 'tpl-hol-force-1',
+        companyId: 'c1',
+        type: 'holerite',
+        name: 'Holerite Padrao'
+      }
+    });
+
+    prisma.payrollResult.findMany.mockResolvedValue([
+      {
+        employeeId: 'e-force-1',
+        grossSalary: 3000,
+        totalDeductions: 300,
+        netSalary: 2700,
+        fgts: 240,
+        employee: { fullName: 'Ana', cpf: '111', position: 'Docente', department: 'pedagogico' }
+      }
+    ]);
+
+    prisma.employeeDocument.updateMany.mockResolvedValue({ count: 1 });
+    documents.createDocumentFromTemplate.mockResolvedValue({ id: 'doc-force-1' });
+
+    const service = new PayrollService(prisma, audit, documents);
+
+    const result = await service.generateDocumentsForRun({
+      payrollRunId: 'run-force-1',
+      companyId: 'c1',
+      userId: 'u1',
+      documentType: 'holerite',
+      forceRegenerate: true,
+      reason: 'teste_forcar_regeneracao'
+    });
+
+    expect(prisma.employeeDocument.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          payrollRunId: 'run-force-1',
+          type: 'holerite'
+        })
+      })
+    );
+
+    expect(result).toMatchObject({
+      createdCount: 1,
+      regeneratedFromPreviousCount: 1
+    });
+  });
   it('generates annual income statements from closed runs', async () => {
     prisma.company.findUnique.mockResolvedValue({ id: 'c1', cnpj: '12345678000199', name: 'Escola X' });
 
@@ -403,6 +464,106 @@ describe('PayrollService document generation', () => {
       deletedDocumentsCount: 1
     });
   });
+  it('returns paystub detail with event ids and contract fields', async () => {
+    prisma.payrollResult.findUnique.mockResolvedValue({
+      id: 'pay-detail-1',
+      employeeId: 'emp-1',
+      grossSalary: 1000,
+      totalDeductions: 100,
+      netSalary: 900,
+      fgts: 80,
+      payrollRun: {
+        companyId: 'c1',
+        month: 2,
+        year: 2026,
+        company: { name: 'Escola Teste', cnpj: '12345678000199' }
+      },
+      employee: {
+        fullName: 'Ana Teste',
+        cpf: '111',
+        position: 'Professora',
+        department: 'pedagogico',
+        admissionDate: new Date('2025-01-10T00:00:00Z'),
+        employeeCode: 'A10',
+        pis: 'P123',
+        dependents: 1,
+        salaryType: 'hourly',
+        baseSalary: 3000,
+        hourlyRate: 50,
+        weeklyHours: 20,
+        transportVoucherValue: 100,
+        mealVoucherValue: 180
+      },
+      events: [
+        { id: 'ev-1', code: 'BASE', description: 'Base', type: 'earning', amount: 1000 },
+        { id: 'ev-2', code: 'INSS', description: 'INSS', type: 'deduction', amount: 100 }
+      ]
+    });
+
+    prisma.taxTableIrrf.findFirst.mockResolvedValue({ dependentDeduction: 189.59 });
+
+    const service = new PayrollService(prisma, audit, documents);
+
+    const result = await service.getPaystubDetail('pay-detail-1', {
+      companyId: 'c1',
+      role: 'admin',
+      employeeId: null
+    });
+
+    expect(result.events?.[0]).toMatchObject({ id: 'ev-1', code: 'BASE' });
+    expect(result.employee).toMatchObject({
+      salaryType: 'hourly',
+      baseSalary: 3000,
+      hourlyRate: 50,
+      weeklyHours: 20,
+      transportVoucherValue: 100,
+      mealVoucherValue: 180
+    });
+  });
+
+  it('blocks paystub detail access for a different employee', async () => {
+    prisma.payrollResult.findUnique.mockResolvedValue({
+      id: 'pay-detail-2',
+      employeeId: 'emp-1',
+      grossSalary: 1000,
+      totalDeductions: 100,
+      netSalary: 900,
+      fgts: 80,
+      payrollRun: {
+        companyId: 'c1',
+        month: 2,
+        year: 2026,
+        company: { name: 'Escola Teste', cnpj: '12345678000199' }
+      },
+      employee: {
+        fullName: 'Ana Teste',
+        cpf: '111',
+        position: 'Professora',
+        department: 'pedagogico',
+        admissionDate: null,
+        employeeCode: 'A10',
+        pis: 'P123',
+        dependents: 0,
+        salaryType: 'monthly',
+        baseSalary: 2000,
+        hourlyRate: null,
+        weeklyHours: null,
+        transportVoucherValue: null,
+        mealVoucherValue: null
+      },
+      events: []
+    });
+
+    const service = new PayrollService(prisma, audit, documents);
+
+    await expect(
+      service.getPaystubDetail('pay-detail-2', {
+        companyId: 'c1',
+        role: 'employee',
+        employeeId: 'emp-999'
+      })
+    ).rejects.toThrow('Paystub not found');
+  });
   it('updates paystub event and recalculates totals', async () => {
     prisma.payrollResult.findUnique.mockResolvedValue({
       id: 'pay-1',
@@ -533,4 +694,3 @@ describe('PayrollService document generation', () => {
     }));
   });
 });
-

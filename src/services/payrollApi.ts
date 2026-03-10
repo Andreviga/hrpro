@@ -80,6 +80,7 @@ export const payrollApi = {
       templateId?: string;
       employeeIds?: string[];
       reason?: string;
+      forceRegenerate?: boolean;
     },
     reprocess = false
   ) {
@@ -87,7 +88,7 @@ export const payrollApi = {
       ? `/payroll-runs/${payrollRunId}/documents/reprocess`
       : `/payroll-runs/${payrollRunId}/documents`;
 
-    return request<{ createdCount: number; skippedCount: number }>(endpoint, {
+    return request<{ createdCount: number; skippedCount: number; regeneratedFromPreviousCount?: number }>(endpoint, {
       method: 'POST',
       body: JSON.stringify(payload)
     });
@@ -108,5 +109,3 @@ export const payrollApi = {
     return request<PayrollRunSummary>(`/payroll/runs/summary?${params.toString()}`);
   }
 };
-
-

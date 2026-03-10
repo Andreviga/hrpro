@@ -525,7 +525,10 @@ export class PayrollService {
     return calculatePayrollForEmployee({ employee, inssTable, irrfTable, month, year });
   }
 
-  async getPaystubDetail(paystubId: string) {
+  async getPaystubDetail(
+    paystubId: string,
+    requester?: { companyId: string; role: string; employeeId?: string | null }
+  ) {
     const result = await this.prisma.payrollResult.findUnique({
       where: { id: paystubId },
       include: {
@@ -536,6 +539,17 @@ export class PayrollService {
     });
 
     if (!result) throw new NotFoundException('Paystub not found');
+
+    if (requester) {
+      const isAdminScope = ['admin', 'rh', 'manager'].includes(requester.role);
+      if (isAdminScope) {
+        if (result.payrollRun.companyId !== requester.companyId) {
+          throw new NotFoundException('Paystub not found');
+        }
+      } else if (!requester.employeeId || requester.employeeId !== result.employeeId) {
+        throw new NotFoundException('Paystub not found');
+      }
+    }
 
     const earnings = result.events.filter((event) => event.type === 'earning');
     const deductions = result.events.filter((event) => event.type === 'deduction');
@@ -558,6 +572,7 @@ export class PayrollService {
 
     const events = result.events
       .map((event) => ({
+        id: event.id,
         code: event.code,
         description: event.description,
         type: event.type,
@@ -584,7 +599,14 @@ export class PayrollService {
         admissionDate: result.employee.admissionDate,
         employeeCode: result.employee.employeeCode,
         pis: result.employee.pis,
-        dependents: result.employee.dependents
+        dependents: result.employee.dependents,
+        salaryType: result.employee.salaryType,
+        baseSalary: result.employee.baseSalary === null ? null : Number(result.employee.baseSalary),
+        hourlyRate: result.employee.hourlyRate === null ? null : Number(result.employee.hourlyRate),
+        weeklyHours: result.employee.weeklyHours === null ? null : Number(result.employee.weeklyHours),
+        transportVoucherValue:
+          result.employee.transportVoucherValue === null ? null : Number(result.employee.transportVoucherValue),
+        mealVoucherValue: result.employee.mealVoucherValue === null ? null : Number(result.employee.mealVoucherValue)
       },
       month: result.payrollRun.month,
       year: result.payrollRun.year,
@@ -1028,6 +1050,7 @@ export class PayrollService {
     extraPlaceholders?: Record<string, string>;
     reason?: string;
     idempotent?: boolean;
+    forceRegenerate?: boolean;
     source?: 'manual' | 'auto_close' | 'reprocess';
   }) {
     const payrollRun = await this.prisma.payrollRun.findUnique({ where: { id: params.payrollRunId } });
@@ -1066,12 +1089,34 @@ export class PayrollService {
       include: { employee: true }
     });
 
-    const idempotent = params.idempotent ?? false;
+    const employeeIds = results.map((item) => item.employeeId);
+
+    let regeneratedFromPreviousCount = 0;
+    if (params.forceRegenerate && employeeIds.length > 0) {
+      const now = new Date();
+      const deletedResult = await this.prisma.employeeDocument.updateMany({
+        where: {
+          companyId: params.companyId,
+          payrollRunId: payrollRun.id,
+          type: params.documentType as any,
+          employeeId: { in: employeeIds },
+          deletedAt: null
+        },
+        data: {
+          deletedAt: now,
+          deletedBy: params.userId ?? null,
+          deletedReason: params.reason ?? 'force_regenerate_documents'
+        }
+      });
+      regeneratedFromPreviousCount = Number(deletedResult?.count ?? 0);
+    }
+
+    const idempotent = params.forceRegenerate ? false : params.idempotent ?? false;
     const existingWhere = idempotent
       ? ({
           payrollRunId: payrollRun.id,
           type: params.documentType as any,
-          employeeId: { in: results.map((item) => item.employeeId) },
+          employeeId: { in: employeeIds },
           deletedAt: null
         } as any)
       : null;
@@ -1137,16 +1182,23 @@ export class PayrollService {
       after: {
         documentType: params.documentType,
         source: params.source ?? 'manual',
+        forceRegenerate: params.forceRegenerate ?? false,
+        regeneratedFromPreviousCount,
         createdCount: created.length,
         skippedCount: skipped.length
       }
     });
 
     this.logger.log(
-      `Documents generated for run ${payrollRun.id}: created=${created.length}, skipped=${skipped.length}.`
+      `Documents generated for run ${payrollRun.id}: created=${created.length}, skipped=${skipped.length}, regenerated=${regeneratedFromPreviousCount}.`
     );
 
-    return { createdCount: created.length, skippedCount: skipped.length, documents: created };
+    return {
+      createdCount: created.length,
+      skippedCount: skipped.length,
+      regeneratedFromPreviousCount,
+      documents: created
+    };
   }
 
   async reprocessDocumentsForRun(params: {
@@ -1158,10 +1210,12 @@ export class PayrollService {
     employeeIds?: string[];
     extraPlaceholders?: Record<string, string>;
     reason?: string;
+    forceRegenerate?: boolean;
   }) {
     return this.generateDocumentsForRun({
       ...params,
       idempotent: true,
+      forceRegenerate: params.forceRegenerate,
       source: 'reprocess'
     });
   }
@@ -1288,4 +1342,3 @@ export class PayrollService {
     };
   }
 }
-
