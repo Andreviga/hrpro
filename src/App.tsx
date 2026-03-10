@@ -25,6 +25,7 @@ import AdminPayrollRunsPage from './pages/AdminPayrollRunsPage';
 import AdminFormulasPage from './pages/AdminFormulasPage';
 import AdminPayrollGridPage from './pages/AdminPayrollGridPage';
 import AdminPaystubBatchPage from './pages/AdminPaystubBatchPage';
+import AdminEsocialPage from './pages/AdminEsocialPage';
 import { Toaster } from './components/ui/toaster';
 
 export default function App() {
@@ -182,6 +183,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminPaystubBatchPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/esocial" 
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminEsocialPage />
               </ProtectedRoute>
             } 
           />

@@ -4,6 +4,7 @@ export interface Employee {
   id: string;
   fullName: string;
   cpf: string;
+  employerCnpj?: string;
   rg?: string;
   birthDate?: string;
   motherName?: string;
@@ -157,6 +158,7 @@ const mapEmployee = (apiEmployee: any): Employee => {
     id: apiEmployee.id,
     fullName: apiEmployee.fullName,
     cpf: apiEmployee.cpf,
+    employerCnpj: apiEmployee.employerCnpj || undefined,
     rg: apiEmployee.rg || undefined,
     birthDate: apiEmployee.birthDate || undefined,
     motherName: apiEmployee.motherName || undefined,
@@ -248,11 +250,13 @@ export const employeeApi = {
     status?: string;
     department?: string;
     position?: string;
+    employerCnpj?: string;
   }): Promise<Employee[]> {
     const query = new URLSearchParams();
     if (filters?.status) query.set('status', filters.status);
     if (filters?.department) query.set('department', filters.department);
     if (filters?.position) query.set('position', filters.position);
+    if (filters?.employerCnpj) query.set('employerCnpj', filters.employerCnpj);
 
     const data = await request<any[]>(`/employees?${query.toString()}`);
     return data.map(mapEmployee);

@@ -243,7 +243,7 @@ export class PayrollController {
       });
 
     const employeeBlockTop = doc.y + 8;
-    doc.rect(xStart, employeeBlockTop, pageWidth, 58).stroke();
+    doc.rect(xStart, employeeBlockTop, pageWidth, 72).stroke();
     doc
       .font('Helvetica')
       .fontSize(8.5)
@@ -261,9 +261,12 @@ export class PayrollController {
         xStart + 8,
         employeeBlockTop + 40,
         { width: pageWidth - 16 }
-      );
+      )
+      .text(`E-mail: ${detail.employee?.email ?? '--'}`, xStart + 8, employeeBlockTop + 56, {
+        width: pageWidth - 16
+      });
 
-    let y = employeeBlockTop + 66;
+    let y = employeeBlockTop + 80;
 
     const contractHeight = 42;
     const contractCellWidth = pageWidth / 4;
@@ -282,7 +285,7 @@ export class PayrollController {
       { label: 'Tipo Salario', value: salaryTypeLabel },
       { label: 'Salario Base', value: formatCurrency(Number(detail.employee?.baseSalary ?? 0)) },
       { label: 'Valor Hora/Aula', value: formatCurrency(Number(detail.employee?.hourlyRate ?? 0)) },
-      { label: 'Carga Semanal', value: `${formatHours(detail.employee?.weeklyHours)} (Mes est.: ${formatHours(estimatedMonthlyHours)})` }
+      { label: 'Qtd Aulas (Ref)', value: `${formatHours(detail.employee?.weeklyHours)} (Mes est.: ${formatHours(estimatedMonthlyHours)})` }
     ];
 
     contractItems.forEach((item, index) => {
@@ -297,7 +300,36 @@ export class PayrollController {
         .text(item.value, xCell + 6, y + 20, { width: contractCellWidth - 12 });
     });
 
-    y += contractHeight + 10;
+    y += contractHeight + 6;
+
+    const paymentHeight = 32;
+    const paymentCellWidth = pageWidth / 4;
+    doc.rect(xStart, y, pageWidth, paymentHeight).stroke();
+    for (let index = 1; index < 4; index += 1) {
+      const xLine = xStart + paymentCellWidth * index;
+      doc.moveTo(xLine, y).lineTo(xLine, y + paymentHeight).stroke();
+    }
+
+    const paymentItems = [
+      { label: 'Banco', value: detail.employee?.bankName ?? '--' },
+      { label: 'Agencia', value: detail.employee?.bankAgency ?? '--' },
+      { label: 'Conta Bancaria', value: detail.employee?.bankAccount ?? '--' },
+      { label: 'Forma Pgto', value: detail.employee?.paymentMethod ?? '--' }
+    ];
+
+    paymentItems.forEach((item, index) => {
+      const xCell = xStart + paymentCellWidth * index;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7.5)
+        .text(item.label, xCell + 6, y + 4, { width: paymentCellWidth - 12 });
+      doc
+        .font('Helvetica')
+        .fontSize(8)
+        .text(item.value, xCell + 6, y + 15, { width: paymentCellWidth - 12 });
+    });
+
+    y += paymentHeight + 10;
 
     const colCode = 52;
     const colDesc = 214;
@@ -390,7 +422,7 @@ export class PayrollController {
       y += rowHeight;
     }
 
-    ensureSpace(120);
+    ensureSpace(150);
 
     const totalsTop = y + 6;
     const totalsHeight = 26;
@@ -460,7 +492,31 @@ export class PayrollController {
         .text(item.value, xCell + 6, basesTop + 16, { width: baseColumnWidth - 12, align: 'right' });
     });
 
-    y = basesTop + basesHeight + 12;
+    y = basesTop + basesHeight + 8;
+
+    ensureSpace(56);
+    const mealVoucherCredit = Number(detail.earnings?.mealVoucherCredit ?? 0);
+    const pensionAlimony = Number(detail.deductions?.pensionAlimony ?? 0);
+    const infoTop = y;
+
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .text(`Vale Alimentacao (credito): ${formatCurrency(mealVoucherCredit)}`, xStart, infoTop, {
+        width: pageWidth / 2
+      })
+      .text(`Pensao Alimenticia: ${formatCurrency(pensionAlimony)}`, xStart + pageWidth / 2, infoTop, {
+        width: pageWidth / 2,
+        align: 'right'
+      })
+      .text(`Conta para credito: ${detail.employee?.bankName ?? '--'} ${detail.employee?.bankAgency ?? '--'} ${detail.employee?.bankAccount ?? '--'}`, xStart, infoTop + 12, {
+        width: pageWidth
+      })
+      .text(`E-mail enviado: ${detail.employee?.email ?? '--'}`, xStart, infoTop + 24, {
+        width: pageWidth
+      });
+
+    y = infoTop + 40;
 
     doc
       .font('Helvetica')

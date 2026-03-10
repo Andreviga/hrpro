@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -8,6 +8,7 @@ export class EmployeesService {
 
   private buildEmployeeData(data: any) {
     const cpf = data.cpf ? data.cpf.replace(/\D/g, '') : undefined;
+    const employerCnpj = data.employerCnpj ? data.employerCnpj.replace(/\D/g, '') : undefined;
     const unionCnpj = data.esocialUnionCnpj ? data.esocialUnionCnpj.replace(/\D/g, '') : undefined;
     const addressLine = data.address?.street
       ? `${data.address.street}, ${data.address.number}${data.address.complement ? ` - ${data.address.complement}` : ''}`
@@ -28,6 +29,7 @@ export class EmployeesService {
     return {
       fullName: data.fullName,
       cpf,
+      employerCnpj,
       rg: data.rg,
       rgIssuer: data.rgIssuer,
       rgIssuerState: data.rgIssuerState,
@@ -45,6 +47,10 @@ export class EmployeesService {
       birthCityCode: data.birthCityCode,
       email: data.email,
       phone: data.phone,
+      bankName: data.bankName,
+      bankAgency: data.bankAgency,
+      bankAccount: data.bankAccount,
+      paymentMethod: data.paymentMethod,
       addressLine,
       city: data.address?.city ?? data.city,
       state: data.address?.state ?? data.state,
@@ -103,13 +109,16 @@ export class EmployeesService {
     return 'clt';
   }
 
-  async list(filters: { status?: string; department?: string; position?: string }, companyId: string) {
+  async list(filters: { status?: string; department?: string; position?: string; employerCnpj?: string }, companyId: string) {
+    const employerCnpj = filters.employerCnpj?.replace(/\D/g, '');
+
     return this.prisma.employee.findMany({
       where: {
         companyId,
         deletedAt: null,
         status: filters.status && filters.status !== 'all' ? (filters.status as any) : undefined,
         department: filters.department && filters.department !== 'all' ? filters.department : undefined,
+        employerCnpj: employerCnpj && employerCnpj !== 'all' ? employerCnpj : undefined,
         position:
           filters.position && filters.position !== 'all'
             ? { contains: filters.position, mode: 'insensitive' }
@@ -217,6 +226,10 @@ export class EmployeesService {
     const before = await this.getEmployeeOrThrow(id, companyId);
     const mapped = this.buildEmployeeData(data);
 
+    if (before.status === 'dismissed' && mapped.status && mapped.status !== 'dismissed') {
+      mapped.status = 'dismissed';
+    }
+
     const employee = await this.prisma.employee.update({
       where: { id },
       data: mapped
@@ -263,6 +276,10 @@ export class EmployeesService {
 
   async approve(id: string, companyId: string, userId?: string) {
     const before = await this.getEmployeeOrThrow(id, companyId);
+    if (before.status === 'dismissed') {
+      throw new ConflictException('Funcionario desligado nao pode ser reativado por aprovacao.');
+    }
+
     const employee = await this.prisma.employee.update({
       where: { id },
       data: { status: 'active' }

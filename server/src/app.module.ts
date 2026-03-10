@@ -12,6 +12,7 @@ import { RubricsModule } from './modules/rubrics/rubrics.module';
 import { TaxTablesModule } from './modules/tax-tables/tax-tables.module';
 import { SupportModule } from './modules/support/support.module';
 import { SystemConfigModule } from './modules/system-config/system-config.module';
+import { EsocialModule } from './modules/esocial/esocial.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { SystemConfigModule } from './modules/system-config/system-config.module
     TaxTablesModule,
     SupportModule,
     SystemConfigModule,
+    EsocialModule,
   ]
 })
 export class AppModule {}

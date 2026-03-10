@@ -143,19 +143,35 @@ Assinatura da fonte pagadora: {{assinatura_fonte_pagadora}}
 Cargo/responsavel: {{responsavel_cargo_nome}}
 `.trim();
 
-const PAYSTUB_TEMPLATE_NAME = 'Holerite Padrao (Automatico)';
+const PAYSTUB_TEMPLATE_NAME = 'Holerite Padrao (Automatico v2)';
 
 const paystubRequiredPlaceholders = [
+  'company_name',
+  'company_cnpj',
   'employee_name',
+  'employee_code',
   'employee_cpf',
   'employee_position',
   'employee_department',
+  'employee_email',
+  'admission_date',
   'payroll_month',
   'payroll_year',
+  'competence',
   'gross_salary',
   'total_deductions',
   'net_salary',
-  'fgts'
+  'fgts',
+  'inss_base',
+  'fgts_base',
+  'irrf_base',
+  'bank_name',
+  'bank_agency',
+  'bank_account',
+  'payment_method',
+  'meal_voucher_credit',
+  'pension_alimony',
+  'event_lines'
 ];
 
 export const buildPaystubTemplateName = () => PAYSTUB_TEMPLATE_NAME;
@@ -164,17 +180,38 @@ export const buildPaystubRequiredPlaceholders = () => [...paystubRequiredPlaceho
 
 export const buildPaystubTemplateContent = () => `
 DEMONSTRATIVO DE PAGAMENTO
+Empresa: {{company_name}}
+CNPJ: {{company_cnpj}}
 Funcionario: {{employee_name}}
+Codigo: {{employee_code}}
 CPF: {{employee_cpf}}
 Cargo: {{employee_position}}
 Departamento: {{employee_department}}
-Competencia: {{payroll_month}}/{{payroll_year}}
+Admissao: {{admission_date}}
+E-mail: {{employee_email}}
+Competencia: {{competence}}
 
 PROVENTOS E DESCONTOS
 Salario Bruto: {{gross_salary}}
 Total de Descontos: {{total_deductions}}
 Salario Liquido: {{net_salary}}
 FGTS: {{fgts}}
+Base INSS: {{inss_base}}
+Base FGTS: {{fgts_base}}
+Base IRRF: {{irrf_base}}
+
+PAGAMENTO
+Banco: {{bank_name}}
+Agencia: {{bank_agency}}
+Conta: {{bank_account}}
+Forma de Pagamento: {{payment_method}}
+
+INFORMACOES COMPLEMENTARES
+Vale Alimentacao (credito): {{meal_voucher_credit}}
+Pensao Alimenticia: {{pension_alimony}}
+
+RUBRICAS
+{{event_lines}}
 
 Declaro ter recebido os valores acima referentes a competencia informada.
 `.trim();

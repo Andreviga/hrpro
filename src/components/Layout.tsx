@@ -4,7 +4,7 @@
 import React, { ReactNode, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
-import { LogOut, User, FileText, Upload, Home, MessageCircle, Calendar as CalendarIcon, TrendingUp, Calculator, Users, Settings, CalendarCheck, Code, TableProperties, Menu, X } from 'lucide-react';
+import { LogOut, User, FileText, Upload, Home, MessageCircle, Calendar as CalendarIcon, TrendingUp, Calculator, Users, Settings, CalendarCheck, Code, TableProperties, Menu, X, Database } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -28,6 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Funcionários', href: '#/admin/employees', icon: Users },
     { name: 'Competências', href: '#/admin/payroll-runs', icon: CalendarCheck },
     { name: 'Emitir Holerites', href: '#/admin/paystub-batch', icon: FileText },
+    { name: 'Monitor eSocial', href: '#/admin/esocial', icon: Database },
     { name: 'Visão Macro Folha', href: '#/admin/payroll-grid', icon: TableProperties },
     { name: 'Fórmulas e Tabelas', href: '#/admin/formulas', icon: Code },
     { name: 'Configurações', href: '#/admin/config', icon: Settings },

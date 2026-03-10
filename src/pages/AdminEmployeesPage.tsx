@@ -42,6 +42,19 @@ import {
   Upload
 } from 'lucide-react';
 
+const EMPLOYER_OPTIONS = [
+  {
+    value: '20755729000185',
+    label: 'Raizes Centro Educacional',
+    cnpjFormatted: '20.755.729/0001-85'
+  },
+  {
+    value: '59946400000137',
+    label: 'Raizes Recreacao Infantil',
+    cnpjFormatted: '59.946.400/0001-37'
+  }
+] as const;
+
 const AdminEmployeesPage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [pendingEmployees, setPendingEmployees] = useState<Employee[]>([]);
@@ -54,7 +67,8 @@ const AdminEmployeesPage: React.FC = () => {
   const [filters, setFilters] = useState({
     status: 'all',
     department: 'all',
-    position: 'all'
+    position: 'all',
+    employerCnpj: 'all'
   });
 
   // Estados para cálculo de folha
@@ -80,6 +94,7 @@ const AdminEmployeesPage: React.FC = () => {
     status: 'pending_approval',
     contractType: 'CLT',
     department: 'centro_educacional',
+    employerCnpj: EMPLOYER_OPTIONS[0].value,
     salaryType: 'hourly',
     benefits: {
       transportVoucher: { enabled: false, routes: [], workDays: 22 },
@@ -137,7 +152,7 @@ const AdminEmployeesPage: React.FC = () => {
 
   const handleCreateEmployee = async () => {
     try {
-      if (!newEmployee.fullName || !newEmployee.cpf || !newEmployee.position) {
+      if (!newEmployee.fullName || !newEmployee.cpf || !newEmployee.position || !newEmployee.employerCnpj) {
         alert('Preencha os campos obrigatórios');
         return;
       }
@@ -147,6 +162,7 @@ const AdminEmployeesPage: React.FC = () => {
         status: 'pending_approval',
         contractType: 'CLT',
         department: 'centro_educacional',
+        employerCnpj: EMPLOYER_OPTIONS[0].value,
         salaryType: 'hourly',
         benefits: {
           transportVoucher: { enabled: false, routes: [], workDays: 22 },
@@ -273,6 +289,18 @@ const AdminEmployeesPage: React.FC = () => {
 
   const formatCPF = (cpf: string) => {
     return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  };
+
+  const formatCnpj = (cnpj?: string) => {
+    const digits = String(cnpj ?? '').replace(/\D/g, '');
+    if (digits.length !== 14) return '--';
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  };
+
+  const getEmployerLabel = (cnpj?: string) => {
+    const match = EMPLOYER_OPTIONS.find((option) => option.value === String(cnpj ?? '').replace(/\D/g, ''));
+    if (!match) return cnpj ? formatCnpj(cnpj) : '--';
+    return `${match.label} (${match.cnpjFormatted})`;
   };
 
   const getStatusColor = (status: string) => {
@@ -426,6 +454,20 @@ const AdminEmployeesPage: React.FC = () => {
                       <SelectItem value="Auxiliar">Auxiliares</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  <Select value={filters.employerCnpj} onValueChange={(value) => setFilters({...filters, employerCnpj: value})}>
+                    <SelectTrigger className="w-[300px]">
+                      <SelectValue placeholder="Vinculo CNPJ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os CNPJs</SelectItem>
+                      {EMPLOYER_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label} ({option.cnpjFormatted})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
@@ -467,6 +509,10 @@ const AdminEmployeesPage: React.FC = () => {
                             <p className="font-medium">
                               {employee.department === 'centro_educacional' ? 'Centro Educacional' : 'Recreação Infantil'}
                             </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Vinculo CNPJ</p>
+                            <p className="font-medium">{getEmployerLabel(employee.employerCnpj)}</p>
                           </div>
                         </div>
 
@@ -880,6 +926,24 @@ const AdminEmployeesPage: React.FC = () => {
                       </Select>
                     </div>
                     <div>
+                      <Label htmlFor="employerCnpj">Vinculo CNPJ *</Label>
+                      <Select
+                        value={newEmployee.employerCnpj || EMPLOYER_OPTIONS[0].value}
+                        onValueChange={(value) => setNewEmployee({ ...newEmployee, employerCnpj: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EMPLOYER_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label} ({option.cnpjFormatted})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label htmlFor="admissionDate">Data de Admissão</Label>
                       <Input
                         id="admissionDate"
@@ -1140,6 +1204,27 @@ const AdminEmployeesPage: React.FC = () => {
                         value={editingEmployee.department || ''}
                         onChange={(e) => updateEditingEmployee('department', e.target.value)}
                       />
+                    </div>
+                    <div>
+                      <Label>Vinculo CNPJ</Label>
+                      <Select
+                        value={editingEmployee.employerCnpj || '__none'}
+                        onValueChange={(value) =>
+                          updateEditingEmployee('employerCnpj', value === '__none' ? undefined : value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">Nao definido</SelectItem>
+                          {EMPLOYER_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label} ({option.cnpjFormatted})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label>Data admissao</Label>
@@ -1494,6 +1579,10 @@ const AdminEmployeesPage: React.FC = () => {
                           ? new Date(selectedEmployee.admissionDate).toLocaleDateString('pt-BR')
                           : '--'}
                       </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Vinculo CNPJ</p>
+                      <p className="font-medium">{getEmployerLabel(selectedEmployee.employerCnpj)}</p>
                     </div>
                   </div>
                 </div>

@@ -15,6 +15,8 @@
     "test:cov": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:sync:docker": "powershell -ExecutionPolicy Bypass -File ../scripts/prisma-sync-docker.ps1",
+    "prisma:sync:docker:history": "powershell -ExecutionPolicy Bypass -File ../scripts/prisma-sync-docker.ps1 -SkipApply",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:seed:js": "node prisma/seed.js"
   },
@@ -33,6 +35,7 @@
     "class-validator": "^0.14.1",
     "docx": "^8.5.0",
     "dotenv": "^16.4.5",
+    "fast-xml-parser": "^5.5.1",
     "ioredis": "^5.4.1",
     "multer": "^1.4.5-lts.1",
     "passport": "^0.7.0",
@@ -41,7 +44,8 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xsd-schema-validator": "^0.11.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.4.8",

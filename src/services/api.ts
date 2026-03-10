@@ -29,6 +29,11 @@ export interface PaystubDetail {
     admissionDate?: string;
     employeeCode?: string;
     pis?: string;
+    email?: string;
+    bankName?: string;
+    bankAgency?: string;
+    bankAccount?: string;
+    paymentMethod?: string;
     dependents?: number;
     salaryType?: string;
     baseSalary?: number | null;
@@ -42,6 +47,7 @@ export interface PaystubDetail {
     overtimeValue: number;
     nightShiftBonus: number;
     holidaysBonus: number;
+    mealVoucherCredit?: number;
     otherBonuses: number;
   };
   deductions: {
@@ -49,6 +55,7 @@ export interface PaystubDetail {
     irrfDeduction: number;
     transportVoucherDeduction: number;
     mealVoucherDeduction: number;
+    pensionAlimony?: number;
     syndicateFee: number;
     otherDeductions: number;
   };

@@ -556,6 +556,10 @@ export class PayrollService {
 
     const sumByCode = (items: typeof result.events, code: string) =>
       items.filter((item) => item.code === code).reduce((acc, item) => acc + Number(item.amount), 0);
+    const sumByDescription = (items: typeof result.events, keyword: string) =>
+      items
+        .filter((item) => item.description.toLowerCase().includes(keyword))
+        .reduce((acc, item) => acc + Number(item.amount), 0);
 
     const irrfBaseRow = await this.prisma.taxTableIrrf.findFirst({
       where: {
@@ -569,6 +573,8 @@ export class PayrollService {
     const dependentDeduction = Number(irrfBaseRow?.dependentDeduction ?? 0);
     const inssValue = sumByCode(deductions, 'INSS');
     const irrfBase = Math.max(0, Number(result.grossSalary) - inssValue - (result.employee.dependents * dependentDeduction));
+    const pensionAlimony = sumByCode(deductions, 'PENSAO') + sumByDescription(deductions, 'pensao');
+    const mealVoucherCredit = sumByCode(earnings, 'VA');
 
     const events = result.events
       .map((event) => ({
@@ -599,6 +605,11 @@ export class PayrollService {
         admissionDate: result.employee.admissionDate,
         employeeCode: result.employee.employeeCode,
         pis: result.employee.pis,
+        email: result.employee.email,
+        bankName: result.employee.bankName,
+        bankAgency: result.employee.bankAgency,
+        bankAccount: result.employee.bankAccount,
+        paymentMethod: result.employee.paymentMethod,
         dependents: result.employee.dependents,
         salaryType: result.employee.salaryType,
         baseSalary: result.employee.baseSalary === null ? null : Number(result.employee.baseSalary),
@@ -615,6 +626,7 @@ export class PayrollService {
         overtimeValue: sumByCode(earnings, 'EXTRA'),
         nightShiftBonus: sumByCode(earnings, 'NOTURNO'),
         holidaysBonus: sumByCode(earnings, 'FERIADOS'),
+        mealVoucherCredit,
         otherBonuses: sumByCode(earnings, 'OUTROS') + sumByCode(earnings, 'DSR') + sumByCode(earnings, 'HORA_ATV')
       },
       deductions: {
@@ -622,6 +634,7 @@ export class PayrollService {
         irrfDeduction: sumByCode(deductions, 'IRRF'),
         transportVoucherDeduction: sumByCode(deductions, 'VT'),
         mealVoucherDeduction: sumByCode(deductions, 'VA'),
+        pensionAlimony,
         syndicateFee: sumByCode(deductions, 'SIND'),
         otherDeductions: sumByCode(deductions, 'OUTROS') + sumByCode(deductions, 'EMPRESTIMO')
       },
@@ -1081,12 +1094,39 @@ export class PayrollService {
       throw new NotFoundException('Template not found for document generation');
     }
 
+    const shouldEnrichPaystub = params.documentType === 'holerite';
+    const company = shouldEnrichPaystub
+      ? await this.prisma.company.findUnique({ where: { id: params.companyId } })
+      : null;
+    if (shouldEnrichPaystub && !company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    const irrfBaseRow = shouldEnrichPaystub
+      ? await this.prisma.taxTableIrrf.findFirst({
+          where: {
+            companyId: params.companyId,
+            month: payrollRun.month,
+            year: payrollRun.year
+          },
+          orderBy: { minValue: 'asc' }
+        })
+      : null;
+    const dependentDeduction = Number(irrfBaseRow?.dependentDeduction ?? 0);
+
+    const formatMoney = (value: number) => Number(value ?? 0).toFixed(2);
+    const formatDate = (value?: Date | null) => {
+      if (!value) return '--';
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? '--' : parsed.toLocaleDateString('pt-BR');
+    };
+
     const results = await this.prisma.payrollResult.findMany({
       where: {
         payrollRunId: payrollRun.id,
         employeeId: params.employeeIds && params.employeeIds.length > 0 ? { in: params.employeeIds } : undefined
       },
-      include: { employee: true }
+      include: { employee: true, events: true }
     });
 
     const employeeIds = results.map((item) => item.employeeId);
@@ -1142,17 +1182,61 @@ export class PayrollService {
         continue;
       }
 
+      const events = result.events ?? [];
+      const inssValue = events
+        .filter((event) => event.type === 'deduction' && event.code === 'INSS')
+        .reduce((sum, event) => sum + Number(event.amount), 0);
+      const mealVoucherCredit = events
+        .filter((event) => event.type === 'earning' && event.code === 'VA')
+        .reduce((sum, event) => sum + Number(event.amount), 0);
+      const pensionAlimony = events
+        .filter((event) => event.type === 'deduction' && (event.code === 'PENSAO' || /pensao/i.test(event.description)))
+        .reduce((sum, event) => sum + Number(event.amount), 0);
+      const irrfBase = Math.max(
+        0,
+        Number(result.grossSalary) - inssValue - (Number(result.employee.dependents ?? 0) * dependentDeduction)
+      );
+      const eventLines = events
+        .slice()
+        .sort((left, right) => {
+          if (left.type !== right.type) {
+            return left.type === 'earning' ? -1 : 1;
+          }
+          return left.code.localeCompare(right.code);
+        })
+        .map((event) => {
+          const signal = event.type === 'earning' ? '+' : '-';
+          return `${event.code} - ${event.description}: ${signal} R$ ${formatMoney(Number(event.amount))}`;
+        })
+        .join('\n');
+
       const placeholders = {
+        company_name: company?.name ?? '--',
+        company_cnpj: company?.cnpj ?? '--',
         employee_name: result.employee.fullName,
+        employee_code: result.employee.employeeCode ?? '--',
         employee_cpf: result.employee.cpf,
         employee_position: result.employee.position,
         employee_department: result.employee.department,
+        employee_email: result.employee.email ?? '--',
+        admission_date: formatDate(result.employee.admissionDate),
         payroll_month: String(payrollRun.month),
         payroll_year: String(payrollRun.year),
-        gross_salary: Number(result.grossSalary).toFixed(2),
-        total_deductions: Number(result.totalDeductions).toFixed(2),
-        net_salary: Number(result.netSalary).toFixed(2),
-        fgts: Number(result.fgts).toFixed(2),
+        competence: `${String(payrollRun.month).padStart(2, '0')}/${payrollRun.year}`,
+        gross_salary: formatMoney(Number(result.grossSalary)),
+        total_deductions: formatMoney(Number(result.totalDeductions)),
+        net_salary: formatMoney(Number(result.netSalary)),
+        fgts: formatMoney(Number(result.fgts)),
+        inss_base: formatMoney(Number(result.grossSalary)),
+        fgts_base: formatMoney(Number(result.grossSalary)),
+        irrf_base: formatMoney(irrfBase),
+        bank_name: result.employee.bankName ?? '--',
+        bank_agency: result.employee.bankAgency ?? '--',
+        bank_account: result.employee.bankAccount ?? '--',
+        payment_method: result.employee.paymentMethod ?? '--',
+        meal_voucher_credit: formatMoney(mealVoucherCredit),
+        pension_alimony: formatMoney(pensionAlimony),
+        event_lines: eventLines || '--',
         ...(params.extraPlaceholders ?? {})
       };
 

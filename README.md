@@ -22,6 +22,7 @@
    - `docker compose up -d db redis`
 5) Migrations + seed:
    - `npm run prisma:migrate`
+   - se houver conflito entre Postgres local e Docker na porta `5432`, rode `npm run prisma:sync:docker`
    - `npm run prisma:seed`
 6) Suba backend:
    - `npm run dev` (porta 4000)
@@ -39,6 +40,14 @@
 - Worker: `npm run worker` (em `server/package.json`)
 - Lint/typecheck: `npm run lint`
 - Testes server: `npm.cmd test -- --runInBand` (em `server/package.json`)
+- Sincronizar migrations Prisma no Postgres Docker: `npm run prisma:sync:docker`
+- Sincronizar apenas historico Prisma no Docker: `npm run prisma:sync:docker:history`
+
+## Prisma + Docker
+- Use `npm run prisma:sync:docker` quando o banco Docker ja estiver no ar e voce quiser aplicar migrations pendentes e registrar o historico do Prisma no `_prisma_migrations`.
+- Use `npm run prisma:sync:docker:history` quando o SQL ja tiver sido aplicado manualmente no container e faltar apenas sincronizar o historico.
+- Os atalhos funcionam tanto na raiz quanto em `server/`.
+- Script base: `scripts/prisma-sync-docker.ps1`.
 
 ## Variaveis de ambiente
 - Backend: `server/.env` (copiado de `server/.env.example`)
@@ -68,6 +77,7 @@
 - Erros de permissao no PowerShell: use `npm.cmd` e `npx.cmd`.
 - Prisma generate falhando por arquivo em uso: finalize processos Node e rode novamente.
 - Conflito ao fechar competencia: existe folha fechada para o mesmo mes/ano.
+- Se `prisma migrate` conectar no Postgres errado por causa de conflito entre Postgres local e Docker na `5432`, prefira `npm run prisma:sync:docker`.
 
 ## Notas
 - Em PowerShell, use `npm.cmd` se `npm` estiver bloqueado por ExecutionPolicy.

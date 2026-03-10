@@ -50,6 +50,8 @@ describe('PayrollService document generation', () => {
     jest.clearAllMocks();
     prisma.$transaction.mockImplementation(async (arg: any) => (typeof arg === 'function' ? arg(prisma) : Promise.all(arg)));
     prisma.employeeDocument.updateMany.mockResolvedValue({ count: 0 });
+    prisma.company.findUnique.mockResolvedValue({ id: 'c1', cnpj: '12345678000199', name: 'Empresa Teste' });
+    prisma.taxTableIrrf.findFirst.mockResolvedValue({ dependentDeduction: 0 });
   });
 
   it('generates documents idempotently', async () => {

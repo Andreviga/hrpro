@@ -1,0 +1,6 @@
+export enum EsocialOccurrenceTypeLabel {
+  ERROR = 'ERRO',
+  WARNING = 'ADVERTENCIA',
+  VALIDATION_HISTORY = 'HISTORICO_VALIDACAO',
+  UNKNOWN = 'UNKNOWN'
+}

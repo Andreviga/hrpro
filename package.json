@@ -5,7 +5,9 @@
     "dev": "node scripts/build.mjs",
     "build": "node scripts/build.mjs --production",
     "lint": "npm run typecheck && npm --prefix server run typecheck",
-    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit"
+    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
+    "prisma:sync:docker": "powershell -ExecutionPolicy Bypass -File ./scripts/prisma-sync-docker.ps1",
+    "prisma:sync:docker:history": "powershell -ExecutionPolicy Bypass -File ./scripts/prisma-sync-docker.ps1 -SkipApply"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",

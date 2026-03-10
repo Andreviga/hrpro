@@ -134,6 +134,31 @@ enum TicketCategory {
   other
 }
 
+enum EsocialDocumentType {
+  event_xml
+  lote_envio
+  retorno_recepcao_lote
+  retorno_processamento_lote
+  retorno_processamento_evento
+  consulta
+  desconhecido
+}
+
+enum EsocialProcessingResult {
+  success
+  partial
+  failed
+  pending
+  unknown
+}
+
+enum EsocialOccurrenceSeverity {
+  ERROR
+  WARNING
+  INFO
+  UNKNOWN
+}
+
 model Company {
   id        String   @id @default(cuid())
   name      String
@@ -157,6 +182,7 @@ model Company {
   supportTickets SupportTicket[]
   chatMessages   ChatMessage[]
   systemConfigs  SystemConfig[]
+  esocialDocuments EsocialDocument[]
 }
 
 model User {
@@ -180,11 +206,16 @@ model Employee {
   companyId    String
   fullName     String
   cpf          String         @unique
+  employerCnpj String?
   rg           String?
   birthDate    DateTime?
   motherName   String?
   email        String?
   phone        String?
+  bankName     String?
+  bankAgency   String?
+  bankAccount  String?
+  paymentMethod String?
   addressLine  String?
   city         String?
   state        String?
@@ -705,6 +736,83 @@ model ChatMessage {
   company Company @relation(fields: [companyId], references: [id])
 
   @@index([companyId])
+}
+
+model EsocialDocument {
+  id                          String                 @id @default(cuid())
+  companyId                   String                 @map("company_id")
+  externalEventId             String?                @map("external_event_id")
+  documentType                EsocialDocumentType    @default(desconhecido) @map("document_type")
+  eventType                   String?                @map("event_type")
+  employerRegistrationType    String?                @map("employer_registration_type")
+  employerRegistrationNumber  String?                @map("employer_registration_number")
+  workerCpf                   String?                @map("worker_cpf")
+  protocolNumber              String?                @map("protocol_number")
+  receiptNumber               String?                @map("receipt_number")
+  statusCode                  String?                @map("status_code")
+  statusDescription           String?                @map("status_description")
+  processingResult            EsocialProcessingResult @default(unknown) @map("processing_result")
+  layoutVersion               String?                @map("layout_version")
+  namespaceUri                String?                @map("namespace_uri")
+  xmlHash                     String                 @map("xml_hash")
+  rawXml                      String                 @db.Text @map("raw_xml")
+  parsedJson                  Json                   @map("parsed_json")
+  parsingError                String?                @db.Text @map("parsing_error")
+  xsdValidationStatus         String?                @map("xsd_validation_status")
+  xsdValidationErrors         Json?                  @map("xsd_validation_errors")
+  createdAt                   DateTime               @default(now()) @map("created_at")
+  updatedAt                   DateTime               @updatedAt @map("updated_at")
+
+  company     Company             @relation(fields: [companyId], references: [id])
+  occurrences EsocialOccurrence[]
+
+  @@unique([companyId, xmlHash])
+  @@index([companyId, documentType])
+  @@index([companyId, eventType])
+  @@index([companyId, receiptNumber])
+  @@index([companyId, protocolNumber])
+  @@index([companyId, workerCpf])
+  @@map("esocial_documents")
+}
+
+model EsocialOccurrence {
+  id                          String                  @id @default(cuid())
+  documentId                  String                  @map("document_id")
+  sourceType                  String                  @map("source_type")
+  occurrenceTypeCode          String?                 @map("occurrence_type_code")
+  occurrenceTypeLabel         String?                 @map("occurrence_type_label")
+  severity                    EsocialOccurrenceSeverity @default(UNKNOWN)
+  code                        String?
+  description                 String                  @db.Text
+  location                    String?
+  logicalXpath                String?                 @map("logical_xpath")
+  officialCatalogDescription  String?                 @db.Text @map("official_catalog_description")
+  probableCause               String?                 @db.Text @map("probable_cause")
+  suggestedAction             String?                 @db.Text @map("suggested_action")
+  category                    String?
+  isBlocking                  Boolean                 @default(false) @map("is_blocking")
+  isSuccessCompatible         Boolean                 @default(false) @map("is_success_compatible")
+  rawFragment                 String?                 @db.Text @map("raw_fragment")
+  createdAt                   DateTime                @default(now()) @map("created_at")
+
+  document EsocialDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([severity])
+  @@index([sourceType])
+  @@map("esocial_occurrences")
+}
+
+model EsocialMessageCatalog {
+  code                String   @id
+  officialDescription String   @db.Text @map("official_description")
+  humanExplanation    String?  @db.Text @map("human_explanation")
+  probableCause       String?  @db.Text @map("probable_cause")
+  suggestedAction     String?  @db.Text @map("suggested_action")
+  category            String?
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("esocial_message_catalog")
 }
 
 model SystemConfig {

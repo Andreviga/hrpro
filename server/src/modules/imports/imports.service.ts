@@ -51,6 +51,10 @@ const headerAliases: Record<string, string[]> = {
   esocialDisabilityType: ['tipo deficiencia'],
   email: ['email', 'e-mail'],
   phone: ['telefone', 'celular'],
+  bankName: ['banco', 'instituicao financeira', 'instituicao'],
+  bankAgency: ['agencia', 'agencia bancaria'],
+  bankAccount: ['conta bancaria', 'conta'],
+  paymentMethod: ['pix', 'ted', 'forma pagamento', 'meio pagamento'],
   birthDate: ['nascimento', 'data de nascimento'],
   motherName: ['nome da mae', 'mae', 'nome da mae'],
   addressLine: ['endereco', 'logradouro'],
@@ -98,6 +102,7 @@ const rubricAliases: Record<string, { code: string; type: 'earning' | 'deduction
 
   'irrf 13': { code: 'IRRF13', type: 'deduction' },
   'inss 13': { code: 'INSS13', type: 'deduction' },
+  irff: { code: 'IRRF', type: 'deduction' },
   irfonte: { code: 'IRRF', type: 'deduction' },
   irrf: { code: 'IRRF', type: 'deduction' },
   inss: { code: 'INSS', type: 'deduction' },
@@ -110,6 +115,8 @@ const rubricAliases: Record<string, { code: string; type: 'earning' | 'deduction
   'vale alimentacao': { code: 'VA', type: 'deduction' },
   va: { code: 'VA', type: 'deduction' },
   sindicato: { code: 'SIND', type: 'deduction' },
+  'pensao alimenticia': { code: 'PENSAO', type: 'deduction' },
+  pensao: { code: 'PENSAO', type: 'deduction' },
   faltas: { code: 'FALTA', type: 'deduction' },
   falta: { code: 'FALTA', type: 'deduction' },
   descontos: { code: 'OUTROS', type: 'deduction' }
@@ -452,6 +459,36 @@ const inferDepartmentFromCompanyLabel = (value: any) => {
   return 'geral';
 };
 
+const knownEmployerCnpjs = {
+  recreacao: '59946400000137',
+  centroEducacional: '20755729000185'
+} as const;
+
+const inferEmployerCnpjFromCompanyLabel = (value: any) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return undefined;
+
+  const digitsOnly = raw.replace(/\D/g, '');
+  if (digitsOnly.length === 14) return digitsOnly;
+
+  const label = normalizeText(raw);
+  if (label.includes('recreacao')) return knownEmployerCnpjs.recreacao;
+  if (label.includes('centro educacional')) return knownEmployerCnpjs.centroEducacional;
+  return undefined;
+};
+
+const inferEmployeeStatus = (value: any): 'active' | 'inactive' | 'dismissed' | undefined => {
+  const label = normalizeText(value);
+  if (!label) return undefined;
+
+  if (label.includes('deslig') || label.includes('demit') || label.includes('rescis')) {
+    return 'dismissed';
+  }
+  if (label.includes('inativ')) return 'inactive';
+  if (label.includes('ativ')) return 'active';
+  return undefined;
+};
+
 const getProfilePriority = (profile: SheetProfile) => {
   if (profile === 'cadastro') return 0;
   if (profile === 'tab_auxilio') return 1;
@@ -579,9 +616,14 @@ export class ImportsService {
         companyId: true,
         fullName: true,
         cpf: true,
+        employerCnpj: true,
         rg: true,
         email: true,
         phone: true,
+        bankName: true,
+        bankAgency: true,
+        bankAccount: true,
+        paymentMethod: true,
         birthDate: true,
         motherName: true,
         addressLine: true,
@@ -597,6 +639,8 @@ export class ImportsService {
         baseSalary: true,
         hourlyRate: true,
         weeklyHours: true,
+        transportVoucherValue: true,
+        mealVoucherValue: true,
         status: true
       }
     });
@@ -683,6 +727,10 @@ export class ImportsService {
 
       const emailHeader = findHeader(headers, 'email');
       const phoneHeader = findHeader(headers, 'phone');
+      const bankNameHeader = findHeader(headers, 'bankName');
+      const bankAgencyHeader = findHeader(headers, 'bankAgency');
+      const bankAccountHeader = findHeader(headers, 'bankAccount');
+      const paymentMethodHeader = findHeader(headers, 'paymentMethod');
       const birthDateHeader = findHeader(headers, 'birthDate');
       const motherNameHeader = findHeader(headers, 'motherName');
       const socialNameHeader = findHeader(headers, 'socialName');
@@ -733,7 +781,21 @@ export class ImportsService {
         const normalized = normalizeText(header);
         return normalized.includes('desconto') || normalized.includes('deducao');
       });
+      const transportVoucherHeader = headers.find((header) => normalizeText(header).includes('vale transporte'));
+      const mealVoucherHeader = headers.find((header) => {
+        const normalized = normalizeText(header);
+        return normalized === 'va' || normalized.includes('vale alimentacao');
+      });
       const companyHeader = headers.find((header) => normalizeText(header).includes('empresa'));
+      const statusHeader = headers.find((header) => {
+        const normalized = normalizeText(header);
+        return (
+          normalized.includes('status') ||
+          normalized.includes('situacao') ||
+          normalized.includes('demissao') ||
+          normalized.includes('deslig')
+        );
+      });
 
       const inssMinHeader = headers.find((header) => normalizeText(header) === 'de');
       const inssMaxHeader = headers.find((header) => normalizeText(header) === 'ate');
@@ -871,16 +933,29 @@ export class ImportsService {
           const existingByName = employeesByName.get(normalizeText(fullName));
           const shouldReuseByName = !!existingByName && (!rawCpf || isTemporaryEmployeeCode(existingByName.cpf));
           const existingEmployee = existingByCpf ?? (shouldReuseByName ? existingByName : undefined);
+          const employerCnpjFromCompany = companyHeader
+            ? inferEmployerCnpjFromCompanyLabel(row[companyHeader])
+            : undefined;
+          const importedStatus = statusHeader ? inferEmployeeStatus(row[statusHeader]) : undefined;
+          const effectiveStatus =
+            existingEmployee?.status === 'dismissed'
+              ? 'dismissed'
+              : importedStatus ?? 'active';
 
           const employeeData: any = {
             fullName,
             cpf,
+            employerCnpj: employerCnpjFromCompany ?? existingEmployee?.employerCnpj ?? null,
             rg: rgHeader ? String(row[rgHeader] || '').trim() || null : null,
             rgIssuer: rgIssuerHeader ? String(row[rgIssuerHeader] || '').trim() || null : null,
             rgIssuerState: rgIssuerStateHeader ? String(row[rgIssuerStateHeader] || '').trim() || null : null,
             rgIssueDate: rgIssueDateHeader ? parseDate(row[rgIssueDateHeader]) ?? null : null,
             email: emailHeader ? String(row[emailHeader] || '').trim() || null : null,
             phone: phoneHeader ? String(row[phoneHeader] || '').trim() || null : null,
+            bankName: bankNameHeader ? String(row[bankNameHeader] || '').trim() || null : null,
+            bankAgency: bankAgencyHeader ? String(row[bankAgencyHeader] || '').trim() || null : null,
+            bankAccount: bankAccountHeader ? String(row[bankAccountHeader] || '').trim() || null : null,
+            paymentMethod: paymentMethodHeader ? String(row[paymentMethodHeader] || '').trim() || null : null,
             birthDate: birthDateHeader ? parseDate(row[birthDateHeader]) ?? null : null,
             motherName: motherNameHeader ? String(row[motherNameHeader] || '').trim() || null : null,
             socialName: socialNameHeader ? String(row[socialNameHeader] || '').trim() || null : null,
@@ -923,7 +998,7 @@ export class ImportsService {
             baseSalary,
             hourlyRate,
             weeklyHours,
-            status: 'active'
+            status: effectiveStatus
           };
 
           try {
@@ -1096,7 +1171,7 @@ export class ImportsService {
               weeklyHours: weeklyHours ?? employee.weeklyHours,
               hourlyRate: hourlyRate ?? employee.hourlyRate,
               baseSalary: grossSalary ?? employee.baseSalary,
-              status: 'active'
+              status: employee.status === 'dismissed' ? 'dismissed' : employee.status
             }
           });
 
@@ -1114,7 +1189,21 @@ export class ImportsService {
             continue;
           }
 
+          const rowBankName = bankNameHeader ? String(row[bankNameHeader] || '').trim() : '';
+          const rowBankAgency = bankAgencyHeader ? String(row[bankAgencyHeader] || '').trim() : '';
+          const rowBankAccountRaw = bankAccountHeader ? String(row[bankAccountHeader] || '').trim() : '';
+          const rowPaymentMethod = paymentMethodHeader ? String(row[paymentMethodHeader] || '').trim() : '';
+          const rowTransportVoucher = transportVoucherHeader ? parseNumber(row[transportVoucherHeader]) : null;
+          const rowMealVoucher = mealVoucherHeader ? parseNumber(row[mealVoucherHeader]) : null;
+
+          const accountMatch = rowBankAccountRaw.match(/^(\d{3,5})\s*\/\s*(.+)$/);
+          const normalizedBankAgency = rowBankAgency || (accountMatch ? accountMatch[1] : '');
+          const normalizedBankAccount = accountMatch ? accountMatch[2].trim() : rowBankAccountRaw;
+
           let employee = findEmployeeInCache({ cpf, fullName });
+          const employerCnpjFromCompany = companyHeader
+            ? inferEmployerCnpjFromCompanyLabel(row[companyHeader])
+            : undefined;
           if (!employee && fullName) {
             const temporaryCpf = buildTemporaryCpf({
               companyId: params.companyId,
@@ -1130,11 +1219,18 @@ export class ImportsService {
                 companyId: params.companyId,
                 fullName,
                 cpf: temporaryCpf,
+                employerCnpj: employerCnpjFromCompany ?? null,
                 rg: rgHeader ? String(row[rgHeader] || '').trim() || null : null,
                 position: 'Colaborador',
                 department: departmentFromCompany,
                 salaryType: 'monthly',
                 baseSalary: grossHeader ? parseNumber(row[grossHeader]) : null,
+                bankName: rowBankName || null,
+                bankAgency: normalizedBankAgency || null,
+                bankAccount: normalizedBankAccount || null,
+                paymentMethod: rowPaymentMethod || null,
+                transportVoucherValue: rowTransportVoucher === null ? null : Math.abs(rowTransportVoucher),
+                mealVoucherValue: rowMealVoucher === null ? null : Math.abs(rowMealVoucher),
                 status: 'active'
               }
             });
@@ -1145,6 +1241,35 @@ export class ImportsService {
           }
 
           if (!employee || !payrollRunId) continue;
+
+          const employeePatch: Record<string, any> = {};
+          if (rowBankName) employeePatch.bankName = rowBankName;
+          if (normalizedBankAgency) employeePatch.bankAgency = normalizedBankAgency;
+          if (normalizedBankAccount) employeePatch.bankAccount = normalizedBankAccount;
+          if (rowPaymentMethod) {
+            const normalizedPaymentMethod = normalizeText(rowPaymentMethod);
+            employeePatch.paymentMethod = ['x', 'ok', '1'].includes(normalizedPaymentMethod)
+              ? 'PIX'
+              : rowPaymentMethod;
+          }
+          if (rowTransportVoucher !== null) {
+            employeePatch.transportVoucherValue = Math.abs(rowTransportVoucher);
+          }
+          if (rowMealVoucher !== null) {
+            employeePatch.mealVoucherValue = Math.abs(rowMealVoucher);
+          }
+          if (employerCnpjFromCompany) {
+            employeePatch.employerCnpj = employerCnpjFromCompany;
+          }
+
+          if (Object.keys(employeePatch).length > 0) {
+            const updatedEmployee = await this.prisma.employee.update({
+              where: { id: employee.id },
+              data: employeePatch
+            });
+            upsertCache(updatedEmployee);
+            employee = updatedEmployee;
+          }
 
           const earnings: { code: string; description: string; amount: number }[] = [];
           const deductions: { code: string; description: string; amount: number }[] = [];
