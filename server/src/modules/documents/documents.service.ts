@@ -155,8 +155,6 @@ const paystubRequiredPlaceholders = [
   'employee_department',
   'employee_email',
   'admission_date',
-  'payroll_month',
-  'payroll_year',
   'competence',
   'gross_salary',
   'total_deductions',
@@ -215,6 +213,15 @@ RUBRICAS
 
 Declaro ter recebido os valores acima referentes a competencia informada.
 `.trim();
+
+const paystubTemplateNeedsRepair = (template: { content: string; requiredPlaceholders?: unknown }) => {
+  const placeholders = extractPlaceholders(template.content ?? '');
+  const required = Array.isArray(template.requiredPlaceholders)
+    ? (template.requiredPlaceholders as string[])
+    : [];
+
+  return required.some((item) => !placeholders.includes(item));
+};
 const sanitizeFilenamePart = (value: string) => {
   return value.replace(/[^a-zA-Z0-9_-]+/g, '_');
 };
@@ -388,6 +395,9 @@ export class DocumentsService {
   }
 
   async ensurePaystubTemplate(params: { companyId: string; userId?: string; reason?: string }) {
+    const defaultContent = buildPaystubTemplateContent();
+    const defaultRequired = buildPaystubRequiredPlaceholders();
+
     const existing = await this.prisma.documentTemplate.findFirst({
       where: {
         companyId: params.companyId,
@@ -399,6 +409,18 @@ export class DocumentsService {
     });
 
     if (existing) {
+      if (paystubTemplateNeedsRepair(existing)) {
+        const template = await this.updateTemplate(existing.id, {
+          companyId: params.companyId,
+          userId: params.userId,
+          content: defaultContent,
+          requiredPlaceholders: defaultRequired,
+          reason: params.reason ?? 'repair_holerite_template_placeholders'
+        });
+
+        return { created: false, template };
+      }
+
       return { created: false, template: existing };
     }
 
@@ -408,9 +430,9 @@ export class DocumentsService {
       type: 'holerite',
       name: PAYSTUB_TEMPLATE_NAME,
       description: 'Template padrao de holerite para emissao em lote.',
-      content: buildPaystubTemplateContent(),
+      content: defaultContent,
       status: 'draft',
-      requiredPlaceholders: buildPaystubRequiredPlaceholders(),
+      requiredPlaceholders: defaultRequired,
       reason: params.reason ?? 'bootstrap_holerite'
     });
 

@@ -3,6 +3,9 @@
   buildIncomeStatementRequiredPlaceholders,
   buildIncomeStatementTemplateContent,
   buildIncomeStatementTemplateName,
+  buildPaystubRequiredPlaceholders,
+  buildPaystubTemplateContent,
+  buildPaystubTemplateName,
   canTransitionStatus,
   extractPlaceholders,
   mergePlaceholders,
@@ -79,5 +82,17 @@ describe('DocumentsService helpers', () => {
     ]));
 
     expect(new Set(required).size).toBe(required.length);
+  });
+
+  it('keeps paystub required placeholders aligned with template content', () => {
+    const templateName = buildPaystubTemplateName();
+    const content = buildPaystubTemplateContent();
+    const required = buildPaystubRequiredPlaceholders();
+    const placeholders = extractPlaceholders(content);
+
+    expect(templateName).toBe('Holerite Padrao (Automatico v2)');
+    expect(content).toContain('{{competence}}');
+    expect(required).not.toEqual(expect.arrayContaining(['payroll_month', 'payroll_year']));
+    expect(required.every((item) => placeholders.includes(item))).toBe(true);
   });
 });
