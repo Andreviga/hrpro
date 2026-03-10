@@ -32,6 +32,7 @@ describe('PayrollService document generation', () => {
     },
     employeeDocument: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       updateMany: jest.fn()
     },
     company: {
@@ -49,6 +50,7 @@ describe('PayrollService document generation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     prisma.$transaction.mockImplementation(async (arg: any) => (typeof arg === 'function' ? arg(prisma) : Promise.all(arg)));
+    prisma.employeeDocument.findFirst.mockResolvedValue(null);
     prisma.employeeDocument.updateMany.mockResolvedValue({ count: 0 });
     prisma.company.findUnique.mockResolvedValue({ id: 'c1', cnpj: '12345678000199', name: 'Empresa Teste' });
     prisma.taxTableIrrf.findFirst.mockResolvedValue({ dependentDeduction: 0 });
@@ -218,7 +220,8 @@ describe('PayrollService document generation', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           payrollRunId: 'run-force-1',
-          type: 'holerite'
+          type: 'holerite',
+          employeeId: undefined
         })
       })
     );
@@ -503,6 +506,11 @@ describe('PayrollService document generation', () => {
     });
 
     prisma.taxTableIrrf.findFirst.mockResolvedValue({ dependentDeduction: 189.59 });
+    prisma.employeeDocument.findFirst.mockResolvedValue({
+      id: 'doc-pay-1',
+      title: 'Holerite Fevereiro 2026',
+      status: 'approved'
+    });
 
     const service = new PayrollService(prisma, audit, documents);
 
@@ -520,6 +528,12 @@ describe('PayrollService document generation', () => {
       weeklyHours: 20,
       transportVoucherValue: 100,
       mealVoucherValue: 180
+    });
+    expect(result.document).toEqual({
+      id: 'doc-pay-1',
+      title: 'Holerite Fevereiro 2026',
+      status: 'approved',
+      filePath: '/documents/doc-pay-1/export/pdf'
     });
   });
 

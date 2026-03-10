@@ -192,9 +192,22 @@ export class PayrollController {
   @Get('paystubs/:id/pdf')
   async paystubPdf(
     @Param('id') id: string,
-    @Req() req: { user: { employeeId?: string | null; companyId: string; role: string } },
+    @Req() req: { user: { employeeId?: string | null; companyId: string; role: string; sub?: string } },
     @Res() res: Response
   ) {
+    const exportedDocument = await this.payroll.exportPaystubPdf({
+      paystubId: id,
+      requester: req.user,
+      userId: req.user.sub
+    });
+
+    if (exportedDocument) {
+      res.setHeader('Content-Type', exportedDocument.contentType);
+      res.setHeader('Content-Disposition', `inline; filename=${exportedDocument.filename}`);
+      res.send(exportedDocument.buffer);
+      return;
+    }
+
     const detail = await this.payroll.getPaystubDetail(id, req.user);
 
     const formatCurrency = (value: number) => `R$ ${Number(value ?? 0).toFixed(2).replace('.', ',')}`;

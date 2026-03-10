@@ -371,6 +371,40 @@ export class PayrollService {
     };
   }
 
+  private async listActivePaystubDocuments(params: {
+    payrollRunIds: string[];
+    employeeIds: string[];
+  }) {
+    if (params.payrollRunIds.length === 0 || params.employeeIds.length === 0) {
+      return new Map<string, { id: string }>();
+    }
+
+    const documents = await this.prisma.employeeDocument.findMany({
+      where: {
+        payrollRunId: { in: params.payrollRunIds },
+        employeeId: { in: params.employeeIds },
+        type: 'holerite' as any,
+        deletedAt: null
+      },
+      select: {
+        id: true,
+        employeeId: true,
+        payrollRunId: true
+      },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }]
+    });
+
+    const lookup = new Map<string, { id: string }>();
+    for (const document of documents) {
+      const key = `${document.payrollRunId}:${document.employeeId}`;
+      if (!lookup.has(key)) {
+        lookup.set(key, { id: document.id });
+      }
+    }
+
+    return lookup;
+  }
+
   async listPaystubsByEmployee(employeeId: string) {
     const results = await this.prisma.payrollResult.findMany({
       where: { employeeId },
@@ -378,15 +412,26 @@ export class PayrollService {
       orderBy: [{ payrollRun: { year: 'desc' } }, { payrollRun: { month: 'desc' } }]
     });
 
-    return results.map((result) => ({
-      id: result.id,
-      employeeId: result.employeeId,
-      employeeName: result.employee.fullName,
-      month: result.payrollRun.month,
-      year: result.payrollRun.year,
-      netSalary: Number(result.netSalary),
-      filePath: `/paystubs/${result.id}/pdf`
-    }));
+    const documentLookup = await this.listActivePaystubDocuments({
+      payrollRunIds: results.map((result) => result.payrollRunId),
+      employeeIds: results.map((result) => result.employeeId)
+    });
+
+    return results.map((result) => {
+      const documentKey = `${result.payrollRunId}:${result.employeeId}`;
+
+      return {
+        id: result.id,
+        employeeId: result.employeeId,
+        employeeName: result.employee.fullName,
+        month: result.payrollRun.month,
+        year: result.payrollRun.year,
+        netSalary: Number(result.netSalary),
+        filePath: documentLookup.has(documentKey)
+          ? `/documents/${documentLookup.get(documentKey)?.id}/export/pdf`
+          : `/paystubs/${result.id}/pdf`
+      };
+    });
   }
 
   async listPaystubsByCompany(companyId: string) {
@@ -400,15 +445,26 @@ export class PayrollService {
       orderBy: [{ payrollRun: { year: 'desc' } }, { payrollRun: { month: 'desc' } }, { employee: { fullName: 'asc' } }]
     });
 
-    return results.map((result) => ({
-      id: result.id,
-      employeeId: result.employeeId,
-      employeeName: result.employee.fullName,
-      month: result.payrollRun.month,
-      year: result.payrollRun.year,
-      netSalary: Number(result.netSalary),
-      filePath: `/paystubs/${result.id}/pdf`
-    }));
+    const documentLookup = await this.listActivePaystubDocuments({
+      payrollRunIds: results.map((result) => result.payrollRunId),
+      employeeIds: results.map((result) => result.employeeId)
+    });
+
+    return results.map((result) => {
+      const documentKey = `${result.payrollRunId}:${result.employeeId}`;
+
+      return {
+        id: result.id,
+        employeeId: result.employeeId,
+        employeeName: result.employee.fullName,
+        month: result.payrollRun.month,
+        year: result.payrollRun.year,
+        netSalary: Number(result.netSalary),
+        filePath: documentLookup.has(documentKey)
+          ? `/documents/${documentLookup.get(documentKey)?.id}/export/pdf`
+          : `/paystubs/${result.id}/pdf`
+      };
+    });
   }
 
   async removeEmployeeFromRun(params: {
@@ -576,6 +632,22 @@ export class PayrollService {
     const pensionAlimony = sumByCode(deductions, 'PENSAO') + sumByDescription(deductions, 'pensao');
     const mealVoucherCredit = sumByCode(earnings, 'VA');
 
+    const paystubDocument = await this.prisma.employeeDocument.findFirst({
+      where: {
+        companyId: result.payrollRun.companyId,
+        payrollRunId: result.payrollRunId,
+        employeeId: result.employeeId,
+        type: 'holerite' as any,
+        deletedAt: null
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true
+      },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }]
+    });
+
     const events = result.events
       .map((event) => ({
         id: event.id,
@@ -621,6 +693,14 @@ export class PayrollService {
       },
       month: result.payrollRun.month,
       year: result.payrollRun.year,
+      document: paystubDocument
+        ? {
+            id: paystubDocument.id,
+            title: paystubDocument.title,
+            status: paystubDocument.status,
+            filePath: `/documents/${paystubDocument.id}/export/pdf`
+          }
+        : null,
       earnings: {
         baseSalary: sumByCode(earnings, 'BASE'),
         overtimeValue: sumByCode(earnings, 'EXTRA'),
@@ -652,6 +732,25 @@ export class PayrollService {
         fgtsDeposit: Number(result.fgts)
       }
     };
+  }
+
+  async exportPaystubPdf(params: {
+    paystubId: string;
+    requester: { companyId: string; role: string; employeeId?: string | null };
+    userId?: string;
+  }) {
+    const detail = await this.getPaystubDetail(params.paystubId, params.requester);
+    if (!detail.document?.id) {
+      return null;
+    }
+
+    return this.documents.exportDocumentFile({
+      id: detail.document.id,
+      companyId: params.requester.companyId,
+      userId: params.userId ?? '',
+      role: params.requester.role,
+      format: 'pdf'
+    });
   }
 
   async updatePaystubEvent(params: {
@@ -1130,16 +1229,19 @@ export class PayrollService {
     });
 
     const employeeIds = results.map((item) => item.employeeId);
+    const regenerationEmployeeFilter = params.employeeIds && params.employeeIds.length > 0
+      ? { in: params.employeeIds }
+      : undefined;
 
     let regeneratedFromPreviousCount = 0;
-    if (params.forceRegenerate && employeeIds.length > 0) {
+    if (params.forceRegenerate) {
       const now = new Date();
       const deletedResult = await this.prisma.employeeDocument.updateMany({
         where: {
           companyId: params.companyId,
           payrollRunId: payrollRun.id,
           type: params.documentType as any,
-          employeeId: { in: employeeIds },
+          employeeId: regenerationEmployeeFilter,
           deletedAt: null
         },
         data: {

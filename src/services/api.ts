@@ -17,6 +17,12 @@ export interface PaystubDetail {
   id: string;
   month: number;
   year: number;
+  document?: {
+    id: string;
+    title: string;
+    status: string;
+    filePath: string;
+  } | null;
   company?: {
     name: string;
     cnpj: string;
@@ -138,16 +144,12 @@ export const apiService = {
   async openPaystubPdf(paystubId: string): Promise<void> {
     const blob = await apiService.fetchPaystubPdf(paystubId);
     const blobUrl = window.URL.createObjectURL(blob);
-    const popup = window.open(blobUrl, '_blank', 'noopener,noreferrer');
-
-    if (!popup) {
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `holerite-${paystubId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    }
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `holerite-${paystubId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 
     window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
   },

@@ -875,6 +875,20 @@ export class ImportsService {
           select: { id: true }
         });
 
+        const deletedDocumentsAt = new Date();
+        const deletedDocuments = await this.prisma.employeeDocument.updateMany({
+          where: {
+            companyId: params.companyId,
+            payrollRunId: payrollRun.id,
+            deletedAt: null
+          },
+          data: {
+            deletedAt: deletedDocumentsAt,
+            deletedBy: params.userId ?? null,
+            deletedReason: 'payroll_reimport_reset'
+          }
+        });
+
         if (existingRunResults.length > 0) {
           await this.prisma.$transaction([
             this.prisma.payrollEvent.deleteMany({
@@ -886,8 +900,12 @@ export class ImportsService {
               where: { payrollRunId: payrollRun.id }
             })
           ]);
+        }
 
-          warnings.push(`Competencia ${competency.month}/${competency.year}: resultados anteriores removidos para reimportacao completa.`);
+        if (existingRunResults.length > 0 || Number(deletedDocuments.count ?? 0) > 0) {
+          warnings.push(
+            `Competencia ${competency.month}/${competency.year}: resultados anteriores e ${Number(deletedDocuments.count ?? 0)} documentos vinculados removidos para reimportacao completa.`
+          );
         }
       }
 
