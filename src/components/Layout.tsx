@@ -28,6 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Funcionários', href: '#/admin/employees', icon: Users },
     { name: 'Competências', href: '#/admin/payroll-runs', icon: CalendarCheck },
     { name: 'Emitir Holerites', href: '#/admin/paystub-batch', icon: FileText },
+    { name: 'Ver Todos Holerites', href: '#/admin/paystubs', icon: FileText },
     { name: 'Monitor eSocial', href: '#/admin/esocial', icon: Database },
     { name: 'Visão Macro Folha', href: '#/admin/payroll-grid', icon: TableProperties },
     { name: 'Fórmulas e Tabelas', href: '#/admin/formulas', icon: Code },

@@ -102,6 +102,19 @@ export const apiService = {
     return request<PaystubSummary[]>('/paystubs');
   },
 
+  async getPaystubsAdmin(params?: {
+    month?: number;
+    year?: number;
+    employeeName?: string;
+  }): Promise<PaystubSummary[]> {
+    const query = new URLSearchParams();
+    if (params?.month) query.set('month', String(params.month));
+    if (params?.year) query.set('year', String(params.year));
+    if (params?.employeeName) query.set('employeeName', params.employeeName);
+    const qs = query.toString();
+    return request<PaystubSummary[]>(`/paystubs/admin${qs ? `?${qs}` : ''}`);
+  },
+
   async getPaystubDetail(id: string): Promise<PaystubDetail | null> {
     return request<PaystubDetail>(`/paystubs/${id}`);
   },
