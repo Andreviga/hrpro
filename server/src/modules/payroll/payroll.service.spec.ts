@@ -39,7 +39,14 @@ describe('PayrollService document generation', () => {
       findUnique: jest.fn()
     },
     taxTableIrrf: {
-      findFirst: jest.fn()
+      findFirst: jest.fn(),
+      count: jest.fn()
+    },
+    taxTableInss: {
+      count: jest.fn()
+    },
+    rubric: {
+      findMany: jest.fn()
     },
     $transaction: jest.fn()
   } as any;
@@ -54,6 +61,9 @@ describe('PayrollService document generation', () => {
     prisma.employeeDocument.updateMany.mockResolvedValue({ count: 0 });
     prisma.company.findUnique.mockResolvedValue({ id: 'c1', cnpj: '12345678000199', name: 'Empresa Teste' });
     prisma.taxTableIrrf.findFirst.mockResolvedValue({ dependentDeduction: 0 });
+    prisma.taxTableIrrf.count.mockResolvedValue(1);
+    prisma.taxTableInss.count.mockResolvedValue(1);
+    prisma.rubric.findMany.mockResolvedValue([{ code: 'BASE' }, { code: 'INSS' }, { code: 'IRRF' }]);
   });
 
   it('generates documents idempotently', async () => {

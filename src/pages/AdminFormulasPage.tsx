@@ -309,6 +309,13 @@ const AdminFormulasPage: React.FC = () => {
     }
   };
 
+  const activeRubricCodes = new Set(
+    rubrics.filter((rubric) => rubric.active).map((rubric) => rubric.code.toUpperCase())
+  );
+  const requiredRubricCodes = ['BASE', 'INSS', 'IRRF'];
+  const missingRubricCodes = requiredRubricCodes.filter((code) => !activeRubricCodes.has(code));
+  const isPayrollReady = missingRubricCodes.length === 0 && inssTable.length > 0 && irrfTable.length > 0;
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -323,6 +330,33 @@ const AdminFormulasPage: React.FC = () => {
             </p>
           </div>
         </div>
+
+        <Card className={isPayrollReady ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className={`font-medium ${isPayrollReady ? 'text-emerald-800' : 'text-amber-900'}`}>
+                  {isPayrollReady
+                    ? 'Pronto para calcular folha'
+                    : 'Calculo bloqueado ate completar os parametros obrigatorios'}
+                </p>
+                <p className={`text-sm mt-1 ${isPayrollReady ? 'text-emerald-700' : 'text-amber-800'}`}>
+                  Rubricas obrigatorias (BASE, INSS, IRRF), tabela INSS e tabela IRRF devem estar preenchidas para a competencia antes do calculo.
+                </p>
+                {!isPayrollReady && (
+                  <ul className="text-sm mt-2 space-y-1 text-amber-900">
+                    {missingRubricCodes.length > 0 && <li>• Rubricas ausentes: {missingRubricCodes.join(', ')}</li>}
+                    {inssTable.length === 0 && <li>• Tabela INSS vazia para {taxMonth}/{taxYear}</li>}
+                    {irrfTable.length === 0 && <li>• Tabela IRRF vazia para {taxMonth}/{taxYear}</li>}
+                  </ul>
+                )}
+              </div>
+              <Badge className={isPayrollReady ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}>
+                {isPayrollReady ? 'Pronto' : 'Pendente'}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>

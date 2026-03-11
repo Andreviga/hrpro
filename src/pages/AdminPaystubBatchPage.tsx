@@ -45,7 +45,12 @@ const AdminPaystubBatchPage: React.FC = () => {
     if (error instanceof Error) {
       try {
         const payload = JSON.parse(error.message);
-        if (payload?.message) return payload.message as string;
+        if (payload?.message) {
+          if (Array.isArray(payload?.details?.issues) && payload.details.issues.length > 0) {
+            return `${payload.message} ${payload.details.issues.join(' ')}`;
+          }
+          return payload.message as string;
+        }
       } catch {
         return error.message || fallback;
       }

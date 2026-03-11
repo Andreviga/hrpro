@@ -25,6 +25,8 @@ import {
 const AdminPayrollUploadPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [wizardStep, setWizardStep] = useState<'select' | 'review' | 'processing' | 'result'>('select');
+  const [formMessage, setFormMessage] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<{
     success: boolean;
     message: string;
@@ -73,23 +75,43 @@ const AdminPayrollUploadPage: React.FC = () => {
       currency: 'BRL'
     }).format(value || 0);
 
+  const validateSpreadsheetFile = (file: File) => {
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'application/vnd.ms-excel.sheet.macroEnabled.12'
+    ];
+
+    const validExtension = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.xlsm');
+    if (!validTypes.includes(file.type) && !validExtension) {
+      return 'Selecione um arquivo Excel valido (.xlsx, .xls ou .xlsm).';
+    }
+
+    const maxSizeMb = 15;
+    const sizeMb = file.size / 1024 / 1024;
+    if (sizeMb > maxSizeMb) {
+      return `Arquivo acima de ${maxSizeMb} MB. Divida a planilha antes do upload.`;
+    }
+
+    return null;
+  };
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validar se é um arquivo Excel
-      const validTypes = [
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-excel',
-        'application/vnd.ms-excel.sheet.macroEnabled.12'
-      ];
-      
-      if (validTypes.includes(file.type) || file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.xlsm')) {
-        setSelectedFile(file);
-        setUploadResult(null);
-      } else {
-        alert('Por favor, selecione um arquivo Excel válido (.xlsx, .xls ou .xlsm)');
+      const validationError = validateSpreadsheetFile(file);
+      if (validationError) {
+        setFormMessage(validationError);
+        setSelectedFile(null);
+        setWizardStep('select');
         event.target.value = '';
+        return;
       }
+
+      setSelectedFile(file);
+      setUploadResult(null);
+      setFormMessage(null);
+      setWizardStep('review');
     }
   };
 
@@ -97,9 +119,11 @@ const AdminPayrollUploadPage: React.FC = () => {
     if (!selectedFile) return;
 
     setUploading(true);
+    setWizardStep('processing');
     try {
       const result = await apiService.uploadPayroll(selectedFile);
       setUploadResult(result);
+      setFormMessage(null);
     } catch (error) {
       const message = getFriendlyError(error, 'Erro interno do servidor');
       setUploadResult({
@@ -111,12 +135,15 @@ const AdminPayrollUploadPage: React.FC = () => {
       });
     } finally {
       setUploading(false);
+      setWizardStep('result');
     }
   };
 
   const resetUpload = () => {
     setSelectedFile(null);
     setUploadResult(null);
+    setFormMessage(null);
+    setWizardStep('select');
     // Reset file input
     const fileInput = document.getElementById('file-input') as HTMLInputElement;
     if (fileInput) fileInput.value = '';
@@ -130,9 +157,32 @@ const AdminPayrollUploadPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Upload de Folha de Pagamento</h1>
             <p className="text-gray-600 mt-1">
-              Faça o upload de planilhas Excel para processar a folha de pagamento dos funcionários
+              Assistente de importacao: selecione, revise e processe a planilha com validacoes antes do envio.
             </p>
           </div>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+                <div className={`rounded border p-3 ${wizardStep === 'select' ? 'border-blue-300 bg-blue-50' : 'border-slate-200'}`}>
+                  <div className="font-medium">1. Selecionar arquivo</div>
+                  <div className="text-slate-600">Escolha o Excel da folha</div>
+                </div>
+                <div className={`rounded border p-3 ${wizardStep === 'review' ? 'border-blue-300 bg-blue-50' : 'border-slate-200'}`}>
+                  <div className="font-medium">2. Revisar</div>
+                  <div className="text-slate-600">Confirme formato e tamanho</div>
+                </div>
+                <div className={`rounded border p-3 ${wizardStep === 'processing' ? 'border-blue-300 bg-blue-50' : 'border-slate-200'}`}>
+                  <div className="font-medium">3. Processar</div>
+                  <div className="text-slate-600">Importacao e validacao</div>
+                </div>
+                <div className={`rounded border p-3 ${wizardStep === 'result' ? 'border-blue-300 bg-blue-50' : 'border-slate-200'}`}>
+                  <div className="font-medium">4. Resultado</div>
+                  <div className="text-slate-600">Resumo e inconsistencias</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Instructions Card */}
           <Card className="bg-blue-50 border-blue-200">
@@ -144,11 +194,12 @@ const AdminPayrollUploadPage: React.FC = () => {
             </CardHeader>
             <CardContent className="text-blue-700">
               <ul className="space-y-2 text-sm">
-                <li>• O arquivo deve estar no formato Excel (.xlsx ou .xls)</li>
+                <li>• O arquivo deve estar no formato Excel (.xlsx, .xls ou .xlsm)</li>
                 <li>• A primeira linha deve conter os cabeçalhos das colunas</li>
                 <li>• Certifique-se de que os CPFs dos funcionários estão corretos</li>
                 <li>• Os valores devem estar em formato numérico (sem símbolos de moeda)</li>
-                <li>• Funcionários não cadastrados no sistema serão ignorados</li>
+                <li>• Funcionários não cadastrados serão ignorados e listados em avisos</li>
+                <li>• Revise o bloco de erros por linha após o processamento</li>
               </ul>
             </CardContent>
           </Card>
@@ -156,7 +207,7 @@ const AdminPayrollUploadPage: React.FC = () => {
           {/* Upload Section */}
           <Card>
             <CardHeader>
-              <CardTitle>Selecionar Arquivo</CardTitle>
+              <CardTitle>Passo 1 e 2: Selecionar e Revisar Arquivo</CardTitle>
               <CardDescription>
                 Escolha a planilha Excel com os dados da folha de pagamento
               </CardDescription>
@@ -190,6 +241,12 @@ const AdminPayrollUploadPage: React.FC = () => {
                 </div>
               )}
 
+              {formMessage && (
+                <Alert variant="destructive">
+                  <AlertDescription>{formMessage}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="flex space-x-3">
                 <Button
                   onClick={handleUpload}
@@ -204,7 +261,7 @@ const AdminPayrollUploadPage: React.FC = () => {
                   ) : (
                     <>
                       <Upload className="h-4 w-4 mr-2" />
-                      Processar Folha
+                      Validar e Processar Folha
                     </>
                   )}
                 </Button>

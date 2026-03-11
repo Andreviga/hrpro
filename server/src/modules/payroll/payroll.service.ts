@@ -10,6 +10,7 @@ import { DocumentsService } from '../documents/documents.service';
 export class PayrollService {
   private queue: Queue;
   private logger = new Logger(PayrollService.name);
+  private readonly requiredRubricCodes = ['BASE', 'INSS', 'IRRF'] as const;
 
   constructor(
     private prisma: PrismaService,
@@ -25,6 +26,66 @@ export class PayrollService {
   async createRun(companyId: string, month: number, year: number) {
     // Keep create endpoint backward compatible but idempotent.
     return this.openRun(companyId, month, year);
+  }
+
+  private async ensureCalculationPreconditions(payrollRun: { id: string; companyId: string; month: number; year: number }) {
+    const [activeRubrics, inssCount, irrfCount] = await Promise.all([
+      this.prisma.rubric.findMany({
+        where: { companyId: payrollRun.companyId, active: true },
+        select: { code: true }
+      }),
+      this.prisma.taxTableInss.count({
+        where: {
+          companyId: payrollRun.companyId,
+          month: payrollRun.month,
+          year: payrollRun.year
+        }
+      }),
+      this.prisma.taxTableIrrf.count({
+        where: {
+          companyId: payrollRun.companyId,
+          month: payrollRun.month,
+          year: payrollRun.year
+        }
+      })
+    ]);
+
+    const activeRubricCodes = new Set(activeRubrics.map((item) => item.code.toUpperCase()));
+    const missingRubricCodes = this.requiredRubricCodes.filter((code) => !activeRubricCodes.has(code));
+
+    const issues: string[] = [];
+    if (activeRubrics.length === 0) {
+      issues.push('Nenhuma rubrica ativa encontrada.');
+    } else if (missingRubricCodes.length > 0) {
+      issues.push(`Rubricas obrigatorias ausentes: ${missingRubricCodes.join(', ')}.`);
+    }
+
+    if (inssCount === 0) {
+      issues.push('Tabela INSS nao configurada para a competencia.');
+    }
+
+    if (irrfCount === 0) {
+      issues.push('Tabela IRRF nao configurada para a competencia.');
+    }
+
+    if (issues.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'Calculo bloqueado: configure Rubricas + INSS + IRRF antes de calcular a folha.',
+        code: 'PAYROLL_CALC_PRECONDITION_FAILED',
+        details: {
+          payrollRunId: payrollRun.id,
+          month: payrollRun.month,
+          year: payrollRun.year,
+          issues,
+          missingRubricCodes,
+          requiredRubricCodes: [...this.requiredRubricCodes],
+          inssBracketsCount: inssCount,
+          irrfBracketsCount: irrfCount
+        }
+      });
+    }
   }
 
   async listRuns(companyId: string, filters: { month?: number; year?: number; status?: 'draft' | 'calculated' | 'closed' }) {
@@ -80,6 +141,14 @@ export class PayrollService {
   }
 
   async enqueueCalculate(payrollRunId: string, userId?: string) {
+    const payrollRun = await this.prisma.payrollRun.findUnique({ where: { id: payrollRunId } });
+    if (!payrollRun) throw new NotFoundException('Payroll run not found');
+
+    const existingResultsCount = await this.prisma.payrollResult.count({ where: { payrollRunId } });
+    if (existingResultsCount === 0) {
+      await this.ensureCalculationPreconditions(payrollRun);
+    }
+
     await this.queue.add('calculate', { payrollRunId, userId });
     return { queued: true };
   }
@@ -113,6 +182,8 @@ export class PayrollService {
 
       return updatedFromExisting;
     }
+
+    await this.ensureCalculationPreconditions(payrollRun);
 
     const employees = await this.prisma.employee.findMany({
       where: { companyId: payrollRun.companyId, status: 'active' }
