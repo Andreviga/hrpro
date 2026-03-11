@@ -1,9 +1,24 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 
 @Injectable()
 export class SupportService {
   constructor(private prisma: PrismaService) {}
+
+  private isAdminRole(role?: string) {
+    return Boolean(role && ['admin', 'rh', 'manager'].includes(role));
+  }
+
+  private sanitizeText(value: string | undefined, fieldName: string, maxLength = 2000) {
+    const sanitized = (value ?? '').trim();
+    if (!sanitized) {
+      throw new BadRequestException(`${fieldName} is required`);
+    }
+    if (sanitized.length > maxLength) {
+      throw new BadRequestException(`${fieldName} exceeds max length (${maxLength})`);
+    }
+    return sanitized;
+  }
 
   async listTickets(companyId: string, employeeId?: string, role?: string) {
     const where =
@@ -45,17 +60,20 @@ export class SupportService {
       category: 'payroll' | 'benefits' | 'technical' | 'other';
     }
   ) {
+    const title = this.sanitizeText(data.title, 'title', 160);
+    const description = this.sanitizeText(data.description, 'description', 4000);
+
     return this.prisma.supportTicket.create({
       data: {
         companyId,
         employeeId,
-        title: data.title,
-        description: data.description,
+        title,
+        description,
         priority: data.priority,
         category: data.category,
         messages: {
           create: {
-            message: data.description,
+            message: description,
             sender: 'employee',
             senderName
           }
@@ -76,19 +94,59 @@ export class SupportService {
     const ticket = await this.prisma.supportTicket.findFirst({ where: { id: ticketId, companyId } });
     if (!ticket) throw new NotFoundException('Ticket not found');
 
-    const isAdmin = role && ['admin', 'rh', 'manager'].includes(role);
+    const sanitizedMessage = this.sanitizeText(message, 'message', 4000);
+    const isAdmin = this.isAdminRole(role);
+    if (!isAdmin && ticket.employeeId !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
     const sender = isAdmin ? 'admin' : 'employee';
+    let nextStatus = ticket.status;
+
+    if (isAdmin && ticket.status === 'open') {
+      nextStatus = 'in_progress';
+    }
+
+    if (!isAdmin && ['resolved', 'closed'].includes(ticket.status)) {
+      nextStatus = 'open';
+    }
 
     const newMessage = await this.prisma.ticketMessage.create({
-      data: { ticketId, userId, message, sender, senderName }
+      data: { ticketId, userId, message: sanitizedMessage, sender, senderName }
     });
 
     await this.prisma.supportTicket.update({
       where: { id: ticketId },
-      data: { updatedAt: new Date() }
+      data: {
+        updatedAt: new Date(),
+        status: nextStatus,
+      }
     });
 
     return newMessage;
+  }
+
+  async updateTicketStatus(
+    ticketId: string,
+    companyId: string,
+    status: 'open' | 'in_progress' | 'resolved' | 'closed',
+    role?: string,
+  ) {
+    if (!this.isAdminRole(role)) {
+      throw new ForbiddenException('Only admin/rh/manager can update ticket status');
+    }
+
+    const ticket = await this.prisma.supportTicket.findFirst({ where: { id: ticketId, companyId } });
+    if (!ticket) throw new NotFoundException('Ticket not found');
+
+    return this.prisma.supportTicket.update({
+      where: { id: ticketId },
+      data: {
+        status,
+        updatedAt: new Date(),
+      },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
   }
 
   async listChatMessages(companyId: string) {
@@ -106,10 +164,11 @@ export class SupportService {
     message: string,
     role?: string
   ) {
-    const sender = role && ['admin', 'rh', 'manager'].includes(role) ? 'admin' : 'employee';
+    const sanitizedMessage = this.sanitizeText(message, 'message', 4000);
+    const sender = this.isAdminRole(role) ? 'admin' : 'employee';
 
     return this.prisma.chatMessage.create({
-      data: { companyId, userId, message, sender, senderName }
+      data: { companyId, userId, message: sanitizedMessage, sender, senderName }
     });
   }
 

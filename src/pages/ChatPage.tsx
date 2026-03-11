@@ -8,24 +8,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import { useAuth } from '../context/AuthContext';
+import { Alert, AlertDescription } from '../components/ui/alert';
 import { supportApi, ChatMessage } from '../services/supportApi';
 import { 
   ArrowLeft,
   Send,
   User,
-  Clock,
   CheckCheck,
   Loader2,
-  MessageCircle
+  MessageCircle,
+  RefreshCw
 } from 'lucide-react';
 
 const ChatPage: React.FC = () => {
-  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,10 +50,13 @@ const ChatPage: React.FC = () => {
     try {
       const data = await supportApi.getChatMessages();
       setMessages(data);
+      setLastSyncAt(new Date());
+      setError('');
     } catch (error) {
-      console.error('Erro ao carregar mensagens:', error);
+      setError('Não foi possível atualizar as mensagens do chat.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -72,6 +77,7 @@ const ChatPage: React.FC = () => {
     if (!newMessage.trim() || sending) return;
 
     setSending(true);
+    setError('');
     try {
       const sentMessage = await supportApi.sendChatMessage(newMessage);
       setMessages(prev => [...prev, sentMessage]);
@@ -82,10 +88,15 @@ const ChatPage: React.FC = () => {
         loadMessages();
       }, 3000);
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      setError('Não foi possível enviar a mensagem.');
     } finally {
       setSending(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadMessages();
   };
 
   const handleBack = () => {
@@ -129,6 +140,10 @@ const ChatPage: React.FC = () => {
   };
 
   const messageGroups = groupMessagesByDate(messages);
+  const now = new Date();
+  const currentHour = now.getHours();
+  const isBusinessDay = now.getDay() >= 1 && now.getDay() <= 5;
+  const isChatOnline = isBusinessDay && currentHour >= 8 && currentHour < 18;
 
   if (loading) {
     return (
@@ -160,17 +175,33 @@ const ChatPage: React.FC = () => {
                   <div>
                     <CardTitle className="text-lg">Chat com Suporte RH</CardTitle>
                     <div className="flex items-center space-x-2">
-                      <Badge className="bg-green-100 text-green-800">Online</Badge>
-                      <span className="text-sm text-gray-500">Resposta em até 5 minutos</span>
+                      <Badge className={isChatOnline ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}>
+                        {isChatOnline ? 'Online agora' : 'Fora do horário'}
+                      </Badge>
+                      <span className="text-sm text-gray-500">
+                        {lastSyncAt
+                          ? `Atualizado às ${lastSyncAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                          : 'Sem sincronização recente'}
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
+              <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+                {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              </Button>
             </div>
           </CardHeader>
 
           {/* Messages Area */}
           <CardContent className="p-0 flex flex-col h-full">
+            {error && (
+              <div className="px-4 pt-4">
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {Object.entries(messageGroups).map(([dateKey, dayMessages]) => (
                 <div key={dateKey}>

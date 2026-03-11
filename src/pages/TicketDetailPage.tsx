@@ -9,8 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Textarea } from '../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Alert, AlertDescription } from '../components/ui/alert';
 import { useAuth } from '../context/AuthContext';
-import { supportApi, Ticket, TicketMessage } from '../services/supportApi';
+import { supportApi, Ticket } from '../services/supportApi';
 import { 
   ArrowLeft,
   Send,
@@ -33,6 +35,7 @@ const TicketDetailPage: React.FC = () => {
   const [error, setError] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,6 +73,7 @@ const TicketDetailPage: React.FC = () => {
     if (!newMessage.trim() || !ticket || sendingMessage) return;
 
     setSendingMessage(true);
+    setError('');
     try {
       const message = await supportApi.addTicketMessage(ticket.id, newMessage);
       setTicket(prev => prev ? {
@@ -78,7 +82,7 @@ const TicketDetailPage: React.FC = () => {
       } : null);
       setNewMessage('');
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      setError('Não foi possível enviar a mensagem. Tente novamente.');
     } finally {
       setSendingMessage(false);
     }
@@ -115,6 +119,32 @@ const TicketDetailPage: React.FC = () => {
       case 'high': return 'bg-orange-100 text-orange-800';
       case 'urgent': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status: Ticket['status']) => {
+    const labels: Record<Ticket['status'], string> = {
+      open: 'Aberto',
+      in_progress: 'Em andamento',
+      resolved: 'Resolvido',
+      closed: 'Fechado',
+    };
+    return labels[status];
+  };
+
+  const isAdminUser = user?.role === 'admin' || user?.role === 'rh' || user?.role === 'manager';
+
+  const handleStatusUpdate = async (status: Ticket['status']) => {
+    if (!ticket || !isAdminUser) return;
+    setUpdatingStatus(true);
+    setError('');
+    try {
+      const updated = await supportApi.updateTicketStatus(ticket.id, status);
+      setTicket(updated);
+    } catch {
+      setError('Não foi possível atualizar o status do ticket.');
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -171,7 +201,7 @@ const TicketDetailPage: React.FC = () => {
               <div className="flex items-center space-x-3 mt-1">
                 <Badge className={getStatusColor(ticket.status)}>
                   {getStatusIcon(ticket.status)}
-                  <span className="ml-1 capitalize">{ticket.status.replace('_', ' ')}</span>
+                  <span className="ml-1">{getStatusText(ticket.status)}</span>
                 </Badge>
                 <Badge className={getPriorityColor(ticket.priority)}>
                   {ticket.priority.toUpperCase()}
@@ -185,6 +215,34 @@ const TicketDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {isAdminUser && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium text-gray-700">Atualizar status:</span>
+                <Select value={ticket.status} onValueChange={(value) => handleStatusUpdate(value as Ticket['status'])}>
+                  <SelectTrigger className="w-[220px]" disabled={updatingStatus}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Aberto</SelectItem>
+                    <SelectItem value="in_progress">Em andamento</SelectItem>
+                    <SelectItem value="resolved">Resolvido</SelectItem>
+                    <SelectItem value="closed">Fechado</SelectItem>
+                  </SelectContent>
+                </Select>
+                {updatingStatus && <span className="text-xs text-gray-500">Atualizando...</span>}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Ticket Info */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

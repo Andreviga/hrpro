@@ -68,6 +68,16 @@ export const supportApi = {
     });
   },
 
+  async updateTicketStatus(
+    ticketId: string,
+    status: 'open' | 'in_progress' | 'resolved' | 'closed'
+  ): Promise<Ticket> {
+    return request<Ticket>(`/support/tickets/${ticketId}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status })
+    });
+  },
+
   async getChatMessages(): Promise<ChatMessage[]> {
     return request<ChatMessage[]>('/support/chat');
   },

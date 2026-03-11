@@ -61,6 +61,15 @@ export class SupportController {
     );
   }
 
+  @Post('support/tickets/:id/status')
+  updateTicketStatus(
+    @Param('id') id: string,
+    @Body() body: { status: 'open' | 'in_progress' | 'resolved' | 'closed' },
+    @Req() req: AuthRequest,
+  ) {
+    return this.support.updateTicketStatus(id, req.user.companyId, body.status, req.user.role);
+  }
+
   @Get('support/chat')
   listChat(@Req() req: AuthRequest) {
     return this.support.listChatMessages(req.user.companyId);
