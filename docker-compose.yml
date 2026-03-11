@@ -26,9 +26,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: ${REDIS_URL}
       PORT: ${PORT}
-      PAYROLL_WORKBOOK_PATH: ${PAYROLL_WORKBOOK_PATH}
+      PAYROLL_WORKBOOK_PATH: /app/workbooks/folha.xlsm
     volumes:
-      - ./Folha de pagamento de fevereiro 2026.xlsm:/app/Folha de pagamento de fevereiro 2026.xlsm:ro
+      - ./Folha de pagamento de fevereiro 2026.xlsm:/app/workbooks/folha.xlsm:ro
     ports:
       - '4000:4000'
     depends_on:
