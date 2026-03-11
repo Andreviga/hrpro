@@ -35,6 +35,8 @@ const RescisionCalculatorPage: React.FC = () => {
   const [calculation, setCalculation] = useState<RescisionCalculation | null>(null);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [calcError, setCalcError] = useState('');
 
   // Estados do formulário
   const [rescisionType, setRescisionType] = useState('');
@@ -43,8 +45,9 @@ const RescisionCalculatorPage: React.FC = () => {
   const [hasVacationDue, setHasVacationDue] = useState(false);
 
   const handleSearchEmployee = async () => {
+    setSearchError('');
     if (!cpf.trim()) {
-      alert('Digite um CPF para buscar');
+      setSearchError('Digite um CPF para buscar');
       return;
     }
 
@@ -55,19 +58,20 @@ const RescisionCalculatorPage: React.FC = () => {
         setEmployee(foundEmployee);
         setRescisionDate(new Date().toISOString().split('T')[0]);
       } else {
-        alert('Funcionário não encontrado');
+        setSearchError('Funcionário não encontrado');
         setEmployee(null);
       }
     } catch (error) {
-      alert('Erro ao buscar funcionário');
+      setSearchError('Erro ao buscar funcionário. Tente novamente.');
     } finally {
       setSearching(false);
     }
   };
 
   const handleCalculate = async () => {
+    setCalcError('');
     if (!employee || !rescisionType || !rescisionDate) {
-      alert('Preencha todos os campos obrigatórios');
+      setCalcError('Preencha todos os campos obrigatórios');
       return;
     }
 
@@ -82,7 +86,7 @@ const RescisionCalculatorPage: React.FC = () => {
       });
       setCalculation(result);
     } catch (error) {
-      alert('Erro ao calcular rescisão');
+      setCalcError('Erro ao calcular rescisão. Verifique os dados e tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -201,7 +205,12 @@ const RescisionCalculatorPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-
+                {searchError && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{searchError}</AlertDescription>
+                  </Alert>
+                )}
                 {employee && (
                   <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                     <div className="flex items-center space-x-2 mb-2">
@@ -292,6 +301,13 @@ const RescisionCalculatorPage: React.FC = () => {
                     )}
                     Calcular Rescisão
                   </Button>
+
+                  {calcError && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{calcError}</AlertDescription>
+                    </Alert>
+                  )}
 
                   <Alert>
                     <AlertTriangle className="h-4 w-4" />

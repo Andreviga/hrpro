@@ -2,8 +2,10 @@
  * Página principal do dashboard
  * Exibe informações resumidas do funcionário e acesso rápido
  */
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { apiService, PaystubSummary } from '../services/api';
+import { employeeApi } from '../services/employeeApi';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -16,10 +18,50 @@ import {
   Building2
 } from 'lucide-react';
 
+const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+const computeTenure = (date: string | null): string => {
+  if (!date) return '–';
+  const now = new Date();
+  const admission = new Date(date);
+  const diffMs = now.getTime() - admission.getTime();
+  const years = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365.25));
+  if (years >= 1) return `${years} ano${years > 1 ? 's' : ''}`;
+  const months = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.4));
+  return `${months} mês${months !== 1 ? 'es' : ''}`;
+};
+
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
+  const [paystubs, setPaystubs] = useState<PaystubSummary[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [admissionDate, setAdmissionDate] = useState<string | null>(null);
 
   const isAdministrativeProfile = ['admin', 'rh', 'manager'].includes(user?.role || '') && !user?.employeeId;
+
+  useEffect(() => {
+    if (isAdministrativeProfile || !user?.employeeId) {
+      setStatsLoading(false);
+      return;
+    }
+    Promise.all([
+      apiService.getPaystubs(),
+      employeeApi.getEmployee(user.employeeId)
+    ])
+      .then(([stubs, emp]) => {
+        setPaystubs(stubs);
+        setAdmissionDate(emp?.admissionDate ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
+  }, [isAdministrativeProfile, user?.employeeId]);
+
+  const mostRecent = paystubs.length > 0
+    ? paystubs.reduce((a, b) => (a.year > b.year || (a.year === b.year && a.month > b.month)) ? a : b)
+    : null;
+
+  const formatCurrency = (v: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
   const quickStats = isAdministrativeProfile ? [
     {
@@ -52,30 +94,30 @@ const DashboardPage: React.FC = () => {
     }
   ] : [
     {
-      title: 'Último Salário',
-      value: 'R$ 4.399,50',
-      description: 'Novembro 2024',
+      title: 'Último Salário Líquido',
+      value: statsLoading ? '...' : (mostRecent ? formatCurrency(mostRecent.netSalary) : '–'),
+      description: statsLoading ? 'Carregando...' : (mostRecent ? `${monthNames[mostRecent.month - 1]} ${mostRecent.year}` : 'Sem holerites'),
       icon: DollarSign,
       color: 'text-green-600'
     },
     {
-      title: 'Holerites',
-      value: '12',
-      description: 'Disponíveis em 2024',
+      title: 'Holerites Disponíveis',
+      value: statsLoading ? '...' : String(paystubs.length),
+      description: statsLoading ? 'Carregando...' : (paystubs.length > 0 ? 'Total processados' : 'Nenhum processado'),
       icon: FileText,
       color: 'text-blue-600'
     },
     {
       title: 'Tempo na Empresa',
-      value: '2 anos',
-      description: 'Desde Jan 2022',
+      value: statsLoading ? '...' : computeTenure(admissionDate),
+      description: statsLoading ? 'Carregando...' : (admissionDate ? `Desde ${new Date(admissionDate).toLocaleDateString('pt-BR')}` : '–'),
       icon: Calendar,
       color: 'text-purple-600'
     },
     {
-      title: 'Performance',
-      value: '95%',
-      description: 'Avaliação atual',
+      title: 'Nível de Acesso',
+      value: user?.role ?? '–',
+      description: 'Perfil no sistema',
       icon: TrendingUp,
       color: 'text-orange-600'
     }
@@ -201,27 +243,30 @@ const DashboardPage: React.FC = () => {
               <p className="text-sm text-gray-600">
                 Acompanhe eventos operacionais nos modulos de Competencias, Documentos e Monitor eSocial.
               </p>
+            ) : statsLoading ? (
+              <p className="text-sm text-gray-500">Carregando atividades...</p>
+            ) : paystubs.length === 0 ? (
+              <p className="text-sm text-gray-500">Nenhuma atividade recente encontrada.</p>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                  <div className="bg-green-100 p-2 rounded-full">
-                    <DollarSign className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Holerite de Novembro disponível</p>
-                    <p className="text-xs text-gray-500">Há 2 dias</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                  <div className="bg-blue-100 p-2 rounded-full">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Comprovante de rendimentos gerado</p>
-                    <p className="text-xs text-gray-500">Há 1 semana</p>
-                  </div>
-                </div>
+                {[...paystubs]
+                  .sort((a, b) => b.year - a.year || b.month - a.month)
+                  .slice(0, 3)
+                  .map((stub) => (
+                    <div key={stub.id} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="bg-green-100 p-2 rounded-full">
+                        <DollarSign className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          Holerite de {monthNames[stub.month - 1]} {stub.year} disponível
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Líquido: {formatCurrency(stub.netSalary)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
               </div>
             )}
           </CardContent>

@@ -27,7 +27,7 @@ async function main() {
     }
   });
 
-  await prisma.user.upsert({
+  const joaoUser = await prisma.user.upsert({
     where: { email: 'joao@hrpro.com' },
     update: {},
     create: {
@@ -38,8 +38,9 @@ async function main() {
       role: UserRole.employee
     }
   });
+  void joaoUser;
 
-  const employee = await prisma.employee.upsert({
+  await prisma.employee.upsert({
     where: { cpf: '48158420869' },
     update: {},
     create: {
@@ -115,9 +116,32 @@ async function main() {
     }
   });
 
+  const joaoEmployee = await prisma.employee.upsert({
+    where: { cpf: '12345678900' },
+    update: {},
+    create: {
+      companyId: company.id,
+      fullName: 'Joao Silva',
+      cpf: '12345678900',
+      email: 'joao@hrpro.com',
+      employeeCode: 'PROF003',
+      admissionDate: new Date('2023-03-01'),
+      position: 'Professor de Matematica',
+      department: 'centro_educacional',
+      status: EmployeeStatus.active,
+      salaryType: SalaryType.monthly,
+      baseSalary: 2800.0,
+      weeklyHours: 20,
+      dependents: 0,
+      unionFee: false,
+      transportVoucherValue: 0,
+      mealVoucherValue: 180
+    }
+  });
+
   await prisma.user.update({
     where: { email: 'joao@hrpro.com' },
-    data: { employeeId: employee.id }
+    data: { employeeId: joaoEmployee.id }
   });
 
   const inssRows = [
@@ -135,54 +159,55 @@ async function main() {
     { minValue: 4664.69, maxValue: 999999, rate: 0.275, deduction: 896.0, dependentDeduction: 189.59 }
   ];
 
-  const month = 1;
-  const year = 2026;
+  for (const month of [1, 2, 3]) {
+    const year = 2026;
 
-  for (const row of inssRows) {
-    await prisma.taxTableInss.upsert({
-      where: {
-        companyId_month_year_minValue: {
+    for (const row of inssRows) {
+      await prisma.taxTableInss.upsert({
+        where: {
+          companyId_month_year_minValue: {
+            companyId: company.id,
+            month,
+            year,
+            minValue: row.minValue
+          }
+        },
+        update: {},
+        create: {
           companyId: company.id,
           month,
           year,
-          minValue: row.minValue
+          minValue: row.minValue,
+          maxValue: row.maxValue,
+          rate: row.rate,
+          deduction: row.deduction
         }
-      },
-      update: {},
-      create: {
-        companyId: company.id,
-        month,
-        year,
-        minValue: row.minValue,
-        maxValue: row.maxValue,
-        rate: row.rate,
-        deduction: row.deduction
-      }
-    });
-  }
+      });
+    }
 
-  for (const row of irrfRows) {
-    await prisma.taxTableIrrf.upsert({
-      where: {
-        companyId_month_year_minValue: {
+    for (const row of irrfRows) {
+      await prisma.taxTableIrrf.upsert({
+        where: {
+          companyId_month_year_minValue: {
+            companyId: company.id,
+            month,
+            year,
+            minValue: row.minValue
+          }
+        },
+        update: {},
+        create: {
           companyId: company.id,
           month,
           year,
-          minValue: row.minValue
+          minValue: row.minValue,
+          maxValue: row.maxValue,
+          rate: row.rate,
+          deduction: row.deduction,
+          dependentDeduction: row.dependentDeduction
         }
-      },
-      update: {},
-      create: {
-        companyId: company.id,
-        month,
-        year,
-        minValue: row.minValue,
-        maxValue: row.maxValue,
-        rate: row.rate,
-        deduction: row.deduction,
-        dependentDeduction: row.dependentDeduction
-      }
-    });
+      });
+    }
   }
 
   await prisma.auditLog.create({
