@@ -27,6 +27,8 @@ services:
       REDIS_URL: ${REDIS_URL}
       PORT: ${PORT}
       PAYROLL_WORKBOOK_PATH: ${PAYROLL_WORKBOOK_PATH}
+    volumes:
+      - ./Folha de pagamento de fevereiro 2026.xlsm:/app/Folha de pagamento de fevereiro 2026.xlsm:ro
     ports:
       - '4000:4000'
     depends_on:

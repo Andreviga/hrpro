@@ -25,5 +25,5 @@ export const buildExamplePayslips = async (filePath: string) => {
 
 export const defaultExampleWorkbookPath = path.resolve(
   __dirname,
-  '../../../../Folha de pagamento de fevereiro 2026.xlsm'
+  '../../../../../Folha de pagamento de fevereiro 2026.xlsm'
 );
