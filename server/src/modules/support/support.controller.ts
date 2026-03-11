@@ -91,6 +91,6 @@ export class SupportController {
 
   @Post('support/chat/mark-read')
   markRead(@Req() req: AuthRequest) {
-    return this.support.markChatRead(req.user.companyId);
+    return this.support.markChatRead(req.user.companyId, req.user.role);
   }
 }

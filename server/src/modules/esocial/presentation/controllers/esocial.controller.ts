@@ -6,9 +6,11 @@ import { ImportEsocialXmlDto } from '../dtos/import-esocial-xml.dto';
 import { QueryEsocialDocumentsDto } from '../dtos/query-esocial-documents.dto';
 import { QueryEsocialOccurrencesDto } from '../dtos/query-esocial-occurrences.dto';
 import { SyncEsocialCatalogDto } from '../dtos/sync-esocial-catalog.dto';
+import { Roles } from '../../../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../../../common/guards/roles.guard';
 
 @Controller('esocial')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 export class EsocialController {
   constructor(private readonly service: EsocialService) {}
 
@@ -60,6 +62,7 @@ export class EsocialController {
   }
 
   @Post('catalog/sync')
+  @Roles('admin', 'rh', 'manager')
   async syncCatalog(@Body() body: SyncEsocialCatalogDto) {
     return this.service.syncCatalog(body.messages);
   }

@@ -913,6 +913,26 @@ export class DocumentsService {
       throw new BadRequestException('Document must be approved before signing');
     }
 
+    // Validate that employee users can only sign docs for themselves
+    const isAdminRole = ['admin', 'rh', 'manager'].includes(params.role);
+    if (!isAdminRole && params.employeeId && params.employeeId !== params.userId) {
+      throw new ForbiddenException('Employees can only sign documents for themselves');
+    }
+
+    // Check idempotency: prevent duplicate signatures from the same user
+    const existingSignature = await this.prisma.documentSignature.findFirst({
+      where: {
+        documentId: params.documentId,
+        userId: params.userId,
+        deletedAt: null
+      }
+    });
+
+    if (existingSignature) {
+      // Already signed by this user; return success without creating a duplicate
+      return before;
+    }
+
     const signature = await this.prisma.documentSignature.create({
       data: {
         documentId: params.documentId,

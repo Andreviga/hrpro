@@ -60,6 +60,10 @@ export class SupportService {
       category: 'payroll' | 'benefits' | 'technical' | 'other';
     }
   ) {
+    if (!employeeId) {
+      throw new BadRequestException('Tickets must be linked to an employee.');
+    }
+
     const title = this.sanitizeText(data.title, 'title', 160);
     const description = this.sanitizeText(data.description, 'description', 4000);
 
@@ -164,6 +168,10 @@ export class SupportService {
     message: string,
     role?: string
   ) {
+    if (!userId) {
+      throw new BadRequestException('User ID is required to send messages.');
+    }
+
     const sanitizedMessage = this.sanitizeText(message, 'message', 4000);
     const sender = this.isAdminRole(role) ? 'admin' : 'employee';
 
@@ -172,7 +180,11 @@ export class SupportService {
     });
   }
 
-  async markChatRead(companyId: string) {
+  async markChatRead(companyId: string, role?: string) {
+    if (!this.isAdminRole(role)) {
+      throw new ForbiddenException('Only admin/rh/manager can mark chat messages as read.');
+    }
+
     await this.prisma.chatMessage.updateMany({
       where: { companyId, isRead: false },
       data: { isRead: true }
