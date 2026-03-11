@@ -72,7 +72,7 @@ async function main() {
     update: {
       fullName: 'Gustavo Takashi Moraes Assano',
       rg: '350276912',
-      birthDate: new Date('1988-02-29'),
+      birthDate: new Date('1988-02-28'),
       email: 'gustavo.assano@gmail.com',
       phone: '11984923087',
       admissionDate: new Date('2026-01-27'),
@@ -94,7 +94,7 @@ async function main() {
       fullName: 'Gustavo Takashi Moraes Assano',
       cpf: '37024665840',
       rg: '350276912',
-      birthDate: new Date('1988-02-29'),
+      birthDate: new Date('1988-02-28'),
       email: 'gustavo.assano@gmail.com',
       phone: '11984923087',
       employeeCode: 'PROF002',
@@ -117,12 +117,12 @@ async function main() {
   });
 
   const joaoEmployee = await prisma.employee.upsert({
-    where: { cpf: '12345678900' },
+    where: { cpf: '11144477735' },
     update: {},
     create: {
       companyId: company.id,
       fullName: 'Joao Silva',
-      cpf: '12345678900',
+      cpf: '11144477735',
       email: 'joao@hrpro.com',
       employeeCode: 'PROF003',
       admissionDate: new Date('2023-03-01'),
