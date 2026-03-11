@@ -26,6 +26,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: ${REDIS_URL}
       PORT: ${PORT}
+      PAYROLL_WORKBOOK_PATH: ${PAYROLL_WORKBOOK_PATH}
     ports:
       - '4000:4000'
     depends_on:
