@@ -11,26 +11,18 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Alert, AlertDescription } from '../components/ui/alert';
 import { Textarea } from '../components/ui/textarea';
-import { academicApi, MonthlyClasses, ExtraClass, TeacherScheduleSummary } from '../services/academicApi';
+import { academicApi, MonthlyClasses, ExtraClass } from '../services/academicApi';
 import { employeeApi } from '../services/employeeApi';
 import { 
   Calendar as CalendarIcon,
-  Clock,
-  Users,
   BookOpen,
   Plus,
   Edit,
   Save,
   TrendingUp,
-  TrendingDown,
-  Calculator,
-  FileText,
-  Search,
   Filter,
   CheckCircle,
-  AlertTriangle,
   Loader2
 } from 'lucide-react';
 
@@ -173,6 +165,16 @@ const CalendarPage: React.FC = () => {
     }
   };
 
+  const handleMarkExtraAsPaid = async (id: number) => {
+    try {
+      await academicApi.updateExtraClassStatus(id, 'paid');
+      loadData();
+      alert('Aula extra marcada como paga!');
+    } catch (error) {
+      alert('Erro ao atualizar status da aula extra');
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -201,6 +203,38 @@ const CalendarPage: React.FC = () => {
   }
 
   const summary = getTotalSummary();
+  const completionRate = summary.scheduled > 0 ? (summary.actual / summary.scheduled) * 100 : 0;
+  const approvedExtraValue = extraClasses
+    .filter((ec) => ec.status === 'approved' || ec.status === 'paid')
+    .reduce((sum, ec) => sum + ec.hours * ec.hourlyRate, 0);
+  const pendingExtraCount = extraClasses.filter((ec) => ec.status === 'pending').length;
+
+  const reportByTeacher = Object.values(
+    monthlyClasses.reduce<Record<string, {
+      teacherName: string;
+      scheduled: number;
+      actual: number;
+      extra: number;
+      substitutions: number;
+    }>>((acc, item) => {
+      const key = item.teacherName;
+      if (!acc[key]) {
+        acc[key] = {
+          teacherName: item.teacherName,
+          scheduled: 0,
+          actual: 0,
+          extra: 0,
+          substitutions: 0,
+        };
+      }
+
+      acc[key].scheduled += item.scheduledHours;
+      acc[key].actual += item.actualHours;
+      acc[key].extra += item.extraHours;
+      acc[key].substitutions += item.substitutionHours;
+      return acc;
+    }, {})
+  );
 
   return (
     <Layout>
@@ -593,10 +627,10 @@ const CalendarPage: React.FC = () => {
                             <Badge className={
                               extra.status === 'approved' ? 'bg-green-100 text-green-800' :
                               extra.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
+                              'bg-blue-100 text-blue-800'
                             }>
                               {extra.status === 'approved' ? 'Aprovado' :
-                               extra.status === 'pending' ? 'Pendente' : 'Rejeitado'}
+                               extra.status === 'pending' ? 'Pendente' : 'Pago'}
                             </Badge>
                           </div>
                           <p className="text-sm text-gray-600">
@@ -612,6 +646,11 @@ const CalendarPage: React.FC = () => {
                             Aprovar
                           </Button>
                         )}
+                        {extra.status === 'approved' && (
+                          <Button size="sm" variant="outline" onClick={() => handleMarkExtraAsPaid(extra.id)}>
+                            Marcar como Pago
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -622,15 +661,69 @@ const CalendarPage: React.FC = () => {
 
           {/* Tab: Relatórios */}
           <TabsContent value="reports" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600">Cumprimento de Carga</p>
+                  <p className="text-2xl font-bold text-blue-700">{completionRate.toFixed(1)}%</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600">Horas de Substituição</p>
+                  <p className="text-2xl font-bold text-indigo-700">
+                    {monthlyClasses.reduce((sum, item) => sum + item.substitutionHours, 0)}h
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600">Valor de Extras Aprovadas</p>
+                  <p className="text-2xl font-bold text-green-700">{formatCurrency(approvedExtraValue)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600">Extras Pendentes</p>
+                  <p className="text-2xl font-bold text-amber-700">{pendingExtraCount}</p>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
-              <CardContent className="p-12 text-center">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Relatórios em Desenvolvimento
-                </h3>
-                <p className="text-gray-600">
-                  Em breve você terá acesso a relatórios detalhados de produtividade e frequência.
-                </p>
+              <CardHeader>
+                <CardTitle>Produtividade por Professor</CardTitle>
+                <CardDescription>
+                  Consolidado de horas programadas, realizadas e complementares do período.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {reportByTeacher.length === 0 ? (
+                  <p className="text-sm text-gray-600">
+                    Sem dados para o período selecionado. Selecione outro mês/ano ou registre aulas.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {reportByTeacher.map((item) => {
+                      const teacherCompletion = item.scheduled > 0 ? (item.actual / item.scheduled) * 100 : 0;
+                      return (
+                        <div key={item.teacherName} className="rounded-lg border p-4">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="font-medium text-gray-900">{item.teacherName}</p>
+                              <p className="text-sm text-gray-600">
+                                Programadas: {item.scheduled}h | Realizadas: {item.actual}h | Extras: {item.extra}h | Substituições: {item.substitutions}h
+                              </p>
+                            </div>
+                            <Badge variant={teacherCompletion >= 95 ? 'default' : 'secondary'}>
+                              {teacherCompletion.toFixed(1)}% de cumprimento
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

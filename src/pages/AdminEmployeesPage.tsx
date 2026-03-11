@@ -323,6 +323,32 @@ const AdminEmployeesPage: React.FC = () => {
     return texts[status as keyof typeof texts] || status;
   };
 
+  const statusSummary = employees.reduce<Record<string, number>>((acc, emp) => {
+    acc[emp.status] = (acc[emp.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const employeesWithMissingData = employees.filter((emp) => {
+    return (
+      !emp.email ||
+      !emp.phone ||
+      !emp.admissionDate ||
+      !emp.address?.street ||
+      !emp.address?.city ||
+      !emp.address?.zipCode
+    );
+  });
+
+  const recentAdmissions = employees
+    .filter((emp) => emp.admissionDate)
+    .sort((a, b) => new Date(b.admissionDate || '').getTime() - new Date(a.admissionDate || '').getTime())
+    .slice(0, 5);
+
+  const byEmployer = EMPLOYER_OPTIONS.map((option) => ({
+    label: option.label,
+    total: employees.filter((emp) => String(emp.employerCnpj ?? '').replace(/\D/g, '') === option.value).length,
+  }));
+
   if (loading) {
     return (
       <Layout>
@@ -806,17 +832,116 @@ const AdminEmployeesPage: React.FC = () => {
 
           {/* Tab: Relatórios */}
           <TabsContent value="reports" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600">Funcionários Cadastrados</p>
+                  <p className="text-2xl font-bold text-blue-700">{employees.length}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600">Pendentes de Aprovação</p>
+                  <p className="text-2xl font-bold text-amber-700">{pendingEmployees.length}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600">Registros com Pendências</p>
+                  <p className="text-2xl font-bold text-red-700">{employeesWithMissingData.length}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600">Ativos</p>
+                  <p className="text-2xl font-bold text-green-700">{statusSummary.active ?? 0}</p>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
-              <CardContent className="p-12 text-center">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Relatórios em Desenvolvimento
-                </h3>
-                <p className="text-gray-600">
-                  Em breve você terá acesso a relatórios detalhados de funcionários.
-                </p>
+              <CardHeader>
+                <CardTitle>Distribuição por Status</CardTitle>
+                <CardDescription>Visão rápida da situação atual da equipe.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="bg-green-100 text-green-800">Ativos: {statusSummary.active ?? 0}</Badge>
+                  <Badge className="bg-yellow-100 text-yellow-800">Pendentes: {statusSummary.pending_approval ?? 0}</Badge>
+                  <Badge className="bg-gray-100 text-gray-800">Inativos: {statusSummary.inactive ?? 0}</Badge>
+                  <Badge className="bg-red-100 text-red-800">Demitidos: {statusSummary.dismissed ?? 0}</Badge>
+                </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuição por CNPJ</CardTitle>
+                <CardDescription>Quantidade de colaboradores vinculados por empregador.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {byEmployer.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between rounded-lg border p-3">
+                      <p className="font-medium text-gray-900">{item.label}</p>
+                      <Badge variant="secondary">{item.total} funcionário(s)</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Últimas Admissões</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {recentAdmissions.length === 0 ? (
+                    <p className="text-sm text-gray-600">Nenhuma admissão com data cadastrada.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {recentAdmissions.map((emp) => (
+                        <div key={emp.id} className="flex items-center justify-between rounded border p-3">
+                          <div>
+                            <p className="font-medium text-gray-900">{emp.fullName}</p>
+                            <p className="text-xs text-gray-600">{emp.position}</p>
+                          </div>
+                          <span className="text-sm text-gray-700">
+                            {emp.admissionDate ? new Date(emp.admissionDate).toLocaleDateString('pt-BR') : '--'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pendências de Cadastro</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {employeesWithMissingData.length === 0 ? (
+                    <p className="text-sm text-green-700">Nenhuma pendência crítica identificada.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {employeesWithMissingData.slice(0, 8).map((emp) => (
+                        <div key={emp.id} className="rounded border border-red-100 bg-red-50 p-3">
+                          <p className="font-medium text-red-900">{emp.fullName}</p>
+                          <p className="text-xs text-red-700">
+                            {!emp.email ? 'Sem e-mail; ' : ''}
+                            {!emp.phone ? 'Sem telefone; ' : ''}
+                            {!emp.admissionDate ? 'Sem admissão; ' : ''}
+                            {!emp.address?.street || !emp.address?.city || !emp.address?.zipCode ? 'Endereço incompleto' : ''}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 

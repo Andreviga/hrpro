@@ -121,6 +121,39 @@ const RescisionCalculatorPage: React.FC = () => {
     return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
+  const exportCalculationSummary = () => {
+    if (!calculation) return;
+
+    const lines = [
+      'RESUMO DE RESCISAO',
+      '==================',
+      `Funcionario: ${calculation.employee.name}`,
+      `CPF: ${formatCPF(calculation.employee.cpf)}`,
+      `Tipo: ${getRescisionTypeName(calculation.rescisionType)}`,
+      `Data da rescisao: ${new Date(calculation.rescisionDate).toLocaleDateString('pt-BR')}`,
+      '',
+      'VALORES',
+      `Total bruto: ${formatCurrency(calculation.calculation.totalGross)}`,
+      `Deducoes: ${formatCurrency(calculation.calculation.totalDeductions)}`,
+      `Liquido: ${formatCurrency(calculation.calculation.netValue)}`,
+      `FGTS deposito: ${formatCurrency(calculation.calculation.fgtsDeposit)}`,
+      `FGTS multa: ${formatCurrency(calculation.calculation.fgtsFine)}`,
+      '',
+      'ITENS',
+      ...calculation.calculation.items.map(
+        (item) => `${item.type === 'deduction' ? '-' : '+'} ${item.code} ${item.description}: ${formatCurrency(item.value)}`
+      ),
+    ];
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `rescisao_${calculation.employee.name.replace(/\s+/g, '_').toLowerCase()}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -259,6 +292,13 @@ const RescisionCalculatorPage: React.FC = () => {
                     )}
                     Calcular Rescisão
                   </Button>
+
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Revise tipo de rescisão, aviso prévio e férias vencidas antes de gerar o termo final.
+                    </AlertDescription>
+                  </Alert>
                 </CardContent>
               </Card>
             )}
@@ -404,6 +444,10 @@ const RescisionCalculatorPage: React.FC = () => {
                       <Button variant="outline" className="flex-1" onClick={() => window.print()}>
                         <FileText className="h-4 w-4 mr-2" />
                         Imprimir Cálculo
+                      </Button>
+                      <Button variant="outline" className="flex-1" onClick={exportCalculationSummary}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Exportar Resumo (.txt)
                       </Button>
                     </div>
                   </CardContent>

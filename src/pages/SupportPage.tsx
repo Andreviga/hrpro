@@ -7,7 +7,9 @@ import Layout from '../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Alert, AlertDescription } from '../components/ui/alert';
 import { supportApi, Ticket } from '../services/supportApi';
 import { 
   MessageCircle, 
@@ -19,13 +21,19 @@ import {
   XCircle,
   Loader2,
   Calendar,
-  User
+  User,
+  Search,
+  Filter
 } from 'lucide-react';
 
 const SupportPage: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | Ticket['status']>('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | Ticket['priority']>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | Ticket['category']>('all');
 
   useEffect(() => {
     loadTickets();
@@ -73,6 +81,26 @@ const SupportPage: React.FC = () => {
     }
   };
 
+  const getStatusLabel = (status: Ticket['status']) => {
+    const labels: Record<Ticket['status'], string> = {
+      open: 'Aberto',
+      in_progress: 'Em andamento',
+      resolved: 'Resolvido',
+      closed: 'Fechado',
+    };
+    return labels[status];
+  };
+
+  const getCategoryLabel = (category: Ticket['category']) => {
+    const labels: Record<Ticket['category'], string> = {
+      payroll: 'Folha',
+      benefits: 'Benefícios',
+      technical: 'Técnico',
+      other: 'Outros',
+    };
+    return labels[category];
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -94,6 +122,35 @@ const SupportPage: React.FC = () => {
   const handleStartChat = () => {
     window.location.href = '#/support/chat';
   };
+
+  const filteredTickets = tickets.filter((ticket) => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const matchesSearch =
+      normalizedSearch.length === 0 ||
+      ticket.title.toLowerCase().includes(normalizedSearch) ||
+      ticket.description.toLowerCase().includes(normalizedSearch) ||
+      ticket.id.toLowerCase().includes(normalizedSearch);
+    const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
+    const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter;
+    const matchesCategory = categoryFilter === 'all' || ticket.category === categoryFilter;
+
+    return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
+  });
+
+  const resolvedTickets = tickets.filter((ticket) => ticket.status === 'resolved' || ticket.status === 'closed');
+  const avgResolutionHours = resolvedTickets.length
+    ? resolvedTickets.reduce((sum, ticket) => {
+        const opened = new Date(ticket.createdAt).getTime();
+        const closed = new Date(ticket.updatedAt).getTime();
+        const diffHours = Math.max(0, (closed - opened) / (1000 * 60 * 60));
+        return sum + diffHours;
+      }, 0) / resolvedTickets.length
+    : null;
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  const isBusinessDay = now.getDay() >= 1 && now.getDay() <= 5;
+  const isChatOnline = isBusinessDay && currentHour >= 8 && currentHour < 18;
 
   if (loading) {
     return (
@@ -120,6 +177,12 @@ const SupportPage: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={handleStartChat}>
             <CardContent className="p-6">
@@ -130,7 +193,9 @@ const SupportPage: React.FC = () => {
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">Chat ao Vivo</h3>
                   <p className="text-gray-600">Converse diretamente com nossa equipe</p>
-                  <Badge className="mt-2 bg-green-100 text-green-800">Online</Badge>
+                  <Badge className={`mt-2 ${isChatOnline ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                    {isChatOnline ? 'Online agora' : 'Fora do horário'}
+                  </Badge>
                 </div>
               </div>
             </CardContent>
@@ -180,7 +245,7 @@ const SupportPage: React.FC = () => {
                 <div>
                   <p className="text-sm text-gray-600">Em Andamento</p>
                   <p className="text-lg font-semibold">
-                    {tickets.filter(t => t.status === 'in_progress').length}
+                    {tickets.filter(t => t.status === 'in_progress' || t.status === 'open').length}
                   </p>
                 </div>
               </div>
@@ -196,7 +261,7 @@ const SupportPage: React.FC = () => {
                 <div>
                   <p className="text-sm text-gray-600">Resolvidos</p>
                   <p className="text-lg font-semibold">
-                    {tickets.filter(t => t.status === 'resolved').length}
+                    {resolvedTickets.length}
                   </p>
                 </div>
               </div>
@@ -211,7 +276,9 @@ const SupportPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Tempo Médio</p>
-                  <p className="text-lg font-semibold">2h 30m</p>
+                  <p className="text-lg font-semibold">
+                    {avgResolutionHours !== null ? `${avgResolutionHours.toFixed(1)}h` : '--'}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -224,7 +291,9 @@ const SupportPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Meus Tickets</CardTitle>
-                <CardDescription>Acompanhe o status dos seus chamados</CardDescription>
+                <CardDescription>
+                  Acompanhe o status dos seus chamados ({filteredTickets.length} de {tickets.length})
+                </CardDescription>
               </div>
               <Button onClick={handleNewTicket}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -233,6 +302,57 @@ const SupportPage: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+              <div className="relative md:col-span-2">
+                <Search className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                <Input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className="pl-9"
+                  placeholder="Buscar por título, ID ou descrição"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | Ticket['status'])}>
+                <SelectTrigger>
+                  <Filter className="h-4 w-4 mr-2 text-gray-500" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="open">Aberto</SelectItem>
+                  <SelectItem value="in_progress">Em andamento</SelectItem>
+                  <SelectItem value="resolved">Resolvido</SelectItem>
+                  <SelectItem value="closed">Fechado</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={priorityFilter} onValueChange={(value) => setPriorityFilter(value as 'all' | Ticket['priority'])}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Prioridade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Prioridades</SelectItem>
+                    <SelectItem value="low">Baixa</SelectItem>
+                    <SelectItem value="medium">Média</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="urgent">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as 'all' | Ticket['category'])}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Categorias</SelectItem>
+                    <SelectItem value="payroll">Folha</SelectItem>
+                    <SelectItem value="benefits">Benefícios</SelectItem>
+                    <SelectItem value="technical">Técnico</SelectItem>
+                    <SelectItem value="other">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             {tickets.length === 0 ? (
               <div className="text-center py-8">
                 <TicketIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -247,9 +367,30 @@ const SupportPage: React.FC = () => {
                   Criar Primeiro Ticket
                 </Button>
               </div>
+            ) : filteredTickets.length === 0 ? (
+              <div className="text-center py-8">
+                <TicketIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Nenhum ticket encontrado com esses filtros
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Limpe os filtros para visualizar todos os chamados.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('all');
+                    setPriorityFilter('all');
+                    setCategoryFilter('all');
+                  }}
+                >
+                  Limpar filtros
+                </Button>
+              </div>
             ) : (
               <div className="space-y-4">
-                {tickets.map((ticket) => (
+                {filteredTickets.map((ticket) => (
                   <div
                     key={ticket.id}
                     className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -261,11 +402,12 @@ const SupportPage: React.FC = () => {
                           <h3 className="font-semibold text-gray-900">#{ticket.id} - {ticket.title}</h3>
                           <Badge className={getStatusColor(ticket.status)}>
                             {getStatusIcon(ticket.status)}
-                            <span className="ml-1 capitalize">{ticket.status.replace('_', ' ')}</span>
+                            <span className="ml-1">{getStatusLabel(ticket.status)}</span>
                           </Badge>
                           <Badge className={getPriorityColor(ticket.priority)}>
                             {ticket.priority.toUpperCase()}
                           </Badge>
+                          <Badge variant="outline">{getCategoryLabel(ticket.category)}</Badge>
                         </div>
                         <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                           {ticket.description}

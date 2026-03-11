@@ -319,14 +319,14 @@ export const academicApi = {
   },
 
   /**
-   * Aprova/rejeita aula extra
+   * Atualiza status da aula extra
    */
-  async updateExtraClassStatus(id: number, status: 'approved' | 'rejected'): Promise<ExtraClass> {
+  async updateExtraClassStatus(id: number, status: 'pending' | 'approved' | 'paid'): Promise<ExtraClass> {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     const index = mockExtraClasses.findIndex(ec => ec.id === id);
     if (index >= 0) {
-      mockExtraClasses[index].status = status === 'approved' ? 'approved' : 'pending';
+      mockExtraClasses[index].status = status;
       return mockExtraClasses[index];
     }
     

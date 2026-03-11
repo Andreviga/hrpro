@@ -294,13 +294,31 @@ const AdminPayrollGridPage: React.FC = () => {
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : !gridData || !gridData.payrollRunId ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <p className="text-lg">Nenhuma folha encontrada para {String(month).padStart(2, '0')}/{year}</p>
-                <p className="text-sm mt-1">Abra e calcule uma competencia na tela de Competencias.</p>
+              <div className="text-center py-12 text-muted-foreground space-y-4">
+                <div>
+                  <p className="text-lg">Nenhuma folha encontrada para {String(month).padStart(2, '0')}/{year}</p>
+                  <p className="text-sm mt-1">Abra e calcule uma competencia para carregar a visao macro.</p>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button onClick={() => { window.location.href = '#/admin/payroll-runs'; }}>
+                    Ir para Competencias
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => { window.location.href = '#/admin/formulas'; }}
+                  >
+                    Revisar Rubricas e Tabelas
+                  </Button>
+                </div>
               </div>
             ) : filteredEmployees.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <p>Nenhum resultado encontrado para a busca.</p>
+                {search.trim() && (
+                  <Button variant="outline" className="mt-3" onClick={() => setSearch('')}>
+                    Limpar busca
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
