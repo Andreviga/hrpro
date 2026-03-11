@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Loader2, FileText, RefreshCcw } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
@@ -28,6 +29,13 @@ const AdminPaystubBatchPage: React.FC = () => {
   const now = new Date();
   const [month, setMonth] = useState(String(now.getMonth() + 1));
   const [year, setYear] = useState(String(now.getFullYear()));
+  const [availableCompetencies, setAvailableCompetencies] = useState<Array<{
+    key: string;
+    month: number;
+    year: number;
+    status: PayrollRun['status'];
+  }>>([]);
+  const [selectedCompetency, setSelectedCompetency] = useState('');
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [loading, setLoading] = useState(false);
   const [emittingId, setEmittingId] = useState<string | null>(null);
@@ -65,6 +73,35 @@ const AdminPaystubBatchPage: React.FC = () => {
       setRuns([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAvailableCompetencies = async () => {
+    try {
+      const allRuns = await payrollApi.listRuns();
+      const seen = new Set<string>();
+      const normalized = [...allRuns]
+        .sort((a, b) => {
+          if (a.year !== b.year) return b.year - a.year;
+          if (a.month !== b.month) return b.month - a.month;
+          return b.version - a.version;
+        })
+        .filter((run) => {
+          const key = `${run.month}-${run.year}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .map((run) => ({
+          key: `${run.month}-${run.year}`,
+          month: run.month,
+          year: run.year,
+          status: run.status
+        }));
+
+      setAvailableCompetencies(normalized);
+    } catch {
+      setAvailableCompetencies([]);
     }
   };
 
@@ -154,6 +191,7 @@ const AdminPaystubBatchPage: React.FC = () => {
 
   useEffect(() => {
     void loadRuns();
+    void loadAvailableCompetencies();
   }, []);
 
   return (
@@ -181,6 +219,40 @@ const AdminPaystubBatchPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div>
+              <Label>Competencias existentes</Label>
+              <div className="flex flex-wrap items-end gap-3 mt-1">
+                <Select
+                  value={selectedCompetency}
+                  onValueChange={(value) => {
+                    setSelectedCompetency(value);
+                    const [selectedMonth, selectedYear] = value.split('-');
+                    setMonth(selectedMonth);
+                    setYear(selectedYear);
+                  }}
+                >
+                  <SelectTrigger className="w-[300px]">
+                    <SelectValue placeholder="Selecione uma competencia existente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCompetencies.map((competency) => (
+                      <SelectItem key={competency.key} value={competency.key}>
+                        {String(competency.month).padStart(2, '0')}/{competency.year} - {statusLabels[competency.status]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="outline"
+                  onClick={() => void loadRuns()}
+                  disabled={loading || !selectedCompetency}
+                >
+                  Carregar selecionada
+                </Button>
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <Label>Mes</Label>

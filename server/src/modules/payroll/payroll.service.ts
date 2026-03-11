@@ -435,11 +435,38 @@ export class PayrollService {
   }
 
   async listPaystubsByCompany(companyId: string) {
+    return this.listPaystubsForCompany({ companyId });
+  }
+
+  async listPaystubsForCompany(params: {
+    companyId: string;
+    month?: number;
+    year?: number;
+    employeeId?: string;
+    employeeName?: string;
+  }) {
     const results = await this.prisma.payrollResult.findMany({
       where: {
         payrollRun: {
-          is: { companyId }
-        }
+          is: {
+            companyId: params.companyId,
+            ...(params.month ? { month: params.month } : {}),
+            ...(params.year ? { year: params.year } : {})
+          }
+        },
+        ...(params.employeeId ? { employeeId: params.employeeId } : {}),
+        ...(params.employeeName
+          ? {
+              employee: {
+                is: {
+                  fullName: {
+                    contains: params.employeeName,
+                    mode: 'insensitive'
+                  }
+                }
+              }
+            }
+          : {})
       },
       include: { payrollRun: true, employee: true },
       orderBy: [{ payrollRun: { year: 'desc' } }, { payrollRun: { month: 'desc' } }, { employee: { fullName: 'asc' } }]
@@ -1342,13 +1369,19 @@ export class PayrollService {
         ...(params.extraPlaceholders ?? {})
       };
 
+      const documentTitle = params.documentType === 'holerite'
+        ? `Holerite ${String(payrollRun.month).padStart(2, '0')}/${payrollRun.year} - ${result.employee.fullName}`
+        : params.documentType === 'recibo_ferias'
+          ? `Recibo de Ferias ${String(payrollRun.month).padStart(2, '0')}/${payrollRun.year} - ${result.employee.fullName}`
+          : template.name;
+
       const doc = await this.documents.createDocumentFromTemplate({
         companyId: params.companyId,
         userId: params.userId,
         employeeId: result.employeeId,
         templateId: template.id,
         payrollRunId: payrollRun.id,
-        title: template.name,
+        title: documentTitle,
         placeholders,
         month: payrollRun.month,
         year: payrollRun.year,

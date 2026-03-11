@@ -491,7 +491,9 @@ const AdminPayrollRunsPage: React.FC = () => {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {actionRun
-                ? `Competência ${actionRun.month}/${actionRun.year}. Deseja continuar?`
+                ? actionType === 'close'
+                  ? `Competência ${actionRun.month}/${actionRun.year}. Ao fechar, a folha fica bloqueada para edições e os documentos automáticos podem ser gerados. Deseja continuar?`
+                  : `Competência ${actionRun.month}/${actionRun.year}. Ao reabrir, a folha volta a aceitar ajustes e poderá exigir novo cálculo antes da emissão final. Deseja continuar?`
                 : 'Deseja continuar?'}
             </AlertDialogDescription>
           </AlertDialogHeader>

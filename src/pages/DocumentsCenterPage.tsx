@@ -36,6 +36,7 @@ import {
   TableRow
 } from '../components/ui/table';
 import { documentsApi, Document, DocumentStatus, DocumentTemplate, DocumentType, DocumentVersion } from '../services/documentsApi';
+import { payrollApi, PayrollRun } from '../services/payrollApi';
 import { API_BASE, getAuthToken } from '../services/http';
 import {
   FileText,
@@ -118,6 +119,8 @@ const DocumentsCenterPage: React.FC = () => {
   const canManageTemplates = ['admin', 'rh', 'manager'].includes(user?.role || '');
 
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [documentPage, setDocumentPage] = useState(1);
+  const [availableRuns, setAvailableRuns] = useState<PayrollRun[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(true);
   const [templatesLoading, setTemplatesLoading] = useState(true);
@@ -153,6 +156,7 @@ const DocumentsCenterPage: React.FC = () => {
   useEffect(() => {
     void loadDocuments();
     void loadTemplates();
+    void loadAvailableRuns();
   }, []);
 
   const loadDocuments = async () => {
@@ -175,10 +179,25 @@ const DocumentsCenterPage: React.FC = () => {
 
       const data = await documentsApi.listDocuments(filters);
       setDocuments(data);
+      setDocumentPage(1);
     } catch (err) {
       setError('Erro ao carregar documentos.');
     } finally {
       setDocumentsLoading(false);
+    }
+  };
+
+  const loadAvailableRuns = async () => {
+    try {
+      const runs = await payrollApi.listRuns();
+      const sorted = [...runs].sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        if (a.month !== b.month) return b.month - a.month;
+        return b.version - a.version;
+      });
+      setAvailableRuns(sorted);
+    } catch {
+      setAvailableRuns([]);
     }
   };
 
@@ -427,7 +446,7 @@ const DocumentsCenterPage: React.FC = () => {
 
   const handleGenerateFromPayroll = async () => {
     if (!generationForm.payrollRunId.trim()) {
-      setError('Informe o ID da folha para gerar documentos.');
+      setError('Selecione uma competencia para gerar documentos.');
       return;
     }
 
@@ -452,6 +471,20 @@ const DocumentsCenterPage: React.FC = () => {
   };
 
   const hasTemplates = templates.length > 0;
+  const documentsPerPage = 12;
+  const totalDocumentPages = Math.max(1, Math.ceil(documents.length / documentsPerPage));
+  const paginatedDocuments = documents.slice((documentPage - 1) * documentsPerPage, documentPage * documentsPerPage);
+
+  const getFriendlyDocumentTitle = (document: Document) => {
+    const hasOpaqueIdTitle = /^[a-z0-9]{18,}$/i.test((document.title || '').trim());
+    if (document.title && !hasOpaqueIdTitle) return document.title;
+
+    const monthYear = document.month && document.year ? `${String(document.month).padStart(2, '0')}/${document.year}` : '';
+    const employeeName = String((document.placeholders as Record<string, unknown> | null | undefined)?.employee_name ?? '').trim();
+    const typeLabel = documentTypes.find((item) => item.value === document.type)?.label || 'Documento';
+    const suffix = [monthYear, employeeName].filter(Boolean).join(' - ');
+    return suffix ? `${typeLabel} ${suffix}` : `${typeLabel} ${document.id.slice(0, 8)}`;
+  };
 
   return (
     <Layout>
@@ -466,6 +499,7 @@ const DocumentsCenterPage: React.FC = () => {
           <Button variant="outline" onClick={() => {
             void loadDocuments();
             void loadTemplates();
+            void loadAvailableRuns();
           }}>
             <RefreshCcw className="h-4 w-4 mr-2" />
             Atualizar
@@ -593,10 +627,10 @@ const DocumentsCenterPage: React.FC = () => {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          documents.map((document) => (
+                          paginatedDocuments.map((document) => (
                             <TableRow key={document.id}>
                               <TableCell>
-                                <div className="font-medium text-gray-900">{document.title}</div>
+                                <div className="font-medium text-gray-900">{getFriendlyDocumentTitle(document)}</div>
                                 <div className="text-xs text-gray-500">{document.id}</div>
                               </TableCell>
                               <TableCell>
@@ -664,6 +698,30 @@ const DocumentsCenterPage: React.FC = () => {
                         )}
                       </TableBody>
                     </Table>
+                    </div>
+                  )}
+
+                  {!documentsLoading && documents.length > documentsPerPage && (
+                    <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+                      <span>Pagina {documentPage} de {totalDocumentPages}</span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDocumentPage((prev) => Math.max(1, prev - 1))}
+                          disabled={documentPage <= 1}
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDocumentPage((prev) => Math.min(totalDocumentPages, prev + 1))}
+                          disabled={documentPage >= totalDocumentPages}
+                        >
+                          Proxima
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -835,12 +893,22 @@ const DocumentsCenterPage: React.FC = () => {
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>ID da folha</Label>
-                  <Input
+                  <Label>Competencia da folha</Label>
+                  <Select
                     value={generationForm.payrollRunId}
-                    onChange={(event) => setGenerationForm({ ...generationForm, payrollRunId: event.target.value })}
-                    placeholder="payroll-run-id"
-                  />
+                    onValueChange={(value) => setGenerationForm({ ...generationForm, payrollRunId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a competencia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableRuns.map((run) => (
+                        <SelectItem key={run.id} value={run.id}>
+                          {String(run.month).padStart(2, '0')}/{run.year} - v{run.version} - {run.status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Tipo de documento</Label>

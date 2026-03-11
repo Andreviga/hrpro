@@ -19,7 +19,38 @@ import {
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
 
-  const quickStats = [
+  const isAdministrativeProfile = ['admin', 'rh', 'manager'].includes(user?.role || '') && !user?.employeeId;
+
+  const quickStats = isAdministrativeProfile ? [
+    {
+      title: 'Perfil',
+      value: 'Administrativo',
+      description: 'Sem vinculo de funcionario',
+      icon: User,
+      color: 'text-blue-600'
+    },
+    {
+      title: 'Holerites pessoais',
+      value: 'N/A',
+      description: 'Nao se aplica para este login',
+      icon: FileText,
+      color: 'text-slate-600'
+    },
+    {
+      title: 'Modulo recomendado',
+      value: 'Competencias',
+      description: 'Use Fechamento por Competencia',
+      icon: Calendar,
+      color: 'text-emerald-600'
+    },
+    {
+      title: 'Gestao',
+      value: 'RH / Folha',
+      description: 'Acesso aos paineis administrativos',
+      icon: TrendingUp,
+      color: 'text-orange-600'
+    }
+  ] : [
     {
       title: 'Último Salário',
       value: 'R$ 4.399,50',
@@ -85,29 +116,35 @@ const DashboardPage: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Matrícula</p>
-                <p className="font-semibold">{user?.employeeCode}</p>
+            {isAdministrativeProfile ? (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
+                Esta conta nao possui vinculo de funcionario. Dados pessoais de holerite e performance individual nao sao exibidos neste dashboard.
               </div>
-              <div>
-                <p className="text-sm text-gray-500">Cargo</p>
-                <p className="font-semibold">{user?.position}</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Matrícula</p>
+                  <p className="font-semibold">{user?.employeeCode}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Cargo</p>
+                  <p className="font-semibold">{user?.position}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Departamento</p>
+                  <p className="font-semibold flex items-center">
+                    <Building2 className="h-4 w-4 mr-1" />
+                    {user?.department}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Nível de Acesso</p>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                    {user?.role}
+                  </span>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-500">Departamento</p>
-                <p className="font-semibold flex items-center">
-                  <Building2 className="h-4 w-4 mr-1" />
-                  {user?.department}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Nível de Acesso</p>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                  {user?.role}
-                </span>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -160,27 +197,33 @@ const DashboardPage: React.FC = () => {
             <CardTitle>Atividades Recentes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                <div className="bg-green-100 p-2 rounded-full">
-                  <DollarSign className="h-4 w-4 text-green-600" />
+            {isAdministrativeProfile ? (
+              <p className="text-sm text-gray-600">
+                Acompanhe eventos operacionais nos modulos de Competencias, Documentos e Monitor eSocial.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="bg-green-100 p-2 rounded-full">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Holerite de Novembro disponível</p>
+                    <p className="text-xs text-gray-500">Há 2 dias</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Holerite de Novembro disponível</p>
-                  <p className="text-xs text-gray-500">Há 2 dias</p>
+                
+                <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="bg-blue-100 p-2 rounded-full">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Comprovante de rendimentos gerado</p>
+                    <p className="text-xs text-gray-500">Há 1 semana</p>
+                  </div>
                 </div>
               </div>
-              
-              <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                <div className="bg-blue-100 p-2 rounded-full">
-                  <FileText className="h-4 w-4 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Comprovante de rendimentos gerado</p>
-                  <p className="text-xs text-gray-500">Há 1 semana</p>
-                </div>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

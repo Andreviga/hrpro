@@ -9,6 +9,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { apiService, PaystubSummary } from '../services/api';
 import { useToast } from '../hooks/use-toast';
+import { useAuth } from '../context/AuthContext';
 import {
   FileText,
   Download,
@@ -33,6 +34,7 @@ const PaystubsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     void loadPaystubs();
@@ -118,6 +120,17 @@ const PaystubsPage: React.FC = () => {
   return (
     <Layout>
       <div className="space-y-6">
+        {['admin', 'rh', 'manager'].includes(user?.role ?? '') && !user?.employeeId && (
+          <Card className="bg-amber-50 border-amber-200">
+            <CardHeader>
+              <CardTitle className="text-amber-900">Conta administrativa sem vínculo de funcionário</CardTitle>
+              <CardDescription className="text-amber-800">
+                Esta tela mostra apenas holerites do próprio usuário. Para consulta de holerites da empresa, use os módulos administrativos de competência/folha.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Meus Holerites</h1>

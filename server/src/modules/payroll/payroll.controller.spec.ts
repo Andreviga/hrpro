@@ -9,6 +9,7 @@ const payrollServiceMock = {
   closeRun: jest.fn(),
   listPaystubsByEmployee: jest.fn(),
   listPaystubsByCompany: jest.fn(),
+  listPaystubsForCompany: jest.fn(),
   removeEmployeeFromRun: jest.fn(),
   updatePaystubEvent: jest.fn()
 };
@@ -145,22 +146,49 @@ describe('PayrollController', () => {
     });
   });
 
-  it('lists company paystubs for admin', async () => {
+  it('lists only own paystubs on default endpoint', async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [PayrollController],
       providers: [{ provide: PayrollService, useValue: payrollServiceMock }]
     }).compile();
 
     const controller = moduleRef.get(PayrollController);
-    payrollServiceMock.listPaystubsByCompany.mockResolvedValueOnce([{ id: 'p1' }]);
+    payrollServiceMock.listPaystubsByEmployee.mockResolvedValueOnce([{ id: 'p1' }]);
 
     const result = await controller.listPaystubs({
       user: { role: 'admin', companyId: 'c1', employeeId: 'emp-1' }
     } as any);
 
     expect(result).toEqual([{ id: 'p1' }]);
-    expect(payrollServiceMock.listPaystubsByCompany).toHaveBeenCalledWith('c1');
-    expect(payrollServiceMock.listPaystubsByEmployee).not.toHaveBeenCalled();
+    expect(payrollServiceMock.listPaystubsByEmployee).toHaveBeenCalledWith('emp-1');
+    expect(payrollServiceMock.listPaystubsByCompany).not.toHaveBeenCalled();
+  });
+
+  it('lists company paystubs on admin endpoint with filters', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PayrollController],
+      providers: [{ provide: PayrollService, useValue: payrollServiceMock }]
+    }).compile();
+
+    const controller = moduleRef.get(PayrollController);
+    payrollServiceMock.listPaystubsForCompany.mockResolvedValueOnce([{ id: 'p99' }]);
+
+    const result = await controller.listPaystubsAdmin(
+      { user: { companyId: 'c1' } } as any,
+      '2',
+      '2026',
+      'emp-1',
+      'Andre'
+    );
+
+    expect(result).toEqual([{ id: 'p99' }]);
+    expect(payrollServiceMock.listPaystubsForCompany).toHaveBeenCalledWith({
+      companyId: 'c1',
+      month: 2,
+      year: 2026,
+      employeeId: 'emp-1',
+      employeeName: 'Andre'
+    });
   });
 
   it('removes an employee from payroll run via controller', async () => {

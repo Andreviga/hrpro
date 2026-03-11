@@ -28,6 +28,33 @@ const processingBadgeClass: Record<string, string> = {
   unknown: 'bg-gray-100 text-gray-800'
 };
 
+const getFriendlyEsocialError = (error: unknown, fallback: string) => {
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+
+  const rawMessage = error.message || '';
+
+  try {
+    const parsed = JSON.parse(rawMessage);
+    if (parsed?.message) {
+      const message = typeof parsed.message === 'string' ? parsed.message : JSON.stringify(parsed.message);
+      if (message.toLowerCase().includes('internal server error')) {
+        return 'Falha interna ao processar dados do eSocial. Tente novamente em instantes.';
+      }
+      return message;
+    }
+  } catch {
+    // not a json payload
+  }
+
+  if (rawMessage.toLowerCase().includes('internal server error')) {
+    return 'Falha interna ao processar dados do eSocial. Tente novamente em instantes.';
+  }
+
+  return rawMessage || fallback;
+};
+
 const AdminEsocialPage: React.FC = () => {
   const [xmlInput, setXmlInput] = useState('');
   const [sourceLabel, setSourceLabel] = useState('manual-import');
@@ -68,7 +95,7 @@ const AdminEsocialPage: React.FC = () => {
       });
       setDocuments(data.items);
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Erro ao carregar documentos do eSocial.');
+      setFeedback(getFriendlyEsocialError(error, 'Erro ao carregar documentos do eSocial.'));
     } finally {
       setDocumentsLoading(false);
     }
@@ -85,7 +112,7 @@ const AdminEsocialPage: React.FC = () => {
       });
       setGlobalOccurrences(data.items);
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Erro ao carregar ocorrencias do eSocial.');
+      setFeedback(getFriendlyEsocialError(error, 'Erro ao carregar ocorrencias do eSocial.'));
     } finally {
       setGlobalOccurrencesLoading(false);
     }
@@ -127,7 +154,7 @@ const AdminEsocialPage: React.FC = () => {
       await loadDocuments();
       await loadGlobalOccurrences();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao importar XML do eSocial.');
+      setFeedback(getFriendlyEsocialError(error, 'Falha ao importar XML do eSocial.'));
     } finally {
       setImporting(false);
     }
@@ -142,7 +169,7 @@ const AdminEsocialPage: React.FC = () => {
       setSelectedDocument(document);
       setSelectedOccurrences(occurrences);
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Erro ao carregar detalhes do documento.');
+      setFeedback(getFriendlyEsocialError(error, 'Erro ao carregar detalhes do documento.'));
     }
   };
 
@@ -152,7 +179,7 @@ const AdminEsocialPage: React.FC = () => {
       setFeedback(`Catalogo sincronizado (${result.syncedCount} mensagens).`);
       await loadGlobalOccurrences();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao sincronizar catalogo.');
+      setFeedback(getFriendlyEsocialError(error, 'Falha ao sincronizar catalogo.'));
     }
   };
 
@@ -176,6 +203,14 @@ const AdminEsocialPage: React.FC = () => {
             <AlertDescription>{feedback}</AlertDescription>
           </Alert>
         )}
+
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-4 text-sm text-blue-900 space-y-1">
+            <p>Como usar: envie um XML de evento/retorno do eSocial por arquivo ou colagem no campo de texto.</p>
+            <p>Formato aceito: arquivo .xml valido. Recomendacao: usar arquivos oficiais exportados do ambiente de folha/eSocial.</p>
+            <p>Fluxo sugerido: importar XML, revisar ocorrencias e depois sincronizar catalogo para enriquecer mensagens.</p>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

@@ -158,15 +158,40 @@ export class PayrollController {
 
   @Get('paystubs')
   async listPaystubs(@Req() req: { user: { employeeId?: string; companyId: string; role: string } }) {
-    if (['admin', 'rh', 'manager'].includes(req.user.role)) {
-      return this.payroll.listPaystubsByCompany(req.user.companyId);
-    }
-
     if (req.user.employeeId) {
       return this.payroll.listPaystubsByEmployee(req.user.employeeId);
     }
 
     return [];
+  }
+
+  @Get('paystubs/admin')
+  @Roles('admin', 'rh', 'manager')
+  async listPaystubsAdmin(
+    @Req() req: { user: { companyId: string } },
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+    @Query('employeeId') employeeId?: string,
+    @Query('employeeName') employeeName?: string
+  ) {
+    const parsedMonth = month ? Number(month) : undefined;
+    const parsedYear = year ? Number(year) : undefined;
+
+    if (month && (!parsedMonth || Number.isNaN(parsedMonth))) {
+      throw new BadRequestException('Month must be numeric.');
+    }
+
+    if (year && (!parsedYear || Number.isNaN(parsedYear))) {
+      throw new BadRequestException('Year must be numeric.');
+    }
+
+    return this.payroll.listPaystubsForCompany({
+      companyId: req.user.companyId,
+      month: parsedMonth,
+      year: parsedYear,
+      employeeId,
+      employeeName
+    });
   }
 
   @Get('paystubs/:id')

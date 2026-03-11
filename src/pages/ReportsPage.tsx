@@ -35,8 +35,10 @@ import {
 
 const ReportsPage: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState('all');
   const [reports, setReports] = useState<MonthlyReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadReports();
@@ -45,10 +47,13 @@ const ReportsPage: React.FC = () => {
   const loadReports = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await academicApi.getYearlyReports(1, selectedYear);
       setReports(data);
     } catch (error) {
       console.error('Erro ao carregar relatórios:', error);
+      setError('Nao foi possivel carregar os relatorios deste periodo.');
+      setReports([]);
     } finally {
       setLoading(false);
     }
@@ -67,8 +72,12 @@ const ReportsPage: React.FC = () => {
     return months[month - 1];
   };
 
+  const filteredReports = reports.filter((report) =>
+    selectedMonth === 'all' ? true : String(report.month) === selectedMonth
+  );
+
   // Dados para gráficos
-  const monthlyData = reports.map(report => ({
+  const monthlyData = filteredReports.map(report => ({
     month: getMonthName(report.month),
     aulas: report.totalHours,
     valor: report.totalValue,
@@ -76,7 +85,7 @@ const ReportsPage: React.FC = () => {
   }));
 
   // Dados para gráfico de pizza (matérias)
-  const subjectData = reports.reduce((acc, report) => {
+  const subjectData = filteredReports.reduce((acc, report) => {
     report.classesBySubject.forEach(subject => {
       const existing = acc.find(item => item.name === subject.subjectName);
       if (existing) {
@@ -96,8 +105,8 @@ const ReportsPage: React.FC = () => {
 
   // Totais anuais
   const yearlyTotals = {
-    totalHours: reports.reduce((sum, r) => sum + r.totalHours, 0),
-    totalValue: reports.reduce((sum, r) => sum + r.totalValue, 0),
+    totalHours: filteredReports.reduce((sum, r) => sum + r.totalHours, 0),
+    totalValue: filteredReports.reduce((sum, r) => sum + r.totalValue, 0),
     averagePerHour: 0,
     totalSubjects: subjectData.length
   };
@@ -140,6 +149,20 @@ const ReportsPage: React.FC = () => {
                   <SelectItem value="2022">2022</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Ano todo</SelectItem>
+                  {Array.from({ length: 12 }, (_, index) => (
+                    <SelectItem key={index + 1} value={String(index + 1)}>
+                      {getMonthName(index + 1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button variant="outline">
               <Download className="h-4 w-4 mr-2" />
@@ -147,6 +170,25 @@ const ReportsPage: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {error && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4 text-sm text-red-700">
+              {error}
+            </CardContent>
+          </Card>
+        )}
+
+        {!error && reports.length === 0 && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardHeader>
+              <CardTitle className="text-amber-900">Sem dados para exibir</CardTitle>
+              <CardDescription className="text-amber-800">
+                Nao ha aulas registradas para {selectedYear}. Cadastre aulas na Gestao Academica para gerar indicadores e graficos.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -219,26 +261,32 @@ const ReportsPage: React.FC = () => {
               <CardDescription>Evolução da receita ao longo do ano</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value, name) => [
-                      name === 'valor' ? formatCurrency(Number(value)) : value,
-                      name === 'valor' ? 'Receita' : name === 'aulas' ? 'Aulas' : 'Valor/Hora'
-                    ]}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="valor" 
-                    stroke="#10B981" 
-                    strokeWidth={3}
-                    dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {monthlyData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-sm text-gray-500">
+                  Nenhum dado no filtro selecionado.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        name === 'valor' ? formatCurrency(Number(value)) : value,
+                        name === 'valor' ? 'Receita' : name === 'aulas' ? 'Aulas' : 'Valor/Hora'
+                      ]}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="valor" 
+                      stroke="#10B981" 
+                      strokeWidth={3}
+                      dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -249,15 +297,21 @@ const ReportsPage: React.FC = () => {
               <CardDescription>Quantidade de aulas ministradas mensalmente</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="aulas" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {monthlyData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-sm text-gray-500">
+                  Nenhum dado no filtro selecionado.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="aulas" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -270,25 +324,31 @@ const ReportsPage: React.FC = () => {
               <CardDescription>Receita por disciplina lecionada</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={subjectData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({name, percent}) => `${name} (${(percent * 100).toFixed(1)}%)`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {subjectData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                </PieChart>
-              </ResponsiveContainer>
+              {subjectData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-sm text-gray-500">
+                  Nenhuma disciplina encontrada para o filtro selecionado.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={subjectData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({name, percent}) => `${name} (${(percent * 100).toFixed(1)}%)`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {subjectData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -300,6 +360,9 @@ const ReportsPage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {subjectData.length === 0 && (
+                  <p className="text-sm text-gray-500">Nenhum dado de disciplina para o filtro atual.</p>
+                )}
                 {subjectData.map((subject, index) => (
                   <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="flex items-center space-x-3">
@@ -346,8 +409,8 @@ const ReportsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {reports.map((report, index) => {
-                    const previousValue = index > 0 ? reports[index - 1].totalValue : 0;
+                  {filteredReports.map((report, index) => {
+                    const previousValue = index > 0 ? filteredReports[index - 1].totalValue : 0;
                     const growth = previousValue > 0 
                       ? ((report.totalValue - previousValue) / previousValue * 100)
                       : 0;
@@ -377,6 +440,13 @@ const ReportsPage: React.FC = () => {
                       </tr>
                     );
                   })}
+                  {filteredReports.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-4 text-center text-sm text-gray-500">
+                        Nenhum registro encontrado para o filtro selecionado.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

@@ -1,10 +1,83 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class EmployeesService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
+
+  private isValidCpf(cpf: string) {
+    if (!/^\d{11}$/.test(cpf)) return false;
+    if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+    const digits = cpf.split('').map(Number);
+    const calcCheckDigit = (slice: number[], factorStart: number) => {
+      const total = slice.reduce((sum, digit, idx) => sum + digit * (factorStart - idx), 0);
+      const mod = (total * 10) % 11;
+      return mod === 10 ? 0 : mod;
+    };
+
+    const check1 = calcCheckDigit(digits.slice(0, 9), 10);
+    const check2 = calcCheckDigit(digits.slice(0, 10), 11);
+    return check1 === digits[9] && check2 === digits[10];
+  }
+
+  private hasLetters(value?: string | null) {
+    return /[A-Za-zÀ-ÿ]/.test(String(value ?? ''));
+  }
+
+  private validateEmployeeInput(rawData: any, mapped: any, mode: 'create' | 'update') {
+    const shouldValidate = (fieldName: string) => mode === 'create' || Object.prototype.hasOwnProperty.call(rawData, fieldName);
+
+    if (mode === 'create' && !String(mapped.fullName ?? '').trim()) {
+      throw new BadRequestException('Nome completo e obrigatorio.');
+    }
+
+    if (shouldValidate('fullName') && String(mapped.fullName ?? '').trim() && !this.hasLetters(mapped.fullName)) {
+      throw new BadRequestException('Nome completo invalido.');
+    }
+
+    if (mode === 'create' && !String(mapped.cpf ?? '').trim()) {
+      throw new BadRequestException('CPF e obrigatorio.');
+    }
+
+    if (shouldValidate('cpf') && mapped.cpf && !this.isValidCpf(mapped.cpf)) {
+      throw new BadRequestException('CPF invalido.');
+    }
+
+    if (mode === 'create' && !String(mapped.email ?? '').trim()) {
+      throw new BadRequestException('E-mail e obrigatorio.');
+    }
+
+    if (shouldValidate('email') && mapped.email) {
+      const email = String(mapped.email).trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new BadRequestException('E-mail invalido.');
+      }
+    }
+
+    if (mode === 'create' && !String(mapped.position ?? '').trim()) {
+      throw new BadRequestException('Cargo e obrigatorio.');
+    }
+
+    if (shouldValidate('position') && String(mapped.position ?? '').trim() && !this.hasLetters(mapped.position)) {
+      throw new BadRequestException('Cargo invalido.');
+    }
+
+    if (mode === 'create' && !mapped.admissionDate) {
+      throw new BadRequestException('Data de admissao e obrigatoria.');
+    }
+
+    if (shouldValidate('admissionDate') && mapped.admissionDate) {
+      const admissionDate = mapped.admissionDate as Date;
+      const year = admissionDate.getFullYear();
+      const today = new Date();
+      if (year < 1950 || admissionDate.getTime() > today.getTime()) {
+        throw new BadRequestException('Data de admissao invalida.');
+      }
+    }
+  }
 
   private buildEmployeeData(data: any) {
     const cpf = data.cpf ? data.cpf.replace(/\D/g, '') : undefined;
@@ -137,6 +210,8 @@ export class EmployeesService {
 
   async create(data: any, companyId: string, userId?: string) {
     const mapped = this.buildEmployeeData(data);
+    this.validateEmployeeInput(data, mapped, 'create');
+
     const employee = await this.prisma.employee.create({
       data: {
         companyId,
@@ -225,6 +300,7 @@ export class EmployeesService {
   async update(id: string, data: any, companyId: string, userId?: string, reason?: string) {
     const before = await this.getEmployeeOrThrow(id, companyId);
     const mapped = this.buildEmployeeData(data);
+    this.validateEmployeeInput(data, mapped, 'update');
 
     if (before.status === 'dismissed' && mapped.status && mapped.status !== 'dismissed') {
       mapped.status = 'dismissed';
