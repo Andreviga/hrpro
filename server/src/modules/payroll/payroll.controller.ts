@@ -1,10 +1,17 @@
-﻿import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+﻿import { BadRequestException, Body, Controller, Get, HttpException, HttpStatus, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PayrollService } from './payroll.service';
-import PDFDocument from 'pdfkit';
 import { Response } from 'express';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import {
+  buildPayslipFromExcel,
+  defaultExampleWorkbookPath,
+  exportPayslipPdf,
+  loadWorkbook,
+  validatePayslipBeforeRender,
+  PayslipValidationException
+} from './payslip-excel';
 
 @Controller()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -209,347 +216,46 @@ export class PayrollController {
     }
 
     const detail = await this.payroll.getPaystubDetail(id, req.user);
+    const workbookPath = process.env.PAYROLL_WORKBOOK_PATH ?? defaultExampleWorkbookPath;
 
-    const formatCurrency = (value: number) => `R$ ${Number(value ?? 0).toFixed(2).replace('.', ',')}`;
-    const formatDate = (value?: string | Date | null) => {
-      if (!value) return '--';
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? '--' : parsed.toLocaleDateString('pt-BR');
-    };
-    const formatNumber = (value: number | null | undefined, decimals = 2) => {
-      if (value === null || value === undefined || !Number.isFinite(Number(value))) return '--';
-      return Number(value).toFixed(decimals).replace('.', ',');
-    };
-    const formatHours = (value: number | null | undefined) => {
-      if (value === null || value === undefined || !Number.isFinite(Number(value))) return '--';
-      return `${formatNumber(Number(value), 2)}h`;
-    };
+    let workbook: Awaited<ReturnType<typeof loadWorkbook>>;
+    try {
+      workbook = await loadWorkbook(workbookPath);
+    } catch (err: unknown) {
+      throw new HttpException(
+        { message: 'Arquivo de planilha não encontrado. Configure PAYROLL_WORKBOOK_PATH.', detail: workbookPath },
+        HttpStatus.UNPROCESSABLE_ENTITY
+      );
+    }
 
-    const salaryTypeLabel = detail.employee?.salaryType === 'hourly'
-      ? 'Horista / Professor(a)'
-      : detail.employee?.salaryType === 'monthly'
-        ? 'Mensalista'
-        : '--';
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename=holerite-${detail.year}-${detail.month}.pdf`);
-
-    const doc = new PDFDocument({ size: 'A4', margin: 24 });
-    doc.pipe(res);
-
-    const xStart = doc.page.margins.left;
-    const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    const pageBottom = doc.page.height - doc.page.margins.bottom;
     const competence = `${String(detail.month).padStart(2, '0')}/${detail.year}`;
-
-    doc.font('Helvetica-Bold').fontSize(13).text('DEMONSTRATIVO DE PAGAMENTO', { align: 'center' });
-    doc.moveDown(0.2);
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(10)
-      .text(detail.company?.name ?? 'EMPRESA NAO INFORMADA', xStart, doc.y, { width: pageWidth });
-    doc
-      .font('Helvetica')
-      .fontSize(8.5)
-      .text(`CNPJ: ${detail.company?.cnpj ?? '--'}    Competencia: ${competence}`, xStart, doc.y + 1, {
-        width: pageWidth
-      });
-
-    const employeeBlockTop = doc.y + 8;
-    doc.rect(xStart, employeeBlockTop, pageWidth, 72).stroke();
-    doc
-      .font('Helvetica')
-      .fontSize(8.5)
-      .text(`Funcionario: ${detail.employee?.fullName ?? '--'}`, xStart + 8, employeeBlockTop + 8, {
-        width: pageWidth - 16
-      })
-      .text(
-        `Codigo: ${detail.employee?.employeeCode ?? '--'}    CPF: ${detail.employee?.cpf ?? '--'}    PIS: ${detail.employee?.pis ?? '--'}`,
-        xStart + 8,
-        employeeBlockTop + 24,
-        { width: pageWidth - 16 }
-      )
-      .text(
-        `Cargo: ${detail.employee?.position ?? '--'}    Departamento: ${detail.employee?.department ?? '--'}    Admissao: ${formatDate(detail.employee?.admissionDate)}`,
-        xStart + 8,
-        employeeBlockTop + 40,
-        { width: pageWidth - 16 }
-      )
-      .text(`E-mail: ${detail.employee?.email ?? '--'}`, xStart + 8, employeeBlockTop + 56, {
-        width: pageWidth - 16
-      });
-
-    let y = employeeBlockTop + 80;
-
-    const contractHeight = 42;
-    const contractCellWidth = pageWidth / 4;
-    doc.rect(xStart, y, pageWidth, contractHeight).stroke();
-    for (let index = 1; index < 4; index += 1) {
-      const xLine = xStart + contractCellWidth * index;
-      doc.moveTo(xLine, y).lineTo(xLine, y + contractHeight).stroke();
-    }
-
-    const estimatedMonthlyHours =
-      detail.employee?.weeklyHours === null || detail.employee?.weeklyHours === undefined
-        ? null
-        : Number(detail.employee.weeklyHours) * 5;
-
-    const contractItems = [
-      { label: 'Tipo Salario', value: salaryTypeLabel },
-      { label: 'Salario Base', value: formatCurrency(Number(detail.employee?.baseSalary ?? 0)) },
-      { label: 'Valor Hora/Aula', value: formatCurrency(Number(detail.employee?.hourlyRate ?? 0)) },
-      { label: 'Qtd Aulas (Ref)', value: `${formatHours(detail.employee?.weeklyHours)} (Mes est.: ${formatHours(estimatedMonthlyHours)})` }
-    ];
-
-    contractItems.forEach((item, index) => {
-      const xCell = xStart + contractCellWidth * index;
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(7.5)
-        .text(item.label, xCell + 6, y + 6, { width: contractCellWidth - 12 });
-      doc
-        .font('Helvetica')
-        .fontSize(8)
-        .text(item.value, xCell + 6, y + 20, { width: contractCellWidth - 12 });
+    const payslip = buildPayslipFromExcel({
+      workbook,
+      employeeKey: { cpf: detail.employee?.cpf ?? undefined, name: detail.employee?.fullName ?? undefined },
+      competence
     });
 
-    y += contractHeight + 6;
-
-    const paymentHeight = 32;
-    const paymentCellWidth = pageWidth / 4;
-    doc.rect(xStart, y, pageWidth, paymentHeight).stroke();
-    for (let index = 1; index < 4; index += 1) {
-      const xLine = xStart + paymentCellWidth * index;
-      doc.moveTo(xLine, y).lineTo(xLine, y + paymentHeight).stroke();
+    // Enrich with DB fields not available in the spreadsheet
+    if (detail.employee?.employeeCode) {
+      payslip.employeeCode = detail.employee.employeeCode;
     }
 
-    const paymentItems = [
-      { label: 'Banco', value: detail.employee?.bankName ?? '--' },
-      { label: 'Agencia', value: detail.employee?.bankAgency ?? '--' },
-      { label: 'Conta Bancaria', value: detail.employee?.bankAccount ?? '--' },
-      { label: 'Forma Pgto', value: detail.employee?.paymentMethod ?? '--' }
-    ];
-
-    paymentItems.forEach((item, index) => {
-      const xCell = xStart + paymentCellWidth * index;
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(7.5)
-        .text(item.label, xCell + 6, y + 4, { width: paymentCellWidth - 12 });
-      doc
-        .font('Helvetica')
-        .fontSize(8)
-        .text(item.value, xCell + 6, y + 15, { width: paymentCellWidth - 12 });
-    });
-
-    y += paymentHeight + 10;
-
-    const colCode = 52;
-    const colDesc = 214;
-    const colRef = 70;
-    const colEarnings = 100;
-    const colDeductions = pageWidth - colCode - colDesc - colRef - colEarnings;
-    const rowHeight = 18;
-
-    const drawGrid = (currentY: number, height: number) => {
-      doc.rect(xStart, currentY, pageWidth, height).stroke();
-      let currentX = xStart + colCode;
-      doc.moveTo(currentX, currentY).lineTo(currentX, currentY + height).stroke();
-      currentX += colDesc;
-      doc.moveTo(currentX, currentY).lineTo(currentX, currentY + height).stroke();
-      currentX += colRef;
-      doc.moveTo(currentX, currentY).lineTo(currentX, currentY + height).stroke();
-      currentX += colEarnings;
-      doc.moveTo(currentX, currentY).lineTo(currentX, currentY + height).stroke();
-    };
-
-    const drawTableHeader = () => {
-      drawGrid(y, rowHeight);
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(8)
-        .text('Codigo', xStart + 5, y + 5, { width: colCode - 10 })
-        .text('Descricao', xStart + colCode + 5, y + 5, { width: colDesc - 10 })
-        .text('Referencia', xStart + colCode + colDesc + 5, y + 5, { width: colRef - 10 })
-        .text('Proventos', xStart + colCode + colDesc + colRef + 5, y + 5, {
-          width: colEarnings - 10,
-          align: 'right'
-        })
-        .text('Descontos', xStart + colCode + colDesc + colRef + colEarnings + 5, y + 5, {
-          width: colDeductions - 10,
-          align: 'right'
-        });
-      y += rowHeight;
-    };
-
-    const ensureSpace = (requiredHeight: number) => {
-      if (y + requiredHeight <= pageBottom) return;
-      doc.addPage();
-      y = doc.page.margins.top;
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(9)
-        .text(`DEMONSTRATIVO DE PAGAMENTO - ${detail.employee?.fullName ?? '--'} (${competence})`, xStart, y, {
-          width: pageWidth
-        });
-      y = doc.y + 6;
-      drawTableHeader();
-    };
-
-    drawTableHeader();
-
-    const rows = (detail.events ?? []).map((event: any) => {
-      let reference = '--';
-      if (event.code === 'BASE') {
-        reference = detail.employee?.salaryType === 'monthly' ? 'MES' : formatHours(detail.employee?.weeklyHours);
-      } else if (event.code === 'EXTRA' || event.code === 'HORA_ATV') {
-        reference = formatHours(detail.employee?.weeklyHours);
+    try {
+      validatePayslipBeforeRender(payslip);
+    } catch (err: unknown) {
+      if (err instanceof PayslipValidationException) {
+        throw new HttpException(
+          { message: err.message, missingFields: err.missingFields, sourceHints: err.sourceHints },
+          HttpStatus.UNPROCESSABLE_ENTITY
+        );
       }
-
-      return {
-        code: event.code,
-        description: event.description,
-        reference,
-        provento: event.type === 'earning' ? Number(event.amount) : 0,
-        desconto: event.type === 'deduction' ? Number(event.amount) : 0
-      };
-    });
-
-    for (const row of rows) {
-      ensureSpace(rowHeight + 2);
-      drawGrid(y, rowHeight);
-      doc
-        .font('Helvetica')
-        .fontSize(8)
-        .text(String(row.code ?? ''), xStart + 5, y + 5, { width: colCode - 10 })
-        .text(String(row.description ?? ''), xStart + colCode + 5, y + 5, { width: colDesc - 10 })
-        .text(String(row.reference ?? '--'), xStart + colCode + colDesc + 5, y + 5, { width: colRef - 10 })
-        .text(row.provento ? formatCurrency(row.provento) : '', xStart + colCode + colDesc + colRef + 5, y + 5, {
-          width: colEarnings - 10,
-          align: 'right'
-        })
-        .text(row.desconto ? formatCurrency(row.desconto) : '', xStart + colCode + colDesc + colRef + colEarnings + 5, y + 5, {
-          width: colDeductions - 10,
-          align: 'right'
-        });
-      y += rowHeight;
+      throw err;
     }
 
-    ensureSpace(150);
-
-    const totalsTop = y + 6;
-    const totalsHeight = 26;
-    const totalsColumnWidth = pageWidth / 3;
-
-    doc.rect(xStart, totalsTop, pageWidth, totalsHeight).stroke();
-    doc
-      .moveTo(xStart + totalsColumnWidth, totalsTop)
-      .lineTo(xStart + totalsColumnWidth, totalsTop + totalsHeight)
-      .stroke();
-    doc
-      .moveTo(xStart + totalsColumnWidth * 2, totalsTop)
-      .lineTo(xStart + totalsColumnWidth * 2, totalsTop + totalsHeight)
-      .stroke();
-
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(8)
-      .text('Salario Bruto', xStart + 6, totalsTop + 4, { width: totalsColumnWidth - 12 })
-      .text('Total Descontos', xStart + totalsColumnWidth + 6, totalsTop + 4, { width: totalsColumnWidth - 12 })
-      .text('Salario Liquido', xStart + totalsColumnWidth * 2 + 6, totalsTop + 4, { width: totalsColumnWidth - 12 });
-
-    doc
-      .font('Helvetica')
-      .fontSize(9)
-      .text(formatCurrency(detail.summary.grossSalary), xStart + 6, totalsTop + 14, {
-        width: totalsColumnWidth - 12,
-        align: 'right'
-      })
-      .text(formatCurrency(detail.summary.totalDeductions), xStart + totalsColumnWidth + 6, totalsTop + 14, {
-        width: totalsColumnWidth - 12,
-        align: 'right'
-      })
-      .text(formatCurrency(detail.summary.netSalary), xStart + totalsColumnWidth * 2 + 6, totalsTop + 14, {
-        width: totalsColumnWidth - 12,
-        align: 'right'
-      });
-
-    y = totalsTop + totalsHeight + 6;
-
-    const basesTop = y;
-    const basesHeight = 30;
-    const baseColumnWidth = pageWidth / 4;
-
-    doc.rect(xStart, basesTop, pageWidth, basesHeight).stroke();
-    for (let index = 1; index < 4; index += 1) {
-      const xLine = xStart + baseColumnWidth * index;
-      doc.moveTo(xLine, basesTop).lineTo(xLine, basesTop + basesHeight).stroke();
-    }
-
-    const baseItems = [
-      { label: 'Base INSS', value: formatCurrency(detail.bases?.inssBase ?? detail.summary.grossSalary) },
-      { label: 'Base FGTS', value: formatCurrency(detail.bases?.fgtsBase ?? detail.summary.grossSalary) },
-      { label: 'Base IRRF', value: formatCurrency(detail.bases?.irrfBase ?? 0) },
-      { label: 'FGTS (8%)', value: formatCurrency(detail.summary.fgtsDeposit) }
-    ];
-
-    baseItems.forEach((item, index) => {
-      const xCell = xStart + baseColumnWidth * index;
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(7.5)
-        .text(item.label, xCell + 6, basesTop + 5, { width: baseColumnWidth - 12 });
-      doc
-        .font('Helvetica')
-        .fontSize(8.5)
-        .text(item.value, xCell + 6, basesTop + 16, { width: baseColumnWidth - 12, align: 'right' });
-    });
-
-    y = basesTop + basesHeight + 8;
-
-    ensureSpace(56);
-    const mealVoucherCredit = Number(detail.earnings?.mealVoucherCredit ?? 0);
-    const pensionAlimony = Number(detail.deductions?.pensionAlimony ?? 0);
-    const infoTop = y;
-
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .text(`Vale Alimentacao (credito): ${formatCurrency(mealVoucherCredit)}`, xStart, infoTop, {
-        width: pageWidth / 2
-      })
-      .text(`Pensao Alimenticia: ${formatCurrency(pensionAlimony)}`, xStart + pageWidth / 2, infoTop, {
-        width: pageWidth / 2,
-        align: 'right'
-      })
-      .text(`Conta para credito: ${detail.employee?.bankName ?? '--'} ${detail.employee?.bankAgency ?? '--'} ${detail.employee?.bankAccount ?? '--'}`, xStart, infoTop + 12, {
-        width: pageWidth
-      })
-      .text(`E-mail enviado: ${detail.employee?.email ?? '--'}`, xStart, infoTop + 24, {
-        width: pageWidth
-      });
-
-    y = infoTop + 40;
-
-    doc
-      .font('Helvetica')
-      .fontSize(8.5)
-      .text('Recebi da empresa acima identificada a importancia liquida deste demonstrativo de pagamento.', xStart, y, {
-        width: pageWidth
-      });
-
-    const signatureY = y + 24;
-    doc.moveTo(xStart + 20, signatureY).lineTo(xStart + 220, signatureY).stroke();
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .text('Assinatura do(a) colaborador(a)', xStart + 58, signatureY + 4, { width: 130, align: 'center' })
-      .text(`Emitido em ${formatDate(new Date())}`, xStart + pageWidth - 150, signatureY + 4, {
-        width: 150,
-        align: 'right'
-      });
-
-    doc.end();
+    const pdfBuffer = await exportPayslipPdf(payslip);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=holerite-${detail.year}-${String(detail.month).padStart(2, '0')}.pdf`);
+    res.send(pdfBuffer);
   }
   @Post('payroll-runs/:id/documents')
   @Roles('admin', 'rh', 'manager')

@@ -73,11 +73,19 @@ const PaystubsPage: React.FC = () => {
   const handleDownload = async (paystubId: string) => {
     try {
       await apiService.openPaystubPdf(paystubId);
-    } catch (downloadError) {
-      toast({
-        title: 'Falha ao baixar PDF',
-        description: getFriendlyError(downloadError, 'Nao foi possivel baixar o PDF do holerite. Faca login novamente e tente de novo.')
-      });
+    } catch (downloadError: unknown) {
+      const err = downloadError as { isValidationError?: boolean; missingFields?: string[]; message?: string };
+      if (err.isValidationError && err.missingFields && err.missingFields.length > 0) {
+        toast({
+          title: 'Holerite com dados incompletos',
+          description: `Campos ausentes: ${err.missingFields.join(', ')}. Complete a planilha e reimporte.`
+        });
+      } else {
+        toast({
+          title: 'Falha ao baixar PDF',
+          description: getFriendlyError(downloadError, 'Nao foi possivel baixar o PDF do holerite. Faca login novamente e tente de novo.')
+        });
+      }
     }
   };
 

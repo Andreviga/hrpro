@@ -134,6 +134,23 @@ export const apiService = {
     });
 
     if (!response.ok) {
+      if (response.status === 422) {
+        let body: { message?: string; missingFields?: string[]; sourceHints?: Record<string, string> } = {};
+        try {
+          body = await response.json();
+        } catch {
+          // ignore parse error
+        }
+        const err = new Error(body.message || 'Holerite incompleto') as Error & {
+          isValidationError: true;
+          missingFields: string[];
+          sourceHints: Record<string, string>;
+        };
+        (err as any).isValidationError = true;
+        (err as any).missingFields = body.missingFields ?? [];
+        (err as any).sourceHints = body.sourceHints ?? {};
+        throw err;
+      }
       const message = await response.text();
       throw new Error(message || 'Falha ao carregar PDF do holerite');
     }

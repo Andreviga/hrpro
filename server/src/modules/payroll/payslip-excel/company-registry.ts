@@ -7,14 +7,12 @@ export const COMPANY_REGISTRY: Record<string, CompanyRegistryEntry> = {
   'RAIZES CENTRO EDUCACIONAL LTDA ME': {
     name: 'RAIZES CENTRO EDUCACIONAL LTDA ME',
     cnpj: '20.755.729/0001-85',
-    address: 'PREENCHER_ENDERECO_RAIZES_CENTRO_EDUCACIONAL',
-    needsAddressFill: true
+    address: 'Rua Diogo de Sousa, 251/7, Cidade Líder, São Paulo/SP, CEP 08285-330'
   },
   'RAIZES RECREAÇÃO INFANTIL LTDA ME': {
     name: 'RAIZES RECREAÇÃO INFANTIL LTDA ME',
     cnpj: '59.946.400/0001-37',
-    address: 'PREENCHER_ENDERECO_RAIZES_RECREACAO_INFANTIL',
-    needsAddressFill: true
+    address: 'Rua Diogo de Sousa, 251/7, Cidade Líder, São Paulo/SP, CEP 08285-330'
   }
 };
 

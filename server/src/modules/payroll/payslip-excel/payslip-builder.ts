@@ -292,33 +292,40 @@ export const buildPayslip = (params: {
     sourceTable: 'Tabela1'
   });
 
-  if (companyRegistry?.needsAddressFill) {
-    warnings.push({
-      code: 'COMPANY_ADDRESS_PLACEHOLDER',
-      message: `Endereco da empresa ${companyName} ainda esta como placeholder. Preencha antes da emissao final.`,
-      fillLocation: COMPANY_REGISTRY_FILL_LOCATION
-    });
-  }
-
   const grossSalary = asNumber(rowCell(mapped.monthlyRow, payrollAliases.monthlyGrossSalary))
     ?? asNumber(rowCell(mapped.classRow, payrollAliases.classGrossSalary));
   const netSalary = asNumber(rowCell(mapped.monthlyRow, payrollAliases.monthlyNetSalary));
   const foodAllowance = asNumber(rowCell(mapped.monthlyRow, payrollAliases.monthlyVa));
+
+  // pensionAlimony: sum of PENSAO deductions from monthly table, or 0
+  const pensionAlimony = absNumber(rowCell(mapped.monthlyRow, ['PENSAO'] as const)) ?? 0;
+
+  // totalClassQuantity: sum of all composition line quantities
+  const compositionLines = buildCompositionLines(mapped);
+  const totalClassQuantity = compositionLines.reduce((sum, line) => sum + (line.quantity ?? 0), 0) || null;
+
+  // classUnitValue: value from auxílio cell E14 (most common) or E15
+  const classUnitValue = asNumber(mapped.auxiliaryCells.E14) ?? asNumber(mapped.auxiliaryCells.E15) ?? null;
+
   const payslip: Payslip = {
     title: asString(mapped.templateCells.C5, 'DEMONSTRATIVO DE PAGAMENTO') ?? 'DEMONSTRATIVO DE PAGAMENTO',
+    employeeCode: null,
     employeeName,
     employeeCpf,
     employeeRole,
+    totalClassQuantity,
+    classUnitValue,
     admissionDate: formatDate(rowCell(mapped.registrationRow, payrollAliases.registrationAdmission)?.value),
     companyName,
     companyCnpj,
     companyAddress,
     referenceMonth: mapped.competenceLabel,
-    classComposition: buildCompositionLines(mapped),
+    classComposition: compositionLines,
     earnings: buildEarnings(mapped),
     deductions: buildDeductions(mapped),
     grossSalary,
     netSalary,
+    pensionAlimony,
     fgts: grossSalary === null ? null : Number((grossSalary * 0.08).toFixed(2)),
     foodAllowance,
     thirteenthSecondInstallment: absNumber(mapped.thirteenthRow ? rowCell(mapped.thirteenthRow, payrollAliases.thirteenthSecond) : undefined),

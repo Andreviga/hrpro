@@ -208,7 +208,7 @@ export const mapPayrollData = (params: {
       sourceSheet: monthlySheetName,
       sourceTable: 'Tabela35'
     });
-  } else if (companyRegistry.needsAddressFill) {
+  } else if (!companyRegistry.address) {
     warnings.push({
       code: 'COMPANY_ADDRESS_FILL_REQUIRED',
       message: `Endereco da empresa ${companyRegistry.name} precisa ser preenchido manualmente no registry antes do uso final do PDF.`,

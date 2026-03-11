@@ -86,6 +86,7 @@ export interface PayslipRawSources {
 
 export interface Payslip {
   title: string;
+  employeeCode: string | null;
   employeeName: string;
   employeeCpf: string;
   employeeRole: string;
@@ -94,11 +95,16 @@ export interface Payslip {
   companyCnpj: string | null;
   companyAddress: string | null;
   referenceMonth: string;
+  /** total quantity of classes from composition (sum of all types) */
+  totalClassQuantity: number | null;
+  /** unit class value (from Tab auxílio, most common rate) */
+  classUnitValue: number | null;
   classComposition: CompositionLine[];
   earnings: PayrollItem[];
   deductions: PayrollItem[];
   grossSalary: number | null;
   netSalary: number | null;
+  pensionAlimony: number | null;
   fgts: number | null;
   foodAllowance: number | null;
   thirteenthSecondInstallment: number | null;
@@ -118,7 +124,6 @@ export interface CompanyRegistryEntry {
   name: string;
   cnpj: string;
   address: string;
-  needsAddressFill?: boolean;
 }
 
 export interface MappedPayrollSources {

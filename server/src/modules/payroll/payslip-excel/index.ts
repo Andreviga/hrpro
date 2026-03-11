@@ -5,4 +5,5 @@ export { buildPayslip, buildPayslipFromExcel } from './payslip-builder';
 export { findEmployeeByCpf, findEmployeeByName, mapPayrollData } from './payroll-mapper';
 export { exportPayslipPdf } from './payslip-pdf-exporter';
 export { renderPayslipHtml } from './payslip-renderer';
+export { validatePayslipBeforeRender, PayslipValidationException } from './payslip-validator';
 export * from './types';
