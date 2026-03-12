@@ -923,8 +923,7 @@ export class DocumentsService {
     const existingSignature = await this.prisma.documentSignature.findFirst({
       where: {
         documentId: params.documentId,
-        userId: params.userId,
-        deletedAt: null
+        userId: params.userId
       }
     });
 
