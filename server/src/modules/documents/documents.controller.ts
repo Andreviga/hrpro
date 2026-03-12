@@ -157,6 +157,26 @@ export class DocumentsController {
     );
   }
 
+  @Get('my')
+  @Roles('admin', 'rh', 'manager', 'employee', 'intern')
+  @ApiQuery({ name: 'type', required: false })
+  async listMyDocuments(
+    @Query() query: { type?: string },
+    @Req() req: { user: { sub: string } }
+  ) {
+    return this.documents.listUserDocuments(req.user.sub, query.type);
+  }
+
+  @Get('users/:userId')
+  @Roles('admin', 'rh', 'manager')
+  @ApiQuery({ name: 'type', required: false })
+  async listDocumentsByUser(
+    @Param('userId') userId: string,
+    @Query() query: { type?: string }
+  ) {
+    return this.documents.listUserDocuments(userId, query.type);
+  }
+
   @Get(':id')
   @Roles('admin', 'rh', 'manager', 'employee', 'intern')
   async getDocument(

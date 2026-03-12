@@ -40,6 +40,27 @@ function Invoke-Psql {
 	return $lines
 }
 
+function Get-Sha256Checksum {
+	param(
+		[Parameter(Mandatory = $true)]
+		[string]$FilePath
+	)
+
+	$hashCmd = Get-Command Get-FileHash -ErrorAction SilentlyContinue
+	if ($hashCmd) {
+		return (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash.ToLowerInvariant()
+	}
+
+	$bytes = [System.IO.File]::ReadAllBytes($FilePath)
+	$sha = [System.Security.Cryptography.SHA256]::Create()
+	try {
+		return ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+	}
+	finally {
+		$sha.Dispose()
+	}
+}
+
 Write-Host "Checking container '$ContainerName'..."
 $isRunning = docker inspect -f "{{.State.Running}}" $ContainerName 2>$null
 if ($LASTEXITCODE -ne 0 -or $isRunning.Trim().ToLowerInvariant() -ne "true") {
@@ -82,7 +103,7 @@ foreach ($migrationName in $pendingMigrations) {
 		Write-Host "SkipApply enabled. Registering only: $migrationName"
 	}
 
-	$checksum = (Get-FileHash -Path $migrationSqlPath -Algorithm SHA256).Hash.ToLowerInvariant()
+	$checksum = Get-Sha256Checksum -FilePath $migrationSqlPath
 	$id = [guid]::NewGuid().ToString()
 	$registerSql = @"
 INSERT INTO "_prisma_migrations" (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)

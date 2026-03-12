@@ -1,17 +1,9 @@
-﻿import { BadRequestException, Body, Controller, Get, HttpException, HttpStatus, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+﻿import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PayrollService } from './payroll.service';
 import { Response } from 'express';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import {
-  buildPayslipFromExcel,
-  defaultExampleWorkbookPath,
-  exportPayslipPdf,
-  loadWorkbook,
-  validatePayslipBeforeRender,
-  PayslipValidationException
-} from './payslip-excel';
 
 @Controller()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -233,54 +225,9 @@ export class PayrollController {
       userId: req.user.sub
     });
 
-    if (exportedDocument) {
-      res.setHeader('Content-Type', exportedDocument.contentType);
-      res.setHeader('Content-Disposition', `inline; filename=${exportedDocument.filename}`);
-      res.send(exportedDocument.buffer);
-      return;
-    }
-
-    const detail = await this.payroll.getPaystubDetail(id, req.user);
-    const workbookPath = process.env.PAYROLL_WORKBOOK_PATH ?? defaultExampleWorkbookPath;
-
-    let workbook: Awaited<ReturnType<typeof loadWorkbook>>;
-    try {
-      workbook = await loadWorkbook(workbookPath);
-    } catch (err: unknown) {
-      throw new HttpException(
-        { message: 'Arquivo de planilha não encontrado. Configure PAYROLL_WORKBOOK_PATH.', detail: workbookPath },
-        HttpStatus.UNPROCESSABLE_ENTITY
-      );
-    }
-
-    const competence = `${String(detail.month).padStart(2, '0')}/${detail.year}`;
-    const payslip = buildPayslipFromExcel({
-      workbook,
-      employeeKey: { cpf: detail.employee?.cpf ?? undefined, name: detail.employee?.fullName ?? undefined },
-      competence
-    });
-
-    // Enrich with DB fields not available in the spreadsheet
-    if (detail.employee?.employeeCode) {
-      payslip.employeeCode = detail.employee.employeeCode;
-    }
-
-    try {
-      validatePayslipBeforeRender(payslip);
-    } catch (err: unknown) {
-      if (err instanceof PayslipValidationException) {
-        throw new HttpException(
-          { message: err.message, missingFields: err.missingFields, sourceHints: err.sourceHints },
-          HttpStatus.UNPROCESSABLE_ENTITY
-        );
-      }
-      throw err;
-    }
-
-    const pdfBuffer = await exportPayslipPdf(payslip);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename=holerite-${detail.year}-${String(detail.month).padStart(2, '0')}.pdf`);
-    res.send(pdfBuffer);
+    res.setHeader('Content-Type', exportedDocument.contentType);
+    res.setHeader('Content-Disposition', `inline; filename=${exportedDocument.filename}`);
+    res.send(exportedDocument.buffer);
   }
   @Post('payroll-runs/:id/documents')
   @Roles('admin', 'rh', 'manager')

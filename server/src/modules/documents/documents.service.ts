@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { DocumentStatus } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
+import { DocumentStorageService } from './document-storage.service';
 
 const PLACEHOLDER_REGEX = /{{\s*([a-zA-Z0-9_.-]+)\s*}}/g;
 
@@ -320,7 +321,11 @@ const renderDocxBuffer = async (params: {
 
 @Injectable()
 export class DocumentsService {
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditService,
+    private storage: DocumentStorageService
+  ) {}
 
   private async getTemplateOrThrow(id: string, companyId: string) {
     const template = await this.prisma.documentTemplate.findUnique({ where: { id } });
@@ -652,18 +657,20 @@ export class DocumentsService {
     userId: string,
     role: string
   ) {
+    const isEmployeeScope = role === 'employee' || role === 'intern';
     let employeeId = filters.employeeId;
 
-    if (role === 'employee' || role === 'intern') {
+    if (isEmployeeScope) {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
       employeeId = user?.employeeId ?? undefined;
       if (!employeeId) return [];
     }
 
-    return this.prisma.employeeDocument.findMany({
+    const documents = await this.prisma.employeeDocument.findMany({
       where: {
         companyId,
         employeeId,
+        OR: isEmployeeScope ? [{ userId }, { userId: null, employeeId }] : undefined,
         month: filters.month,
         year: filters.year,
         type: filters.type as any,
@@ -677,6 +684,15 @@ export class DocumentsService {
       },
       orderBy: { updatedAt: 'desc' }
     });
+
+    if (isEmployeeScope) {
+      return documents.filter((document) => {
+        const ownerUserId = this.storage.getStoredOwnerUserId(document);
+        return !ownerUserId || ownerUserId === userId;
+      });
+    }
+
+    return documents;
   }
 
   async getDocumentForUser(id: string, companyId: string, userId: string, role: string) {
@@ -686,6 +702,11 @@ export class DocumentsService {
     if (role === 'employee' || role === 'intern') {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
       if (!user?.employeeId || user.employeeId !== document.employeeId) {
+        throw new ForbiddenException('Not allowed to access this document');
+      }
+
+      const ownerUserId = this.storage.getStoredOwnerUserId(document);
+      if (ownerUserId && ownerUserId !== userId) {
         throw new ForbiddenException('Not allowed to access this document');
       }
     }
@@ -716,6 +737,12 @@ export class DocumentsService {
   }) {
     const template = await this.getTemplateOrThrow(params.templateId, params.companyId);
     if (template.deletedAt) throw new BadRequestException('Template is deleted');
+
+    if (template.type === 'holerite') {
+      throw new BadRequestException(
+        'Holerite generation now uses fixed Payslip pipeline and cannot be created from generic templates.'
+      );
+    }
 
     const required = (template.requiredPlaceholders as string[]) ?? [];
     const missing = validateRequiredPlaceholders(required, params.placeholders);
@@ -992,6 +1019,14 @@ export class DocumentsService {
     };
   }
 
+  async saveDocumentRecord(params: Parameters<DocumentStorageService['saveDocumentRecord']>[0]) {
+    return this.storage.saveDocumentRecord(params);
+  }
+
+  async listUserDocuments(userId: string, type?: string) {
+    return this.storage.listUserDocuments(userId, type);
+  }
+
   async exportDocumentFile(params: {
     id: string;
     companyId: string;
@@ -1000,6 +1035,43 @@ export class DocumentsService {
     format: 'pdf' | 'docx';
   }) {
     const document = await this.getDocumentForUser(params.id, params.companyId, params.userId, params.role);
+
+    if (document.type === 'holerite') {
+      if (params.format !== 'pdf') {
+        throw new BadRequestException('Holerite export supports only PDF format');
+      }
+
+      const storedPath = this.storage.getStoredFilePath(document);
+      if (storedPath) {
+        const buffer = await this.storage.readStoredPdf(storedPath);
+        const filename = storedPath.split('/').pop() || 'holerite.pdf';
+
+        await this.audit.log({
+          companyId: params.companyId,
+          userId: params.userId,
+          action: 'export',
+          entity: 'employee_document',
+          entityId: document.id,
+          after: {
+            format: 'pdf',
+            filename,
+            source: 'stored_file',
+            exportedAt: new Date().toISOString()
+          }
+        });
+
+        return {
+          buffer,
+          filename,
+          contentType: 'application/pdf'
+        };
+      }
+
+      throw new BadRequestException(
+        'Holerite file is not stored in fixed pipeline. Regenerate the document to export PDF.'
+      );
+    }
+
     const employee = await this.prisma.employee.findUnique({ where: { id: document.employeeId } });
     if (!employee || employee.companyId !== params.companyId) {
       throw new NotFoundException('Employee not found');

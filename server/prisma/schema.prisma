@@ -590,6 +590,7 @@ model DocumentTemplate {
 model EmployeeDocument {
   id        String        @id @default(cuid())
   companyId String
+  userId    String?
   employeeId String
   templateId String?
   payrollRunId String?
@@ -597,6 +598,7 @@ model EmployeeDocument {
   title     String
   status    DocumentStatus @default(draft)
   content   String
+  filePath  String?
   placeholders Json?
   requiredPlaceholders Json?
   month     Int?
@@ -620,7 +622,9 @@ model EmployeeDocument {
   versions DocumentVersion[]
 
   @@index([companyId, employeeId])
+  @@index([companyId, userId])
   @@index([companyId, type, status])
+  @@index([companyId, userId, type, year, month])
   @@index([payrollRunId, employeeId, type])
 }
 

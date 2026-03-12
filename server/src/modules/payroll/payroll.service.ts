@@ -5,6 +5,9 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { calculatePayrollForEmployee, hasFgtsContributionByCategory } from './payroll.utils';
 import { DocumentsService } from '../documents/documents.service';
+import { PayslipDataBuilder } from '../documents/payslip-data.builder';
+import { PayslipPdfService } from '../documents/payslip-pdf.service';
+import { renderPayslipHtml } from '../documents/payslip-template';
 
 @Injectable()
 export class PayrollService {
@@ -15,7 +18,9 @@ export class PayrollService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
-    private documents: DocumentsService
+    private documents: DocumentsService,
+    private payslipBuilder: PayslipDataBuilder,
+    private payslipPdf: PayslipPdfService
   ) {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     this.queue = new Queue('payroll.calculate', {
@@ -837,13 +842,50 @@ export class PayrollService {
     requester: { companyId: string; role: string; employeeId?: string | null };
     userId?: string;
   }) {
-    const detail = await this.getPaystubDetail(params.paystubId, params.requester);
-    if (!detail.document?.id) {
-      return null;
+    const paystub = await this.prisma.payrollResult.findUnique({
+      where: { id: params.paystubId },
+      include: {
+        payrollRun: true,
+        employee: true
+      }
+    });
+
+    if (!paystub || paystub.payrollRun.companyId !== params.requester.companyId) {
+      throw new NotFoundException('Paystub not found');
+    }
+
+    await this.getPaystubDetail(params.paystubId, params.requester);
+
+    let documentId: string | null = null;
+    const existing = await this.prisma.employeeDocument.findFirst({
+      where: {
+        companyId: params.requester.companyId,
+        payrollRunId: paystub.payrollRunId,
+        employeeId: paystub.employeeId,
+        type: 'holerite' as any,
+        deletedAt: null
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true }
+    });
+
+    if (existing?.id) {
+      documentId = existing.id;
+    } else {
+      const generated = await this.generateFixedPayslipDocument({
+        companyId: params.requester.companyId,
+        payrollRunId: paystub.payrollRunId,
+        month: paystub.payrollRun.month,
+        year: paystub.payrollRun.year,
+        employeeId: paystub.employeeId,
+        actorUserId: params.userId,
+        reason: 'generate_on_demand_paystub_pdf'
+      });
+      documentId = generated.id;
     }
 
     return this.documents.exportDocumentFile({
-      id: detail.document.id,
+      id: documentId,
       companyId: params.requester.companyId,
       userId: params.userId ?? '',
       role: params.requester.role,
@@ -1250,6 +1292,63 @@ export class PayrollService {
       skipped
     };
   }
+
+  private buildHoleriteFilename(year: number, month: number) {
+    return `holerite-${year}-${String(month).padStart(2, '0')}.pdf`;
+  }
+
+  private async resolveDocumentOwnerUserId(companyId: string, employeeId: string) {
+    const ownerUser = await this.prisma.user.findFirst({
+      where: {
+        companyId,
+        employeeId
+      },
+      select: { id: true }
+    });
+
+    return ownerUser?.id ?? employeeId;
+  }
+
+  private async generateFixedPayslipDocument(params: {
+    companyId: string;
+    payrollRunId: string;
+    month: number;
+    year: number;
+    employeeId: string;
+    actorUserId?: string;
+    reason?: string;
+  }) {
+    const payslip = await this.payslipBuilder.buildPayslip(params.employeeId, {
+      companyId: params.companyId,
+      payrollRunId: params.payrollRunId,
+      month: params.month,
+      year: params.year
+    });
+
+    const pdfBuffer = await this.payslipPdf.generatePayslipPdf(payslip);
+    const htmlContent = renderPayslipHtml(payslip);
+    const ownerUserId = await this.resolveDocumentOwnerUserId(params.companyId, params.employeeId);
+
+    const saved = await this.documents.saveDocumentRecord({
+      companyId: params.companyId,
+      userId: ownerUserId,
+      employeeId: params.employeeId,
+      payrollRunId: params.payrollRunId,
+      documentType: 'holerite',
+      title: `Holerite ${String(params.month).padStart(2, '0')}/${params.year} - ${payslip.employeeName}`,
+      competenceMonth: params.month,
+      competenceYear: params.year,
+      status: 'finalized',
+      filename: this.buildHoleriteFilename(params.year, params.month),
+      pdfBuffer,
+      htmlContent,
+      createdBy: params.actorUserId,
+      reason: params.reason
+    });
+
+    return saved.document;
+  }
+
   async generateDocumentsForRun(params: {
     payrollRunId: string;
     companyId: string;
@@ -1268,16 +1367,11 @@ export class PayrollService {
       throw new NotFoundException('Payroll run not found');
     }
 
-    const template = params.templateId
-      ? await this.prisma.documentTemplate.findUnique({ where: { id: params.templateId } })
-      : params.documentType === 'holerite'
-        ? (
-            await this.documents.ensurePaystubTemplate({
-              companyId: params.companyId,
-              userId: params.userId,
-              reason: params.reason ?? 'bootstrap_holerite'
-            })
-          ).template
+    const shouldUseFixedPayslipFlow = params.documentType === 'holerite';
+    const template = shouldUseFixedPayslipFlow
+      ? null
+      : params.templateId
+        ? await this.prisma.documentTemplate.findUnique({ where: { id: params.templateId } })
         : await this.prisma.documentTemplate.findFirst({
             where: {
               companyId: params.companyId,
@@ -1287,35 +1381,15 @@ export class PayrollService {
             orderBy: [{ version: 'desc' }, { updatedAt: 'desc' }]
           });
 
-    if (!template || template.companyId !== params.companyId) {
+    if (!shouldUseFixedPayslipFlow && (!template || template.companyId !== params.companyId)) {
       throw new NotFoundException('Template not found for document generation');
     }
 
-    const shouldEnrichPaystub = params.documentType === 'holerite';
-    const company = shouldEnrichPaystub
-      ? await this.prisma.company.findUnique({ where: { id: params.companyId } })
-      : null;
-    if (shouldEnrichPaystub && !company) {
-      throw new NotFoundException('Company not found');
-    }
-
-    const irrfBaseRow = shouldEnrichPaystub
-      ? await this.prisma.taxTableIrrf.findFirst({
-          where: {
-            companyId: params.companyId,
-            month: payrollRun.month,
-            year: payrollRun.year
-          },
-          orderBy: { minValue: 'asc' }
-        })
-      : null;
-    const dependentDeduction = Number(irrfBaseRow?.dependentDeduction ?? 0);
-
     const formatMoney = (value: number) => Number(value ?? 0).toFixed(2);
     const formatDate = (value?: Date | null) => {
-      if (!value) return '--';
+      if (!value) return '-';
       const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? '--' : parsed.toLocaleDateString('pt-BR');
+      return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleDateString('pt-BR');
     };
 
     const results = await this.prisma.payrollResult.findMany({
@@ -1382,20 +1456,28 @@ export class PayrollService {
         continue;
       }
 
+      if (shouldUseFixedPayslipFlow) {
+        const doc = await this.generateFixedPayslipDocument({
+          companyId: params.companyId,
+          payrollRunId: payrollRun.id,
+          month: payrollRun.month,
+          year: payrollRun.year,
+          employeeId: result.employeeId,
+          actorUserId: params.userId,
+          reason: params.reason
+        });
+
+        created.push(doc);
+        continue;
+      }
+
       const events = result.events ?? [];
-      const inssValue = events
-        .filter((event) => event.type === 'deduction' && event.code === 'INSS')
-        .reduce((sum, event) => sum + Number(event.amount), 0);
       const mealVoucherCredit = events
         .filter((event) => event.type === 'earning' && event.code === 'VA')
         .reduce((sum, event) => sum + Number(event.amount), 0);
       const pensionAlimony = events
         .filter((event) => event.type === 'deduction' && (event.code === 'PENSAO' || /pensao/i.test(event.description)))
         .reduce((sum, event) => sum + Number(event.amount), 0);
-      const irrfBase = Math.max(
-        0,
-        Number(result.grossSalary) - inssValue - (Number(result.employee.dependents ?? 0) * dependentDeduction)
-      );
       const eventLines = events
         .slice()
         .sort((left, right) => {
@@ -1411,14 +1493,14 @@ export class PayrollService {
         .join('\n');
 
       const placeholders = {
-        company_name: company?.name ?? '--',
-        company_cnpj: company?.cnpj ?? '--',
+        company_name: '-',
+        company_cnpj: '-',
         employee_name: result.employee.fullName,
-        employee_code: result.employee.employeeCode ?? '--',
+        employee_code: result.employee.employeeCode ?? '-',
         employee_cpf: result.employee.cpf,
         employee_position: result.employee.position,
         employee_department: result.employee.department,
-        employee_email: result.employee.email ?? '--',
+        employee_email: result.employee.email ?? '-',
         admission_date: formatDate(result.employee.admissionDate),
         payroll_month: String(payrollRun.month),
         payroll_year: String(payrollRun.year),
@@ -1429,14 +1511,14 @@ export class PayrollService {
         fgts: formatMoney(Number(result.fgts)),
         inss_base: formatMoney(Number(result.grossSalary)),
         fgts_base: formatMoney(Number(result.grossSalary)),
-        irrf_base: formatMoney(irrfBase),
-        bank_name: result.employee.bankName ?? '--',
-        bank_agency: result.employee.bankAgency ?? '--',
-        bank_account: result.employee.bankAccount ?? '--',
-        payment_method: result.employee.paymentMethod ?? '--',
+        irrf_base: formatMoney(0),
+        bank_name: result.employee.bankName ?? '-',
+        bank_agency: result.employee.bankAgency ?? '-',
+        bank_account: result.employee.bankAccount ?? '-',
+        payment_method: result.employee.paymentMethod ?? '-',
         meal_voucher_credit: formatMoney(mealVoucherCredit),
         pension_alimony: formatMoney(pensionAlimony),
-        event_lines: eventLines || '--',
+        event_lines: eventLines || '-',
         ...(params.extraPlaceholders ?? {})
       };
 
@@ -1444,13 +1526,13 @@ export class PayrollService {
         ? `Holerite ${String(payrollRun.month).padStart(2, '0')}/${payrollRun.year} - ${result.employee.fullName}`
         : params.documentType === 'recibo_ferias'
           ? `Recibo de Ferias ${String(payrollRun.month).padStart(2, '0')}/${payrollRun.year} - ${result.employee.fullName}`
-          : template.name;
+          : template!.name;
 
       const doc = await this.documents.createDocumentFromTemplate({
         companyId: params.companyId,
         userId: params.userId,
         employeeId: result.employeeId,
-        templateId: template.id,
+        templateId: template!.id,
         payrollRunId: payrollRun.id,
         title: documentTitle,
         placeholders,
