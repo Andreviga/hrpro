@@ -42,8 +42,12 @@ export class PayrollController {
 
   @Post('payroll/runs/:id/reopen')
   @Roles('admin', 'rh', 'manager')
-  async reopenRun(@Param('id') id: string, @Req() req: { user: { sub: string } }) {
-    return this.payroll.reopenRun(id, req.user.sub);
+  async reopenRun(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+    @Req() req: { user: { sub: string } }
+  ) {
+    return this.payroll.reopenRun(id, req.user.sub, body?.reason);
   }
 
   @Post('payroll/runs/:id/employees/:employeeId/remove')

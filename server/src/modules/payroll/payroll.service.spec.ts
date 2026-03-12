@@ -405,13 +405,23 @@ describe('PayrollService document generation', () => {
     });
 
     const service = new PayrollService(prisma, audit, documents);
-    const result = await service.reopenRun('run-10', 'u1');
+    const result = await service.reopenRun('run-10', 'u1', 'Correccao de lancamento indevido');
 
     expect(result.status).toBe('calculated');
     expect(prisma.payrollRun.update).toHaveBeenCalledWith({
       where: { id: 'run-10' },
-      data: { status: 'calculated', closedAt: null }
+      data: expect.objectContaining({
+        status: 'calculated',
+        closedAt: null,
+        reopenReason: 'Correccao de lancamento indevido'
+      })
     });
+  });
+
+  it('rejects reopen without reason', async () => {
+    const service = new PayrollService(prisma, audit, documents);
+    await expect(service.reopenRun('run-10', 'u1')).rejects.toThrow('Motivo de reabertura e obrigatorio.');
+    await expect(service.reopenRun('run-10', 'u1', '   ')).rejects.toThrow('Motivo de reabertura e obrigatorio.');
   });
 
   it('returns summary totals for a competence', async () => {

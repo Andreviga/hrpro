@@ -434,14 +434,18 @@ model EmployeeAttachment {
 }
 
 model PayrollRun {
-  id        String        @id @default(cuid())
-  companyId String
-  month     Int
-  year      Int
-  status    PayrollStatus @default(draft)
-  version   Int           @default(1)
-  createdAt DateTime      @default(now())
-  closedAt  DateTime?
+  id              String        @id @default(cuid())
+  companyId       String
+  month           Int
+  year            Int
+  status          PayrollStatus @default(draft)
+  version         Int           @default(1)
+  createdAt       DateTime      @default(now())
+  closedAt        DateTime?
+  closedSnapshot  Json?
+  reopenedAt      DateTime?
+  reopenedBy      String?
+  reopenReason    String?
 
   company   Company @relation(fields: [companyId], references: [id])
   results   PayrollResult[]

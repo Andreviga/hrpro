@@ -331,9 +331,43 @@ export class PayrollService {
       });
     }
 
+    // Build immutable snapshot of all results + events before closing
+    const resultsForSnapshot = await this.prisma.payrollResult.findMany({
+      where: { payrollRunId },
+      include: {
+        employee: { select: { fullName: true, cpf: true } },
+        events: { orderBy: { code: 'asc' } }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    const closedSnapshot = {
+      capturedAt: new Date().toISOString(),
+      month: payrollRun.month,
+      year: payrollRun.year,
+      resultCount: resultsForSnapshot.length,
+      results: resultsForSnapshot.map((r) => ({
+        id: r.id,
+        employeeId: r.employeeId,
+        employeeName: r.employee.fullName,
+        employeeCpf: r.employee.cpf,
+        grossSalary: Number(r.grossSalary),
+        totalDeductions: Number(r.totalDeductions),
+        netSalary: Number(r.netSalary),
+        fgts: Number(r.fgts),
+        events: r.events.map((e) => ({
+          id: e.id,
+          code: e.code,
+          description: e.description,
+          type: e.type,
+          amount: Number(e.amount)
+        }))
+      }))
+    };
+
     const closed = await this.prisma.payrollRun.update({
       where: { id: payrollRunId },
-      data: { status: 'closed', closedAt: new Date() }
+      data: { status: 'closed', closedAt: new Date(), closedSnapshot }
     });
 
     await this.audit.log({
@@ -376,7 +410,16 @@ export class PayrollService {
     return this.closeRun(payrollRunId, userId);
   }
 
-  async reopenRun(payrollRunId: string, userId?: string) {
+  async reopenRun(payrollRunId: string, userId?: string, reason?: string) {
+    if (!reason || !reason.trim()) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'Motivo de reabertura e obrigatorio.',
+        code: 'PAYROLL_REOPEN_REASON_REQUIRED'
+      });
+    }
+
     const payrollRun = await this.prisma.payrollRun.findUnique({ where: { id: payrollRunId } });
     if (!payrollRun) throw new NotFoundException('Payroll run not found');
 
@@ -412,7 +455,13 @@ export class PayrollService {
 
     const reopened = await this.prisma.payrollRun.update({
       where: { id: payrollRunId },
-      data: { status: 'calculated', closedAt: null }
+      data: {
+        status: 'calculated',
+        closedAt: null,
+        reopenedAt: new Date(),
+        reopenedBy: userId,
+        reopenReason: reason.trim()
+      }
     });
 
     await this.audit.log({
@@ -421,6 +470,7 @@ export class PayrollService {
       action: 'reopen',
       entity: 'payroll_run',
       entityId: payrollRunId,
+      reason: reason.trim(),
       after: { status: reopened.status }
     });
 
