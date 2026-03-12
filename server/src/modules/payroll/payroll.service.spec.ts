@@ -35,6 +35,9 @@ describe('PayrollService document generation', () => {
       findFirst: jest.fn(),
       updateMany: jest.fn()
     },
+    user: {
+      findFirst: jest.fn()
+    },
     company: {
       findUnique: jest.fn()
     },
@@ -52,18 +55,71 @@ describe('PayrollService document generation', () => {
   } as any;
 
   const audit = { log: jest.fn() } as any;
-  const documents = { createDocumentFromTemplate: jest.fn(), ensureIncomeStatementTemplate: jest.fn(), ensurePaystubTemplate: jest.fn() } as any;
+  const documents = {
+    createDocumentFromTemplate: jest.fn(),
+    ensureIncomeStatementTemplate: jest.fn(),
+    ensurePaystubTemplate: jest.fn(),
+    saveDocumentRecord: jest.fn()
+  } as any;
+  const payslipBuilder = { buildPayslip: jest.fn() } as any;
+  const payslipPdf = { generatePayslipPdf: jest.fn() } as any;
 
   beforeEach(() => {
     jest.clearAllMocks();
     prisma.$transaction.mockImplementation(async (arg: any) => (typeof arg === 'function' ? arg(prisma) : Promise.all(arg)));
     prisma.employeeDocument.findFirst.mockResolvedValue(null);
     prisma.employeeDocument.updateMany.mockResolvedValue({ count: 0 });
+    prisma.user.findFirst.mockResolvedValue({ id: 'u-employee-1' });
     prisma.company.findUnique.mockResolvedValue({ id: 'c1', cnpj: '12345678000199', name: 'Empresa Teste' });
     prisma.taxTableIrrf.findFirst.mockResolvedValue({ dependentDeduction: 0 });
     prisma.taxTableIrrf.count.mockResolvedValue(1);
     prisma.taxTableInss.count.mockResolvedValue(1);
     prisma.rubric.findMany.mockResolvedValue([{ code: 'BASE' }, { code: 'INSS' }, { code: 'IRRF' }]);
+    payslipBuilder.buildPayslip.mockResolvedValue({
+      companyId: 'c1',
+      companyName: 'Empresa Teste',
+      companyCnpj: '12345678000199',
+      companyAddress: 'Rua Exemplo, 123',
+      employeeId: 'e1',
+      employeeName: 'Ana',
+      employeeCpf: '111',
+      employeeCode: 'COD-1',
+      employeeRole: 'Docente',
+      admissionDate: '01/02/2024',
+      employeeEmail: 'ana@example.com',
+      bank: 'Banco Teste',
+      agency: '0001',
+      account: '12345-6',
+      paymentMethod: 'Transferencia',
+      competenceMonth: 2,
+      competenceYear: 2026,
+      classComposition: [
+        { code: '1', description: 'ENSINO INFANTIL', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '2', description: 'ENSINO FUNDAMENTAL I', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '3', description: 'ENSINO FUNDAMENTAL II', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '4', description: 'ENSINO MEDIO', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '5', description: 'RO', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '6', description: 'AD FUNCAO / TURNO', quantity: 0, unitValue: 0, totalValue: 0 }
+      ],
+      earnings: [{ code: '1500', description: 'SALARIO BASE', amount: 3200, type: 'earning' }],
+      deductions: [{ code: '2080', description: 'INSS', amount: 420, type: 'deduction' }],
+      grossSalary: 3200,
+      totalDiscounts: 420,
+      netSalary: 2780,
+      fgts: 256,
+      inssBase: 3200,
+      fgtsBase: 3200,
+      irrfBase: 2780,
+      foodAllowance: 0,
+      alimony: 0,
+      thirteenthSecondInstallment: 0,
+      thirteenthInss: 0,
+      thirteenthIrrf: 0,
+      calculationBase: 3200,
+      createdAt: new Date('2026-02-28T00:00:00.000Z').toISOString()
+    });
+    payslipPdf.generatePayslipPdf.mockResolvedValue(Buffer.from('pdf'));
+    documents.saveDocumentRecord.mockResolvedValue({ document: { id: 'doc-fixed-1' } });
   });
 
   it('generates documents idempotently', async () => {
@@ -125,22 +181,12 @@ describe('PayrollService document generation', () => {
     );
     });
 
-  it('auto-bootstraps default holerite template for payroll batch generation', async () => {
+  it('uses the fixed holerite pipeline for payroll batch generation', async () => {
     prisma.payrollRun.findUnique.mockResolvedValue({
       id: 'run-hol-1',
       companyId: 'c1',
       month: 2,
       year: 2026
-    });
-
-    documents.ensurePaystubTemplate.mockResolvedValue({
-      created: true,
-      template: {
-        id: 'tpl-hol-1',
-        companyId: 'c1',
-        type: 'holerite',
-        name: 'Holerite Padrao (Automatico)'
-      }
     });
 
     prisma.payrollResult.findMany.mockResolvedValue([
@@ -154,9 +200,7 @@ describe('PayrollService document generation', () => {
       }
     ]);
 
-    documents.createDocumentFromTemplate.mockResolvedValue({ id: 'doc-hol-1' });
-
-    const service = new PayrollService(prisma, audit, documents);
+    const service = new PayrollService(prisma, audit, documents, payslipBuilder, payslipPdf);
 
     const result = await service.generateDocumentsForRun({
       payrollRunId: 'run-hol-1',
@@ -166,20 +210,24 @@ describe('PayrollService document generation', () => {
     });
 
     expect(result.createdCount).toBe(1);
-    expect(documents.ensurePaystubTemplate).toHaveBeenCalledWith(
+    expect(payslipBuilder.buildPayslip).toHaveBeenCalledWith(
+      'e1',
       expect.objectContaining({
         companyId: 'c1',
-        userId: 'u1',
-        reason: 'bootstrap_holerite'
-      })
-    );
-    expect(documents.createDocumentFromTemplate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        templateId: 'tpl-hol-1',
         payrollRunId: 'run-hol-1',
-        employeeId: 'e1'
+        month: 2,
+        year: 2026
       })
     );
+    expect(documents.saveDocumentRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyId: 'c1',
+        payrollRunId: 'run-hol-1',
+        employeeId: 'e1',
+        documentType: 'holerite'
+      })
+    );
+    expect(documents.createDocumentFromTemplate).not.toHaveBeenCalled();
   });
 
 
@@ -189,16 +237,6 @@ describe('PayrollService document generation', () => {
       companyId: 'c1',
       month: 2,
       year: 2026
-    });
-
-    documents.ensurePaystubTemplate.mockResolvedValue({
-      created: false,
-      template: {
-        id: 'tpl-hol-force-1',
-        companyId: 'c1',
-        type: 'holerite',
-        name: 'Holerite Padrao'
-      }
     });
 
     prisma.payrollResult.findMany.mockResolvedValue([
@@ -213,9 +251,8 @@ describe('PayrollService document generation', () => {
     ]);
 
     prisma.employeeDocument.updateMany.mockResolvedValue({ count: 1 });
-    documents.createDocumentFromTemplate.mockResolvedValue({ id: 'doc-force-1' });
 
-    const service = new PayrollService(prisma, audit, documents);
+    const service = new PayrollService(prisma, audit, documents, payslipBuilder, payslipPdf);
 
     const result = await service.generateDocumentsForRun({
       payrollRunId: 'run-force-1',
@@ -240,6 +277,13 @@ describe('PayrollService document generation', () => {
       createdCount: 1,
       regeneratedFromPreviousCount: 1
     });
+    expect(documents.saveDocumentRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payrollRunId: 'run-force-1',
+        employeeId: 'e-force-1',
+        documentType: 'holerite'
+      })
+    );
   });
   it('generates annual income statements from closed runs', async () => {
     prisma.company.findUnique.mockResolvedValue({ id: 'c1', cnpj: '12345678000199', name: 'Escola X' });

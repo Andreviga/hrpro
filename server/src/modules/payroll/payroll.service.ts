@@ -5,7 +5,7 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { calculatePayrollForEmployee, hasFgtsContributionByCategory } from './payroll.utils';
 import { DocumentsService } from '../documents/documents.service';
-import { PayslipDataBuilder } from '../documents/payslip-data.builder';
+import { Payslip, PayslipDataBuilder } from '../documents/payslip-data.builder';
 import { PayslipPdfService } from '../documents/payslip-pdf.service';
 import { renderPayslipHtml } from '../documents/payslip-template';
 
@@ -14,18 +14,39 @@ export class PayrollService {
   private queue: Queue;
   private logger = new Logger(PayrollService.name);
   private readonly requiredRubricCodes = ['BASE', 'INSS', 'IRRF'] as const;
+  private readonly missingPayslipBuilder = {
+    buildPayslip: async () => {
+      throw new Error('PayslipDataBuilder dependency was not provided');
+    }
+  } as unknown as PayslipDataBuilder;
+  private readonly missingPayslipPdf = {
+    generatePayslipPdf: async () => {
+      throw new Error('PayslipPdfService dependency was not provided');
+    }
+  } as unknown as PayslipPdfService;
 
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
     private documents: DocumentsService,
-    private payslipBuilder: PayslipDataBuilder,
-    private payslipPdf: PayslipPdfService
+    private payslipBuilder: PayslipDataBuilder = {
+      buildPayslip: async () => {
+        throw new Error('PayslipDataBuilder dependency was not provided');
+      }
+    } as unknown as PayslipDataBuilder,
+    private payslipPdf: PayslipPdfService = {
+      generatePayslipPdf: async () => {
+        throw new Error('PayslipPdfService dependency was not provided');
+      }
+    } as unknown as PayslipPdfService
   ) {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     this.queue = new Queue('payroll.calculate', {
       connection: new IORedis(redisUrl, { maxRetriesPerRequest: null })
     });
+
+    this.payslipBuilder = payslipBuilder ?? this.missingPayslipBuilder;
+    this.payslipPdf = payslipPdf ?? this.missingPayslipPdf;
   }
 
   async createRun(companyId: string, month: number, year: number) {
@@ -746,10 +767,71 @@ export class PayrollService {
       select: {
         id: true,
         title: true,
-        status: true
+        status: true,
+        filePath: true,
+        updatedAt: true
       },
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }]
     });
+
+    const payslip = await this.payslipBuilder
+      .buildPayslip(result.employeeId, {
+        companyId: result.payrollRun.companyId,
+        payrollRunId: result.payrollRunId,
+        month: result.payrollRun.month,
+        year: result.payrollRun.year
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'unknown_error';
+        this.logger.warn(
+          `Falling back to runtime payslip detail for ${paystubId}: ${message}`
+        );
+
+        return this.buildFallbackPayslip({
+          companyId: result.payrollRun.companyId,
+          companyName: result.payrollRun.company.name,
+          companyCnpj: result.payrollRun.company.cnpj,
+          companyAddress: 'Endereco nao informado',
+          employeeId: result.employeeId,
+          employeeName: result.employee.fullName,
+          employeeCpf: result.employee.cpf,
+          employeeCode: result.employee.employeeCode,
+          employeeRole: result.employee.position,
+          admissionDate: result.employee.admissionDate,
+          employeeEmail: result.employee.email,
+          bank: result.employee.bankName,
+          agency: result.employee.bankAgency,
+          account: result.employee.bankAccount,
+          paymentMethod: result.employee.paymentMethod,
+          competenceMonth: result.payrollRun.month,
+          competenceYear: result.payrollRun.year,
+          earnings: earnings.map((event) => ({
+            code: event.code,
+            description: event.description,
+            amount: Number(event.amount),
+            type: 'earning' as const
+          })),
+          deductions: deductions.map((event) => ({
+            code: event.code,
+            description: event.description,
+            amount: Number(event.amount),
+            type: 'deduction' as const
+          })),
+          grossSalary: Number(result.grossSalary),
+          totalDiscounts: Number(result.totalDeductions),
+          netSalary: Number(result.netSalary),
+          fgts: Number(result.fgts),
+          inssBase: Number(result.grossSalary),
+          fgtsBase: Number(result.grossSalary),
+          irrfBase: Number(irrfBase.toFixed(2)),
+          foodAllowance: mealVoucherCredit,
+          alimony: pensionAlimony,
+          thirteenthSecondInstallment: sumByDescription(earnings, '13'),
+          thirteenthInss: sumByDescription(deductions, 'inss 13') + sumByDescription(deductions, '13 inss'),
+          thirteenthIrrf: sumByDescription(deductions, 'irrf 13') + sumByDescription(deductions, '13 irrf'),
+          calculationBase: Number(result.grossSalary)
+        });
+      });
 
     const events = result.events
       .map((event) => ({
@@ -801,9 +883,12 @@ export class PayrollService {
             id: paystubDocument.id,
             title: paystubDocument.title,
             status: paystubDocument.status,
-            filePath: `/documents/${paystubDocument.id}/export/pdf`
+            filePath: `/documents/${paystubDocument.id}/export/pdf`,
+            storedFilePath: paystubDocument.filePath,
+            updatedAt: paystubDocument.updatedAt
           }
         : null,
+      payslip,
       earnings: {
         baseSalary: sumByCode(earnings, 'BASE'),
         overtimeValue: sumByCode(earnings, 'EXTRA'),
@@ -835,6 +920,106 @@ export class PayrollService {
         fgtsDeposit: Number(result.fgts)
       }
     };
+  }
+
+  private buildFallbackPayslip(params: {
+    companyId: string;
+    companyName: string;
+    companyCnpj: string;
+    companyAddress?: string | null;
+    employeeId: string;
+    employeeName: string;
+    employeeCpf: string;
+    employeeCode?: string | null;
+    employeeRole?: string | null;
+    admissionDate?: Date | null;
+    employeeEmail?: string | null;
+    bank?: string | null;
+    agency?: string | null;
+    account?: string | null;
+    paymentMethod?: string | null;
+    competenceMonth: number;
+    competenceYear: number;
+    earnings: Payslip['earnings'];
+    deductions: Payslip['deductions'];
+    grossSalary: number;
+    totalDiscounts: number;
+    netSalary: number;
+    fgts: number;
+    inssBase: number;
+    fgtsBase: number;
+    irrfBase: number;
+    foodAllowance: number;
+    alimony: number;
+    thirteenthSecondInstallment: number;
+    thirteenthInss: number;
+    thirteenthIrrf: number;
+    calculationBase: number;
+  }): Payslip {
+    const addFunctionAmount = params.earnings
+      .filter((event) => {
+        const code = String(event.code ?? '').toUpperCase();
+        const description = String(event.description ?? '').toUpperCase();
+        return code.includes('AD') || description.includes('AD FUNCAO') || description.includes('ADICIONAL TURNO');
+      })
+      .reduce((sum, event) => sum + Number(event.amount ?? 0), 0);
+
+    return {
+      companyId: params.companyId,
+      companyName: String(params.companyName || '').trim() || '-',
+      companyCnpj: String(params.companyCnpj || '').trim() || '-',
+      companyAddress: String(params.companyAddress || '').trim() || 'Endereco nao informado',
+      employeeId: params.employeeId,
+      employeeName: String(params.employeeName || '').trim() || '-',
+      employeeCpf: String(params.employeeCpf || '').trim() || '-',
+      employeeCode: String(params.employeeCode || '').trim() || '-',
+      employeeRole: String(params.employeeRole || '').trim() || '-',
+      admissionDate: this.formatPayslipDate(params.admissionDate),
+      employeeEmail: String(params.employeeEmail || '').trim() || '-',
+      bank: String(params.bank || '').trim() || '-',
+      agency: String(params.agency || '').trim() || '-',
+      account: String(params.account || '').trim() || '-',
+      paymentMethod: String(params.paymentMethod || '').trim() || '-',
+      competenceMonth: params.competenceMonth,
+      competenceYear: params.competenceYear,
+      classComposition: [
+        { code: '1', description: 'ENSINO INFANTIL', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '2', description: 'ENSINO FUNDAMENTAL I', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '3', description: 'ENSINO FUNDAMENTAL II', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '4', description: 'ENSINO MEDIO', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '5', description: 'RO', quantity: 0, unitValue: 0, totalValue: 0 },
+        { code: '6', description: 'AD FUNCAO / TURNO', quantity: 0, unitValue: 0, totalValue: Number(addFunctionAmount.toFixed(2)) }
+      ],
+      earnings: params.earnings,
+      deductions: params.deductions,
+      grossSalary: Number(params.grossSalary.toFixed(2)),
+      totalDiscounts: Number(params.totalDiscounts.toFixed(2)),
+      netSalary: Number(params.netSalary.toFixed(2)),
+      fgts: Number(params.fgts.toFixed(2)),
+      inssBase: Number(params.inssBase.toFixed(2)),
+      fgtsBase: Number(params.fgtsBase.toFixed(2)),
+      irrfBase: Number(params.irrfBase.toFixed(2)),
+      foodAllowance: Number(params.foodAllowance.toFixed(2)),
+      alimony: Number(params.alimony.toFixed(2)),
+      thirteenthSecondInstallment: Number(params.thirteenthSecondInstallment.toFixed(2)),
+      thirteenthInss: Number(params.thirteenthInss.toFixed(2)),
+      thirteenthIrrf: Number(params.thirteenthIrrf.toFixed(2)),
+      calculationBase: Number(params.calculationBase.toFixed(2)),
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  private formatPayslipDate(value?: Date | null) {
+    if (!value) {
+      return '-';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return '-';
+    }
+
+    return parsed.toLocaleDateString('pt-BR');
   }
 
   async exportPaystubPdf(params: {

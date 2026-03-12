@@ -49,6 +49,26 @@ const getFriendlyError = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const formatDateValue = (value?: string | null) => {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleDateString('pt-BR');
+};
+
+const buildRubricRows = (paystub: PaystubDetail) => {
+  const earnings = paystub.payslip?.earnings ?? [];
+  const deductions = paystub.payslip?.deductions ?? [];
+  const size = Math.max(earnings.length, deductions.length, 1);
+
+  return Array.from({ length: size }, (_, index) => ({
+    earning: earnings[index] ?? null,
+    deduction: deductions[index] ?? null
+  }));
+};
+
 const PaystubDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -195,22 +215,8 @@ const PaystubDetailPage: React.FC = () => {
     );
   }
 
-  const earningsItems = [
-    { label: 'Salário Base', value: paystub.earnings.baseSalary },
-    { label: 'Horas Extras', value: paystub.earnings.overtimeValue },
-    { label: 'Adicional Noturno', value: paystub.earnings.nightShiftBonus },
-    { label: 'Adicional de Feriados', value: paystub.earnings.holidaysBonus },
-    { label: 'Outros Bônus', value: paystub.earnings.otherBonuses },
-  ].filter(item => item.value > 0);
-
-  const deductionsItems = [
-    { label: 'INSS', value: paystub.deductions.inssDeduction },
-    { label: 'IRRF', value: paystub.deductions.irrfDeduction },
-    { label: 'Vale Transporte', value: paystub.deductions.transportVoucherDeduction },
-    { label: 'Vale Refeição', value: paystub.deductions.mealVoucherDeduction },
-    { label: 'Taxa Sindical', value: paystub.deductions.syndicateFee },
-    { label: 'Outros Descontos', value: paystub.deductions.otherDeductions },
-  ].filter(item => item.value > 0);
+  const payslip = paystub.payslip;
+  const rubricRows = buildRubricRows(paystub);
 
   return (
     <Layout>
@@ -237,6 +243,44 @@ const PaystubDetailPage: React.FC = () => {
             Baixar PDF
           </Button>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Documento do Holerite</span>
+              <div className="flex items-center gap-2">
+                {paystub.document?.status ? <Badge variant="outline">{paystub.document.status}</Badge> : null}
+                {canEdit ? <Badge variant="secondary">Edição liberada</Badge> : null}
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 text-sm">
+            <div>
+              <p className="text-gray-500">Título</p>
+              <p className="font-medium text-gray-900">{paystub.document?.title ?? payslip?.title ?? 'Holerite fixo'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Empresa</p>
+              <p className="font-medium text-gray-900">{payslip?.companyName ?? paystub.company?.name ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">CNPJ</p>
+              <p className="font-medium text-gray-900">{payslip?.companyCnpj ?? paystub.company?.cnpj ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Última atualização</p>
+              <p className="font-medium text-gray-900">{formatDateValue(paystub.document?.updatedAt)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Referência da planilha</p>
+              <p className="font-medium text-gray-900">{payslip?.referenceMonth ?? `${paystub.month}/${paystub.year}`}</p>
+            </div>
+            <div className="md:col-span-2 xl:col-span-4">
+              <p className="text-gray-500">Endereço</p>
+              <p className="font-medium text-gray-900">{payslip?.companyAddress ?? '-'}</p>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
@@ -287,6 +331,128 @@ const PaystubDetailPage: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Dados do Funcionário</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 text-sm">
+            <div>
+              <p className="text-gray-500">Código</p>
+              <p className="font-medium text-gray-900">{payslip?.employeeCode ?? paystub.employee?.employeeCode ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Nome</p>
+              <p className="font-medium text-gray-900">{payslip?.employeeName ?? paystub.employee?.fullName ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Cargo</p>
+              <p className="font-medium text-gray-900">{payslip?.employeeRole ?? paystub.employee?.position ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Competência</p>
+              <p className="font-medium text-gray-900">{formatMonthYear(paystub.month, paystub.year)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">CPF</p>
+              <p className="font-medium text-gray-900">{payslip?.employeeCpf ?? paystub.employee?.cpf ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Admissão</p>
+              <p className="font-medium text-gray-900">{payslip?.admissionDate ?? formatDateValue(paystub.employee?.admissionDate)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">E-mail</p>
+              <p className="font-medium text-gray-900 break-all">{payslip?.employeeEmail ?? paystub.employee?.email ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Forma de pagamento</p>
+              <p className="font-medium text-gray-900">{payslip?.paymentMethod ?? paystub.employee?.paymentMethod ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Banco</p>
+              <p className="font-medium text-gray-900">{payslip?.bank ?? paystub.employee?.bankName ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Agência</p>
+              <p className="font-medium text-gray-900">{payslip?.agency ?? paystub.employee?.bankAgency ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Conta</p>
+              <p className="font-medium text-gray-900">{payslip?.account ?? paystub.employee?.bankAccount ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">PIX</p>
+              <p className="font-medium text-gray-900 break-all">{payslip?.pix ?? '-'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">PIS</p>
+              <p className="font-medium text-gray-900">{paystub.employee?.pis ?? '-'}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Composição de Aulas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="py-2 pr-3">Item</th>
+                    <th className="py-2 pr-3">Descrição</th>
+                    <th className="py-2 pr-3 text-right">Quantidade</th>
+                    <th className="py-2 pr-3 text-right">Valor aula / unitário</th>
+                    <th className="py-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(payslip?.classComposition ?? []).map((row) => (
+                    <tr key={row.code} className="border-b last:border-b-0">
+                      <td className="py-3 pr-3 font-medium text-gray-900">{row.code}</td>
+                      <td className="py-3 pr-3 text-gray-700">{row.description}</td>
+                      <td className="py-3 pr-3 text-right text-gray-700">{row.quantity.toFixed(2)}</td>
+                      <td className="py-3 pr-3 text-right text-gray-700">{formatCurrency(row.unitValue)}</td>
+                      <td className="py-3 text-right font-medium text-gray-900">{formatCurrency(row.totalValue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Rubricas do Holerite</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="py-2 pr-3">Código</th>
+                    <th className="py-2 pr-3">Descrição</th>
+                    <th className="py-2 pr-3 text-right">Provento</th>
+                    <th className="py-2 text-right">Desconto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rubricRows.map((row, index) => (
+                    <tr key={`${row.earning?.code ?? row.deduction?.code ?? 'row'}-${index}`} className="border-b last:border-b-0">
+                      <td className="py-3 pr-3 font-medium text-gray-900">{row.earning?.code ?? row.deduction?.code ?? '-'}</td>
+                      <td className="py-3 pr-3 text-gray-700">{row.earning?.description ?? row.deduction?.description ?? '-'}</td>
+                      <td className="py-3 pr-3 text-right text-green-700">{row.earning ? formatCurrency(row.earning.amount) : '-'}</td>
+                      <td className="py-3 text-right text-red-700">{row.deduction ? formatCurrency(row.deduction.amount) : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
 
         {paystub.events && paystub.events.length > 0 && (
           <Card>
@@ -340,13 +506,127 @@ const PaystubDetailPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
+              <CardTitle className="text-green-700">Bases e Totais</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Salário Bruto</span>
+                <span className="font-semibold text-green-700">{formatCurrency(payslip?.grossSalary ?? paystub.summary.grossSalary)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Total Descontos</span>
+                <span className="font-semibold text-red-700">{formatCurrency(payslip?.totalDiscounts ?? paystub.summary.totalDeductions)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Salário Líquido</span>
+                <span className="font-semibold text-blue-700">{formatCurrency(payslip?.netSalary ?? paystub.summary.netSalary)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">FGTS</span>
+                <span className="font-semibold">{formatCurrency(payslip?.fgts ?? paystub.summary.fgtsDeposit)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Base INSS</span>
+                <span className="font-semibold">{formatCurrency(payslip?.inssBase ?? paystub.bases?.inssBase ?? 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Base FGTS</span>
+                <span className="font-semibold">{formatCurrency(payslip?.fgtsBase ?? paystub.bases?.fgtsBase ?? 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Base IRRF</span>
+                <span className="font-semibold">{formatCurrency(payslip?.irrfBase ?? paystub.bases?.irrfBase ?? 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Base de Cálculo</span>
+                <span className="font-semibold">{formatCurrency(payslip?.calculationBase ?? paystub.summary.grossSalary)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Qtd. total de aulas</span>
+                <span className="font-semibold">{typeof payslip?.totalClassQuantity === 'number' ? payslip.totalClassQuantity.toFixed(2) : '-'}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Valor unitário aula</span>
+                <span className="font-semibold">{typeof payslip?.classUnitValue === 'number' ? formatCurrency(payslip.classUnitValue) : '-'}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-blue-700">Informações Complementares</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Vale Alimentação</span>
+                <span className="font-semibold">{formatCurrency(payslip?.foodAllowance ?? paystub.earnings.mealVoucherCredit ?? 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Pensão Alimentícia</span>
+                <span className="font-semibold text-red-700">{formatCurrency(payslip?.alimony ?? paystub.deductions.pensionAlimony ?? 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">2ª Parcela 13º</span>
+                <span className="font-semibold">{formatCurrency(payslip?.thirteenthSecondInstallment ?? 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">INSS 13º</span>
+                <span className="font-semibold text-red-700">{formatCurrency(payslip?.thirteenthInss ?? 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">IRRF 13º</span>
+                <span className="font-semibold text-red-700">{formatCurrency(payslip?.thirteenthIrrf ?? 0)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Dependentes</span>
+                <span className="font-semibold">{paystub.employee?.dependents ?? 0}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-700">Tipo salarial</span>
+                <span className="font-semibold">{paystub.employee?.salaryType ?? '-'}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {payslip?.sourceWarnings && payslip.sourceWarnings.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Alertas da Planilha</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {payslip.sourceWarnings.map((warning) => (
+                <div key={`${warning.code}-${warning.sourceCell ?? warning.sourceTable ?? warning.message}`} className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                  <p className="font-medium text-amber-900">{warning.code}</p>
+                  <p className="text-amber-800">{warning.message}</p>
+                  <p className="text-amber-700">
+                    {warning.fillLocation ?? warning.sourceSheet ?? 'Origem não informada'}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
               <CardTitle className="flex items-center space-x-2 text-green-700">
                 <TrendingUp className="h-5 w-5" />
-                <span>Rendimentos</span>
+                <span>Resumo de Proventos</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {earningsItems.map((item, index) => (
+              {[
+                { label: 'Salário Base', value: paystub.earnings.baseSalary },
+                { label: 'Horas Extras', value: paystub.earnings.overtimeValue },
+                { label: 'Adicional Noturno', value: paystub.earnings.nightShiftBonus },
+                { label: 'Adicional de Feriados', value: paystub.earnings.holidaysBonus },
+                { label: 'Vale Alimentação', value: paystub.earnings.mealVoucherCredit ?? 0 },
+                { label: 'Outros Bônus', value: paystub.earnings.otherBonuses }
+              ].filter((item) => item.value > 0).map((item, index) => (
                 <div key={index} className="flex justify-between items-center py-2">
                   <span className="text-gray-700">{item.label}</span>
                   <span className="font-semibold text-green-600">
@@ -368,11 +648,19 @@ const PaystubDetailPage: React.FC = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2 text-red-700">
                 <TrendingDown className="h-5 w-5" />
-                <span>Descontos</span>
+                <span>Resumo de Descontos</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {deductionsItems.map((item, index) => (
+              {[
+                { label: 'INSS', value: paystub.deductions.inssDeduction },
+                { label: 'IRRF', value: paystub.deductions.irrfDeduction },
+                { label: 'Vale Transporte', value: paystub.deductions.transportVoucherDeduction },
+                { label: 'Vale Refeição', value: paystub.deductions.mealVoucherDeduction },
+                { label: 'Pensão Alimentícia', value: paystub.deductions.pensionAlimony ?? 0 },
+                { label: 'Taxa Sindical', value: paystub.deductions.syndicateFee },
+                { label: 'Outros Descontos', value: paystub.deductions.otherDeductions }
+              ].filter((item) => item.value > 0).map((item, index) => (
                 <div key={index} className="flex justify-between items-center py-2">
                   <span className="text-gray-700">{item.label}</span>
                   <span className="font-semibold text-red-600">
@@ -391,57 +679,6 @@ const PaystubDetailPage: React.FC = () => {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-            <CardHeader>
-              <CardTitle className="text-blue-800">Resumo Final</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700">Salário Bruto</span>
-                <span className="font-semibold">
-                  {formatCurrency(paystub.summary.grossSalary)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700">(-) Total Descontos</span>
-                <span className="font-semibold text-red-600">
-                  {formatCurrency(paystub.summary.totalDeductions)}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center py-2 bg-blue-100 px-3 rounded">
-                <span className="font-bold text-blue-800">Salário Líquido</span>
-                <span className="font-bold text-blue-600 text-xl">
-                  {formatCurrency(paystub.summary.netSalary)}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-purple-50 to-violet-50 border-purple-200">
-            <CardHeader>
-              <CardTitle className="text-purple-800">Informações Adicionais</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700">Depósito FGTS (8%)</span>
-                <span className="font-semibold text-purple-600">
-                  {formatCurrency(paystub.summary.fgtsDeposit)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700">Base de Cálculo FGTS</span>
-                <span className="font-semibold">
-                  {formatCurrency(paystub.summary.fgtsDeposit * 12.5)}
-                </span>
-              </div>
-              <div className="text-xs text-gray-500 mt-2">
-                O FGTS é depositado mensalmente na conta vinculada quando aplicável.
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </Layout>
   );

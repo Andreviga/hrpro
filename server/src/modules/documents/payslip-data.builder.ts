@@ -1,6 +1,17 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { access } from 'node:fs/promises';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { resolveCompanyRegistry } from '../payroll/payslip-excel/company-registry';
+import {
+  buildPayslipFromExcel,
+  defaultExampleWorkbookPath,
+  loadWorkbook
+} from '../payroll/payslip-excel';
+import type {
+  LoadedWorkbook,
+  Payslip as LegacyPayslip,
+  PayslipWarning as LegacyPayslipWarning
+} from '../payroll/payslip-excel/types';
 
 export interface PayslipClassCompositionLine {
   code: string;
@@ -51,6 +62,12 @@ export interface Payslip {
   thirteenthInss: number;
   thirteenthIrrf: number;
   calculationBase: number;
+  title?: string;
+  referenceMonth?: string;
+  totalClassQuantity?: number | null;
+  classUnitValue?: number | null;
+  pix?: string;
+  sourceWarnings?: LegacyPayslipWarning[];
   createdAt: string;
 }
 
@@ -83,6 +100,11 @@ const toNumber = (value: unknown) => {
 const normalizeText = (value: unknown, fallback = '-') => {
   const text = String(value ?? '').trim();
   return text.length > 0 ? text : fallback;
+};
+
+const normalizeOptionalText = (value: unknown) => {
+  const text = String(value ?? '').trim();
+  return text.length > 0 ? text : null;
 };
 
 const formatDate = (value: Date | null | undefined) => {
@@ -140,8 +162,48 @@ const existsByMatcher = (
   });
 };
 
+const firstFiniteNumber = (...values: Array<number | null | undefined>) => {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Number(value.toFixed(2));
+    }
+  }
+
+  return null;
+};
+
+const firstNonEmptyText = (...values: Array<string | null | undefined>) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return null;
+};
+
+const sumRubricAmounts = (items: Array<{ amount: number }> | undefined) => {
+  return Number(
+    (items ?? []).reduce((sum, item) => sum + Number(item.amount ?? 0), 0).toFixed(2)
+  );
+};
+
+const competenceLabel = (month: number, year: number) => `${String(month).padStart(2, '0')}/${year}`;
+
+const LEGACY_CLASS_LINE_MAP: Record<string, { code: string; description: string }> = {
+  INFANTIL: { code: '1', description: 'ENSINO INFANTIL' },
+  EFI: { code: '2', description: 'ENSINO FUNDAMENTAL I' },
+  EFII: { code: '3', description: 'ENSINO FUNDAMENTAL II' },
+  EM: { code: '4', description: 'ENSINO MEDIO' },
+  RO: { code: '5', description: 'RO' },
+  AD_FUNCAO: { code: '6', description: 'AD FUNCAO / TURNO' }
+};
+
 @Injectable()
 export class PayslipDataBuilder {
+  private readonly logger = new Logger(PayslipDataBuilder.name);
+  private legacyWorkbookPromise: Promise<LoadedWorkbook | null> | null = null;
+
   constructor(private readonly prisma: PrismaService) {}
 
   async buildPayslip(employeeId: string, competence: BuildPayslipCompetenceInput): Promise<Payslip> {
@@ -343,11 +405,243 @@ export class PayslipDataBuilder {
         return (code.includes('13') && description.includes('IRRF')) || description.includes('IRRF 13');
       }),
       calculationBase: toNumber(payrollResult.grossSalary),
+      title: 'DEMONSTRATIVO DE PAGAMENTO',
+      referenceMonth: competenceLabel(competence.month, competence.year),
+      totalClassQuantity: 0,
+      classUnitValue: 0,
+      pix: normalizeOptionalText(payrollResult.employee.bankAccount) ?? undefined,
       createdAt: new Date().toISOString()
     };
 
-    this.validatePayslip(payslip);
-    return payslip;
+    const enrichedPayslip = await this.enrichWithLegacyWorkbook(payslip, payrollResult.employee, competence);
+
+    this.validatePayslip(enrichedPayslip);
+    return enrichedPayslip;
+  }
+
+  private async enrichWithLegacyWorkbook(
+    basePayslip: Payslip,
+    employee: { cpf?: string | null; fullName?: string | null },
+    competence: BuildPayslipCompetenceInput
+  ) {
+    const workbook = await this.getLegacyWorkbook();
+    if (!workbook) {
+      return basePayslip;
+    }
+
+    try {
+      const legacyPayslip = buildPayslipFromExcel({
+        workbook,
+        employeeKey: {
+          cpf: employee.cpf,
+          name: employee.fullName
+        },
+        competence: competenceLabel(competence.month, competence.year)
+      });
+
+      const requestedCompetence = competenceLabel(competence.month, competence.year);
+      const shouldMergeFinancialData = this.matchesCompetence(requestedCompetence, legacyPayslip.referenceMonth);
+
+      if (!shouldMergeFinancialData) {
+        this.logger.warn(
+          `Workbook competence mismatch for ${employee.cpf ?? employee.fullName ?? 'unknown'}: requested ${requestedCompetence}, workbook returned ${legacyPayslip.referenceMonth}`
+        );
+
+        legacyPayslip.warnings = [
+          ...legacyPayslip.warnings,
+          {
+            code: 'WORKBOOK_COMPETENCE_MISMATCH',
+            message: `A planilha carregada retornou a competencia ${legacyPayslip.referenceMonth ?? 'desconhecida'} para este colaborador, diferente da competencia solicitada ${requestedCompetence}. Os valores do banco foram mantidos para evitar mistura de meses.`,
+            fillLocation: 'Folha de pagamento de fevereiro 2026.xlsm',
+            sourceSheet: 'Folha de pagamento janeiro2026'
+          }
+        ];
+      }
+
+      return this.mergeWithLegacyPayslip(basePayslip, legacyPayslip, shouldMergeFinancialData);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown_error';
+      this.logger.warn(
+        `Unable to enrich payslip from workbook for employee ${employee.cpf ?? employee.fullName ?? 'unknown'}: ${message}`
+      );
+      return basePayslip;
+    }
+  }
+
+  private async getLegacyWorkbook() {
+    if (!this.legacyWorkbookPromise) {
+      this.legacyWorkbookPromise = this.loadLegacyWorkbook();
+    }
+
+    return this.legacyWorkbookPromise;
+  }
+
+  private async loadLegacyWorkbook() {
+    const workbookPath = process.env.HRPRO_PAYSLIP_WORKBOOK_PATH || defaultExampleWorkbookPath;
+
+    try {
+      await access(workbookPath);
+    } catch (_error) {
+      return null;
+    }
+
+    try {
+      return await loadWorkbook(workbookPath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown_error';
+      this.logger.warn(`Unable to load legacy payslip workbook ${workbookPath}: ${message}`);
+      return null;
+    }
+  }
+
+  private mergeWithLegacyPayslip(
+    basePayslip: Payslip,
+    legacyPayslip: LegacyPayslip,
+    includeFinancialData: boolean
+  ): Payslip {
+    const legacyClassComposition = this.mapLegacyClassComposition(legacyPayslip);
+    const legacyEarnings = legacyPayslip.earnings.map((item) => ({
+      code: normalizeText(item.payrollCode, 'EARNING'),
+      description: normalizeText(item.description, 'PROVENTO'),
+      amount: toNumber(item.amount),
+      type: 'earning' as const
+    }));
+    const legacyDeductions = legacyPayslip.deductions.map((item) => ({
+      code: normalizeText(item.payrollCode, 'DEDUCTION'),
+      description: normalizeText(item.description, 'DESCONTO'),
+      amount: toNumber(item.amount),
+      type: 'deduction' as const
+    }));
+
+    return {
+      ...basePayslip,
+      companyName: firstNonEmptyText(legacyPayslip.companyName, basePayslip.companyName) ?? basePayslip.companyName,
+      companyCnpj: firstNonEmptyText(legacyPayslip.companyCnpj, basePayslip.companyCnpj) ?? basePayslip.companyCnpj,
+      companyAddress:
+        firstNonEmptyText(legacyPayslip.companyAddress, basePayslip.companyAddress) ?? basePayslip.companyAddress,
+      employeeName: firstNonEmptyText(legacyPayslip.employeeName, basePayslip.employeeName) ?? basePayslip.employeeName,
+      employeeCpf: firstNonEmptyText(legacyPayslip.employeeCpf, basePayslip.employeeCpf) ?? basePayslip.employeeCpf,
+      employeeCode: firstNonEmptyText(legacyPayslip.employeeCode, basePayslip.employeeCode) ?? basePayslip.employeeCode,
+      employeeRole: firstNonEmptyText(legacyPayslip.employeeRole, basePayslip.employeeRole) ?? basePayslip.employeeRole,
+      admissionDate:
+        firstNonEmptyText(legacyPayslip.admissionDate, basePayslip.admissionDate) ?? basePayslip.admissionDate,
+      employeeEmail:
+        firstNonEmptyText(legacyPayslip.email, basePayslip.employeeEmail) ?? basePayslip.employeeEmail,
+      bank: firstNonEmptyText(legacyPayslip.bank, basePayslip.bank) ?? basePayslip.bank,
+      agency: firstNonEmptyText(legacyPayslip.agency, basePayslip.agency) ?? basePayslip.agency,
+      account: firstNonEmptyText(legacyPayslip.account, basePayslip.account) ?? basePayslip.account,
+      paymentMethod: firstNonEmptyText(basePayslip.paymentMethod, legacyPayslip.pix ? 'PIX' : null) ?? basePayslip.paymentMethod,
+      classComposition:
+        includeFinancialData && legacyClassComposition.length > 0 ? legacyClassComposition : basePayslip.classComposition,
+      earnings: includeFinancialData && legacyEarnings.length > 0 ? legacyEarnings : basePayslip.earnings,
+      deductions: includeFinancialData && legacyDeductions.length > 0 ? legacyDeductions : basePayslip.deductions,
+      grossSalary:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.grossSalary, basePayslip.grossSalary) ?? basePayslip.grossSalary
+          : basePayslip.grossSalary,
+      totalDiscounts:
+        includeFinancialData && legacyDeductions.length > 0
+          ? sumRubricAmounts(legacyDeductions)
+          : basePayslip.totalDiscounts,
+      netSalary:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.netSalary, basePayslip.netSalary) ?? basePayslip.netSalary
+          : basePayslip.netSalary,
+      fgts:
+        includeFinancialData ? firstFiniteNumber(legacyPayslip.fgts, basePayslip.fgts) ?? basePayslip.fgts : basePayslip.fgts,
+      inssBase:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.grossSalary, basePayslip.inssBase) ?? basePayslip.inssBase
+          : basePayslip.inssBase,
+      fgtsBase:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.grossSalary, basePayslip.fgtsBase) ?? basePayslip.fgtsBase
+          : basePayslip.fgtsBase,
+      irrfBase:
+        includeFinancialData
+          ? firstFiniteNumber(basePayslip.irrfBase, legacyPayslip.calculationBase) ?? basePayslip.irrfBase
+          : basePayslip.irrfBase,
+      foodAllowance:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.foodAllowance, basePayslip.foodAllowance) ?? basePayslip.foodAllowance
+          : basePayslip.foodAllowance,
+      alimony:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.pensionAlimony, basePayslip.alimony) ?? basePayslip.alimony
+          : basePayslip.alimony,
+      thirteenthSecondInstallment:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.thirteenthSecondInstallment, basePayslip.thirteenthSecondInstallment)
+            ?? basePayslip.thirteenthSecondInstallment
+          : basePayslip.thirteenthSecondInstallment,
+      thirteenthInss:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.thirteenthInss, basePayslip.thirteenthInss) ?? basePayslip.thirteenthInss
+          : basePayslip.thirteenthInss,
+      thirteenthIrrf:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.thirteenthIrrf, basePayslip.thirteenthIrrf) ?? basePayslip.thirteenthIrrf
+          : basePayslip.thirteenthIrrf,
+      calculationBase:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.calculationBase, basePayslip.calculationBase) ?? basePayslip.calculationBase
+          : basePayslip.calculationBase,
+      title: firstNonEmptyText(legacyPayslip.title, basePayslip.title) ?? basePayslip.title,
+      referenceMonth:
+        includeFinancialData
+          ? firstNonEmptyText(legacyPayslip.referenceMonth, basePayslip.referenceMonth) ?? basePayslip.referenceMonth
+          : basePayslip.referenceMonth,
+      totalClassQuantity:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.totalClassQuantity, basePayslip.totalClassQuantity) ?? basePayslip.totalClassQuantity
+          : basePayslip.totalClassQuantity,
+      classUnitValue:
+        includeFinancialData
+          ? firstFiniteNumber(legacyPayslip.classUnitValue, basePayslip.classUnitValue) ?? basePayslip.classUnitValue
+          : basePayslip.classUnitValue,
+      pix: firstNonEmptyText(legacyPayslip.pix, basePayslip.pix) ?? basePayslip.pix,
+      sourceWarnings: legacyPayslip.warnings,
+      createdAt: basePayslip.createdAt
+    };
+  }
+
+  private matchesCompetence(requestedCompetence: string, workbookCompetence?: string | null) {
+    const left = String(requestedCompetence ?? '').trim();
+    const right = String(workbookCompetence ?? '').trim();
+    if (!left || !right) {
+      return false;
+    }
+
+    return left === right;
+  }
+
+  private mapLegacyClassComposition(legacyPayslip: LegacyPayslip): PayslipClassCompositionLine[] {
+    const mapped = new Map<string, PayslipClassCompositionLine>();
+
+    for (const line of legacyPayslip.classComposition) {
+      const descriptor = LEGACY_CLASS_LINE_MAP[String(line.lineCode ?? '').toUpperCase()];
+      if (!descriptor) {
+        continue;
+      }
+
+      mapped.set(descriptor.code, {
+        code: descriptor.code,
+        description: descriptor.description,
+        quantity: toNumber(line.quantity),
+        unitValue: toNumber(line.unitValue),
+        totalValue: toNumber(line.totalValue)
+      });
+    }
+
+    return REQUIRED_CLASS_LINES.map((line) => {
+      return mapped.get(line.code) ?? {
+        code: line.code,
+        description: line.description,
+        quantity: 0,
+        unitValue: 0,
+        totalValue: 0
+      };
+    });
   }
 
   private validatePayslip(payslip: Payslip) {

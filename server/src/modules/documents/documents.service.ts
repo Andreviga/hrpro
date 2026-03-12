@@ -5,6 +5,9 @@ import { DocumentStatus } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 import { DocumentStorageService } from './document-storage.service';
+import { PayslipDataBuilder } from './payslip-data.builder';
+import { PayslipPdfService } from './payslip-pdf.service';
+import { renderPayslipHtml } from './payslip-template';
 
 const PLACEHOLDER_REGEX = /{{\s*([a-zA-Z0-9_.-]+)\s*}}/g;
 
@@ -324,7 +327,9 @@ export class DocumentsService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
-    private storage: DocumentStorageService
+    private storage: DocumentStorageService,
+    private payslipBuilder: PayslipDataBuilder,
+    private payslipPdf: PayslipPdfService
   ) {}
 
   private async getTemplateOrThrow(id: string, companyId: string) {
@@ -1019,6 +1024,81 @@ export class DocumentsService {
     };
   }
 
+  private async resolveDocumentOwnerUserId(document: {
+    companyId: string;
+    employeeId: string;
+    userId?: string | null;
+  }) {
+    if (document.userId && document.userId.trim().length > 0) {
+      return document.userId;
+    }
+
+    const ownerUser = await this.prisma.user.findFirst({
+      where: {
+        companyId: document.companyId,
+        employeeId: document.employeeId
+      },
+      select: { id: true }
+    });
+
+    return ownerUser?.id ?? document.employeeId;
+  }
+
+  private buildPayslipFilename(year?: number | null, month?: number | null) {
+    return `holerite-${year ?? 'sem-ano'}-${String(month ?? 0).padStart(2, '0')}.pdf`;
+  }
+
+  private async ensureStoredHoleriteFile(document: {
+    id: string;
+    companyId: string;
+    employeeId: string;
+    payrollRunId?: string | null;
+    userId?: string | null;
+    month?: number | null;
+    year?: number | null;
+    title: string;
+  }) {
+    if (!document.month || !document.year) {
+      throw new BadRequestException(
+        'Holerite sem competencia associada. Regenerate the document to export PDF.'
+      );
+    }
+
+    const payslip = await this.payslipBuilder.buildPayslip(document.employeeId, {
+      companyId: document.companyId,
+      payrollRunId: document.payrollRunId ?? undefined,
+      month: document.month,
+      year: document.year
+    });
+
+    const pdfBuffer = await this.payslipPdf.generatePayslipPdf(payslip);
+    const htmlContent = renderPayslipHtml(payslip);
+    const ownerUserId = await this.resolveDocumentOwnerUserId(document);
+
+    const saved = await this.storage.saveDocumentRecord({
+      companyId: document.companyId,
+      userId: ownerUserId,
+      employeeId: document.employeeId,
+      payrollRunId: document.payrollRunId ?? undefined,
+      documentType: 'holerite',
+      title: document.title,
+      competenceMonth: document.month,
+      competenceYear: document.year,
+      status: 'finalized',
+      filename: this.buildPayslipFilename(document.year, document.month),
+      pdfBuffer,
+      htmlContent,
+      documentId: document.id,
+      reason: 'regenerate_legacy_holerite_storage'
+    });
+
+    return {
+      buffer: pdfBuffer,
+      filename: saved.filePath.split('/').pop() || this.buildPayslipFilename(document.year, document.month),
+      contentType: 'application/pdf' as const
+    };
+  }
+
   async saveDocumentRecord(params: Parameters<DocumentStorageService['saveDocumentRecord']>[0]) {
     return this.storage.saveDocumentRecord(params);
   }
@@ -1043,33 +1123,53 @@ export class DocumentsService {
 
       const storedPath = this.storage.getStoredFilePath(document);
       if (storedPath) {
-        const buffer = await this.storage.readStoredPdf(storedPath);
-        const filename = storedPath.split('/').pop() || 'holerite.pdf';
+        try {
+          const buffer = await this.storage.readStoredPdf(storedPath);
+          const filename = storedPath.split('/').pop() || 'holerite.pdf';
 
-        await this.audit.log({
-          companyId: params.companyId,
-          userId: params.userId,
-          action: 'export',
-          entity: 'employee_document',
-          entityId: document.id,
-          after: {
-            format: 'pdf',
+          await this.audit.log({
+            companyId: params.companyId,
+            userId: params.userId,
+            action: 'export',
+            entity: 'employee_document',
+            entityId: document.id,
+            after: {
+              format: 'pdf',
+              filename,
+              source: 'stored_file',
+              exportedAt: new Date().toISOString()
+            }
+          });
+
+          return {
+            buffer,
             filename,
-            source: 'stored_file',
-            exportedAt: new Date().toISOString()
+            contentType: 'application/pdf'
+          };
+        } catch (error) {
+          if (!(error instanceof NotFoundException)) {
+            throw error;
           }
-        });
-
-        return {
-          buffer,
-          filename,
-          contentType: 'application/pdf'
         };
       }
 
-      throw new BadRequestException(
-        'Holerite file is not stored in fixed pipeline. Regenerate the document to export PDF.'
-      );
+      const regenerated = await this.ensureStoredHoleriteFile(document);
+
+      await this.audit.log({
+        companyId: params.companyId,
+        userId: params.userId,
+        action: 'export',
+        entity: 'employee_document',
+        entityId: document.id,
+        after: {
+          format: 'pdf',
+          filename: regenerated.filename,
+          source: 'regenerated_legacy_file',
+          exportedAt: new Date().toISOString()
+        }
+      });
+
+      return regenerated;
     }
 
     const employee = await this.prisma.employee.findUnique({ where: { id: document.employeeId } });

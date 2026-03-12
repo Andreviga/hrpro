@@ -22,10 +22,77 @@ export interface PaystubDetail {
     title: string;
     status: string;
     filePath: string;
+    storedFilePath?: string | null;
+    updatedAt?: string;
   } | null;
   company?: {
     name: string;
     cnpj: string;
+  };
+  payslip?: {
+    companyId: string;
+    companyName: string;
+    companyCnpj: string;
+    companyAddress: string;
+    employeeId: string;
+    employeeName: string;
+    employeeCpf: string;
+    employeeCode: string;
+    employeeRole: string;
+    admissionDate: string;
+    employeeEmail: string;
+    bank: string;
+    agency: string;
+    account: string;
+    paymentMethod: string;
+    competenceMonth: number;
+    competenceYear: number;
+    classComposition: Array<{
+      code: string;
+      description: string;
+      quantity: number;
+      unitValue: number;
+      totalValue: number;
+    }>;
+    earnings: Array<{
+      code: string;
+      description: string;
+      amount: number;
+      type: 'earning';
+    }>;
+    deductions: Array<{
+      code: string;
+      description: string;
+      amount: number;
+      type: 'deduction';
+    }>;
+    grossSalary: number;
+    totalDiscounts: number;
+    netSalary: number;
+    fgts: number;
+    inssBase: number;
+    fgtsBase: number;
+    irrfBase: number;
+    foodAllowance: number;
+    alimony: number;
+    thirteenthSecondInstallment: number;
+    thirteenthInss: number;
+    thirteenthIrrf: number;
+    calculationBase: number;
+    title?: string;
+    referenceMonth?: string;
+    totalClassQuantity?: number | null;
+    classUnitValue?: number | null;
+    pix?: string;
+    sourceWarnings?: Array<{
+      code: string;
+      message: string;
+      fillLocation?: string;
+      sourceSheet?: string;
+      sourceTable?: string;
+      sourceCell?: string;
+    }>;
+    createdAt: string;
   };
   employee?: {
     fullName?: string;
