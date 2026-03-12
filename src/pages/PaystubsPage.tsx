@@ -35,10 +35,15 @@ const PaystubsPage: React.FC = () => {
   const [error, setError] = useState('');
   const { toast } = useToast();
   const { user } = useAuth();
+  const isAdminWithoutEmployee = ['admin', 'rh', 'manager'].includes(user?.role ?? '') && !user?.employeeId;
 
   useEffect(() => {
+    if (isAdminWithoutEmployee) {
+      window.location.href = '#/admin/paystubs';
+      return;
+    }
     void loadPaystubs();
-  }, []);
+  }, [isAdminWithoutEmployee]);
 
   const loadPaystubs = async () => {
     try {
@@ -120,12 +125,12 @@ const PaystubsPage: React.FC = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        {['admin', 'rh', 'manager'].includes(user?.role ?? '') && !user?.employeeId && (
+        {isAdminWithoutEmployee && (
           <Card className="bg-amber-50 border-amber-200">
             <CardHeader>
               <CardTitle className="text-amber-900">Conta administrativa sem vínculo de funcionário</CardTitle>
               <CardDescription className="text-amber-800">
-                Esta tela mostra apenas holerites do próprio usuário. Para consulta de holerites da empresa, use os módulos administrativos de competência/folha.
+                Redirecionando para a visão administrativa com todos os holerites da empresa.
               </CardDescription>
             </CardHeader>
           </Card>

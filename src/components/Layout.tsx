@@ -13,10 +13,11 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const shouldUseAdminPaystubs = ['admin', 'rh', 'manager'].includes(user?.role ?? '') && !user?.employeeId;
 
   const navigation = [
     { name: 'Dashboard', href: '#/', icon: Home },
-    { name: 'Holerites', href: '#/paystubs', icon: FileText },
+    { name: 'Holerites', href: shouldUseAdminPaystubs ? '#/admin/paystubs' : '#/paystubs', icon: FileText },
     { name: 'Gestão Acadêmica', href: '#/calendar', icon: CalendarIcon },
     { name: 'Relatórios', href: '#/reports', icon: TrendingUp },
     { name: 'Documentos', href: '#/documents', icon: Upload },
