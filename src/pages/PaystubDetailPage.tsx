@@ -23,8 +23,12 @@ import {
   FileText,
   Pencil,
   Save,
-  Calculator
+  Calculator,
+  Utensils,
+  Gift
 } from 'lucide-react';
+
+const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
 const parseAmountInput = (value: string) => {
   const normalized = value
@@ -79,6 +83,24 @@ const sumClassQuantity = (paystub: PaystubDetail) => {
   return Number(paystub.payslip?.totalClassQuantity ?? 0);
 };
 
+const replaceOrInsertEarning = (
+  earnings: NonNullable<PaystubDetail['payslip']>['earnings'],
+  code: string,
+  description: string,
+  amount: number
+) => {
+  const next = earnings.filter((item) => item.code !== code);
+  if (amount > 0) {
+    next.push({
+      code,
+      description,
+      amount,
+      type: 'earning'
+    });
+  }
+  return next;
+};
+
 const buildFreeEditPayload = (paystub: PaystubDetail) => {
   const payslip = paystub.payslip;
 
@@ -102,7 +124,8 @@ const buildFreeEditPayload = (paystub: PaystubDetail) => {
       employeeCode: payslip?.employeeCode ?? paystub.employee?.employeeCode ?? '',
       pis: paystub.employee?.pis ?? '',
       weeklyHours: paystub.employee?.weeklyHours ?? 0,
-      transportVoucherValue: paystub.employee?.transportVoucherValue ?? 0
+      transportVoucherValue: paystub.employee?.transportVoucherValue ?? 0,
+      mealVoucherValue: paystub.employee?.mealVoucherValue ?? 0
     },
     payslipOverride: {
       title: payslip?.title,
@@ -162,6 +185,14 @@ const PaystubDetailPage: React.FC = () => {
     workDays: 22
   });
   const [savingTransport, setSavingTransport] = useState(false);
+  const [mealVoucherValue, setMealVoucherValue] = useState(0);
+  const [savingMealVoucher, setSavingMealVoucher] = useState(false);
+  const [bonusForm, setBonusForm] = useState({
+    code: 'BONUS_MANUAL',
+    description: 'Bonificação',
+    amount: 0
+  });
+  const [savingBonus, setSavingBonus] = useState(false);
 
   const canEdit = ['admin', 'rh', 'manager'].includes(user?.role ?? '');
 
@@ -188,6 +219,24 @@ const PaystubDetailPage: React.FC = () => {
       tripsPerDay: 2,
       workDays: estimatedWorkDays
     });
+
+    const currentMealVoucher = Number(
+      paystub.employee?.mealVoucherValue
+      ?? paystub.payslip?.foodAllowance
+      ?? paystub.earnings.mealVoucherCredit
+      ?? 0
+    );
+    setMealVoucherValue(roundCurrency(currentMealVoucher));
+
+    const currentBonus = Number(
+      paystub.payslip?.earnings?.find((item) => item.code === 'BONUS_MANUAL')?.amount
+      ?? paystub.earnings.otherBonuses
+      ?? 0
+    );
+    setBonusForm((current) => ({
+      ...current,
+      amount: roundCurrency(currentBonus)
+    }));
   }, [paystub]);
 
   const loadPaystubDetail = async (paystubId: string) => {
@@ -362,6 +411,124 @@ const PaystubDetailPage: React.FC = () => {
       });
     } finally {
       setSavingTransport(false);
+    }
+  };
+
+  const handleApplyMealVoucher = async () => {
+    if (!paystub || !canEdit) return;
+
+    const normalizedValue = roundCurrency(Math.max(0, mealVoucherValue));
+    const currentPayslip = paystub.payslip;
+
+    if (!currentPayslip) {
+      toast({
+        title: 'Holerite indisponível',
+        description: 'Não foi possível aplicar o vale-alimentação sem o payload do holerite.'
+      });
+      return;
+    }
+
+    const previousManualMeal = Number(
+      currentPayslip.earnings.find((item) => item.code === 'VA_BEN_MANUAL')?.amount ?? 0
+    );
+
+    const nextEarnings = replaceOrInsertEarning(
+      currentPayslip.earnings,
+      'VA_BEN_MANUAL',
+      'Vale Alimentação',
+      normalizedValue
+    );
+
+    const nextGrossSalary = roundCurrency(Number(currentPayslip.grossSalary ?? 0) - previousManualMeal + normalizedValue);
+    const currentTotalDiscounts = Number(currentPayslip.totalDiscounts ?? paystub.summary.totalDeductions ?? 0);
+    const nextNetSalary = roundCurrency(nextGrossSalary - currentTotalDiscounts);
+
+    try {
+      setSavingMealVoucher(true);
+      await apiService.updatePaystubContent(paystub.id, {
+        employee: {
+          mealVoucherValue: normalizedValue
+        },
+        payslipOverride: {
+          earnings: nextEarnings,
+          foodAllowance: normalizedValue,
+          grossSalary: nextGrossSalary,
+          netSalary: nextNetSalary,
+          calculationBase: nextGrossSalary
+        },
+        reason: 'simulador_vale_alimentacao'
+      });
+
+      await loadPaystubDetail(paystub.id);
+      toast({
+        title: 'Vale-alimentação aplicado',
+        description: 'Valor salvo no cadastro do funcionário e refletido no holerite.'
+      });
+    } catch (saveError) {
+      toast({
+        title: 'Falha ao aplicar vale-alimentação',
+        description: getFriendlyError(saveError, 'Não foi possível salvar o vale-alimentação.')
+      });
+    } finally {
+      setSavingMealVoucher(false);
+    }
+  };
+
+  const handleApplyBonus = async () => {
+    if (!paystub || !canEdit) return;
+
+    const normalizedAmount = roundCurrency(Math.max(0, bonusForm.amount));
+    const normalizedCode = (bonusForm.code || 'BONUS_MANUAL').trim().toUpperCase();
+    const normalizedDescription = (bonusForm.description || 'Bonificação').trim();
+    const currentPayslip = paystub.payslip;
+
+    if (!currentPayslip) {
+      toast({
+        title: 'Holerite indisponível',
+        description: 'Não foi possível aplicar a bonificação sem o payload do holerite.'
+      });
+      return;
+    }
+
+    const previousManualBonus = Number(
+      currentPayslip.earnings.find((item) => item.code === normalizedCode)?.amount ?? 0
+    );
+
+    const nextEarnings = replaceOrInsertEarning(
+      currentPayslip.earnings,
+      normalizedCode,
+      normalizedDescription,
+      normalizedAmount
+    );
+
+    const nextGrossSalary = roundCurrency(Number(currentPayslip.grossSalary ?? 0) - previousManualBonus + normalizedAmount);
+    const currentTotalDiscounts = Number(currentPayslip.totalDiscounts ?? paystub.summary.totalDeductions ?? 0);
+    const nextNetSalary = roundCurrency(nextGrossSalary - currentTotalDiscounts);
+
+    try {
+      setSavingBonus(true);
+      await apiService.updatePaystubContent(paystub.id, {
+        payslipOverride: {
+          earnings: nextEarnings,
+          grossSalary: nextGrossSalary,
+          netSalary: nextNetSalary,
+          calculationBase: nextGrossSalary
+        },
+        reason: 'bonificacao_manual_holerite'
+      });
+
+      await loadPaystubDetail(paystub.id);
+      toast({
+        title: 'Bonificação aplicada',
+        description: 'Bonificação registrada com sucesso no holerite.'
+      });
+    } catch (saveError) {
+      toast({
+        title: 'Falha ao aplicar bonificação',
+        description: getFriendlyError(saveError, 'Não foi possível aplicar a bonificação.')
+      });
+    } finally {
+      setSavingBonus(false);
     }
   };
 
@@ -724,6 +891,120 @@ const PaystubDetailPage: React.FC = () => {
             ) : null}
           </CardContent>
         </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Utensils className="h-5 w-5 text-emerald-700" />
+                Área de Vale-Alimentação
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="rounded-md border p-3 bg-emerald-50 border-emerald-200">
+                <p className="text-emerald-700">Valor atual no holerite</p>
+                <p className="text-lg font-semibold text-emerald-800">
+                  {formatCurrency(Number(payslip?.foodAllowance ?? paystub.earnings.mealVoucherCredit ?? 0))}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-gray-500 mb-1">Novo valor mensal (R$)</p>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="w-full rounded-md border px-3 py-2"
+                  value={mealVoucherValue}
+                  onChange={(e) => setMealVoucherValue(Number(e.target.value) || 0)}
+                />
+              </div>
+
+              <div className="rounded-md border p-3">
+                <p className="text-gray-700">
+                  Valor que será aplicado: <strong>{formatCurrency(Math.max(0, mealVoucherValue))}</strong>
+                </p>
+              </div>
+
+              {canEdit ? (
+                <Button onClick={() => void handleApplyMealVoucher()} disabled={savingMealVoucher}>
+                  {savingMealVoucher ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Aplicar vale-alimentação
+                </Button>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gift className="h-5 w-5 text-violet-700" />
+                Área de Bonificações
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-gray-500 mb-1">Código da rubrica</p>
+                  <input
+                    type="text"
+                    className="w-full rounded-md border px-3 py-2"
+                    value={bonusForm.code}
+                    onChange={(e) =>
+                      setBonusForm((current) => ({
+                        ...current,
+                        code: e.target.value
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Valor da bonificação (R$)</p>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="w-full rounded-md border px-3 py-2"
+                    value={bonusForm.amount}
+                    onChange={(e) =>
+                      setBonusForm((current) => ({
+                        ...current,
+                        amount: Number(e.target.value) || 0
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p className="text-gray-500 mb-1">Descrição</p>
+                <input
+                  type="text"
+                  className="w-full rounded-md border px-3 py-2"
+                  value={bonusForm.description}
+                  onChange={(e) =>
+                    setBonusForm((current) => ({
+                      ...current,
+                      description: e.target.value
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="rounded-md border p-3 bg-violet-50 border-violet-200">
+                <p className="text-violet-700">Bonificação configurada</p>
+                <p className="text-lg font-semibold text-violet-800">{formatCurrency(Math.max(0, bonusForm.amount))}</p>
+              </div>
+
+              {canEdit ? (
+                <Button onClick={() => void handleApplyBonus()} disabled={savingBonus}>
+                  {savingBonus ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Aplicar bonificação
+                </Button>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
           <CardHeader>

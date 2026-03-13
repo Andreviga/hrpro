@@ -175,6 +175,7 @@ export interface UpdatePaystubContentPayload {
     pis?: string;
     weeklyHours?: number;
     transportVoucherValue?: number;
+    mealVoucherValue?: number;
   };
   companyProfile?: {
     name?: string;

@@ -1537,6 +1537,7 @@ export class PayrollService {
       pis?: string;
       weeklyHours?: number;
       transportVoucherValue?: number;
+      mealVoucherValue?: number;
     };
     companyProfile?: {
       name?: string;
@@ -1618,6 +1619,14 @@ export class PayrollService {
           throw new BadRequestException('Valor de vale-transporte inválido.');
         }
         employeePatch.transportVoucherValue = this.roundMoney(transportValue);
+      }
+
+      if (params.employee.mealVoucherValue !== undefined) {
+        const mealValue = Number(params.employee.mealVoucherValue);
+        if (!Number.isFinite(mealValue) || mealValue < 0) {
+          throw new BadRequestException('Valor de vale-alimentação inválido.');
+        }
+        employeePatch.mealVoucherValue = this.roundMoney(mealValue);
       }
     }
 
