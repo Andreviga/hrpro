@@ -9,6 +9,30 @@ import { Payslip, PayslipDataBuilder } from '../documents/payslip-data.builder';
 import { PayslipPdfService } from '../documents/payslip-pdf.service';
 import { renderPayslipHtml } from '../documents/payslip-template';
 
+interface CompanyProfileConfig {
+  name: string;
+  cnpj: string;
+  address: string;
+  logoUrl?: string;
+}
+
+type EditablePayslipOverride = Partial<Payslip>;
+
+const SYSTEM_CONFIG_KEY = 'system_config';
+
+const DEFAULT_COMPANY_PROFILES: CompanyProfileConfig[] = [
+  {
+    name: 'Raizes Centro Educacional',
+    cnpj: '20.755.729/0001-85',
+    address: 'Rua Diogo de Sousa, 251, Cidade Lider, Sao Paulo/SP, CEP 08285-330'
+  },
+  {
+    name: 'Raizes Recreacao Infantil',
+    cnpj: '59.946.400/0001-37',
+    address: 'Rua Diogo de Sousa, 257, Cidade Lider, Sao Paulo/SP, CEP 08285-330'
+  }
+];
+
 @Injectable()
 export class PayrollService {
   private queue: Queue;
@@ -47,6 +71,237 @@ export class PayrollService {
 
     this.payslipBuilder = payslipBuilder ?? this.missingPayslipBuilder;
     this.payslipPdf = payslipPdf ?? this.missingPayslipPdf;
+  }
+
+  private onlyDigits(value: string | null | undefined) {
+    return String(value ?? '').replace(/\D+/g, '');
+  }
+
+  private formatCnpj(value: string | null | undefined) {
+    const digits = this.onlyDigits(value);
+    if (digits.length !== 14) return String(value ?? '').trim();
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+  }
+
+  private roundMoney(value: number) {
+    if (!Number.isFinite(value)) return 0;
+    return Math.round(value * 100) / 100;
+  }
+
+  private asMoney(value: unknown) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return this.roundMoney(parsed);
+  }
+
+  private asText(value: unknown) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private async getSystemConfig(companyId: string): Promise<Record<string, unknown>> {
+    const configRow = await this.prisma.systemConfig.findUnique({
+      where: {
+        companyId_key: {
+          companyId,
+          key: SYSTEM_CONFIG_KEY
+        }
+      }
+    });
+
+    if (!configRow || !this.isObject(configRow.value)) {
+      return {};
+    }
+
+    return configRow.value;
+  }
+
+  private async saveSystemConfig(companyId: string, value: Record<string, unknown>) {
+    await this.prisma.systemConfig.upsert({
+      where: {
+        companyId_key: {
+          companyId,
+          key: SYSTEM_CONFIG_KEY
+        }
+      },
+      create: {
+        companyId,
+        key: SYSTEM_CONFIG_KEY,
+        value
+      },
+      update: {
+        value
+      }
+    });
+  }
+
+  private getCompanyProfiles(config: Record<string, unknown>) {
+    const fromConfig = Array.isArray(config.companyProfiles)
+      ? config.companyProfiles.filter((item): item is Record<string, unknown> => this.isObject(item))
+      : [];
+
+    const merged = new Map<string, CompanyProfileConfig>();
+    for (const profile of DEFAULT_COMPANY_PROFILES) {
+      const cnpjDigits = this.onlyDigits(profile.cnpj);
+      if (!cnpjDigits) continue;
+      merged.set(cnpjDigits, {
+        ...profile,
+        cnpj: this.formatCnpj(profile.cnpj)
+      });
+    }
+
+    for (const profile of fromConfig) {
+      const cnpjDigits = this.onlyDigits(String(profile.cnpj ?? ''));
+      if (cnpjDigits.length !== 14) continue;
+
+      const previous = merged.get(cnpjDigits);
+      const next: CompanyProfileConfig = {
+        name: this.asText(profile.name) ?? previous?.name ?? '-',
+        cnpj: this.formatCnpj(cnpjDigits),
+        address: this.asText(profile.address) ?? previous?.address ?? '-',
+        logoUrl: this.asText(profile.logoUrl) ?? previous?.logoUrl
+      };
+
+      merged.set(cnpjDigits, next);
+    }
+
+    return Array.from(merged.values());
+  }
+
+  private getPaystubOverrides(config: Record<string, unknown>) {
+    if (!this.isObject(config.paystubOverrides)) {
+      return {} as Record<string, EditablePayslipOverride>;
+    }
+
+    const output: Record<string, EditablePayslipOverride> = {};
+    for (const [paystubId, payload] of Object.entries(config.paystubOverrides)) {
+      if (this.isObject(payload)) {
+        output[paystubId] = payload as EditablePayslipOverride;
+      }
+    }
+
+    return output;
+  }
+
+  private resolveCompanyProfile(
+    profiles: CompanyProfileConfig[],
+    employeeEmployerCnpj?: string | null,
+    fallbackCompanyCnpj?: string | null
+  ) {
+    const byEmployee = this.onlyDigits(employeeEmployerCnpj);
+    const byCompany = this.onlyDigits(fallbackCompanyCnpj);
+
+    if (byEmployee.length === 14) {
+      const found = profiles.find((profile) => this.onlyDigits(profile.cnpj) === byEmployee);
+      if (found) return found;
+    }
+
+    if (byCompany.length === 14) {
+      const found = profiles.find((profile) => this.onlyDigits(profile.cnpj) === byCompany);
+      if (found) return found;
+    }
+
+    return null;
+  }
+
+  private parseClassComposition(input: unknown, fallback: Payslip['classComposition']) {
+    if (!Array.isArray(input)) {
+      return fallback;
+    }
+
+    const parsed = input
+      .filter((row) => this.isObject(row))
+      .map((row) => {
+        const quantity = this.asMoney(row.quantity);
+        const unitValue = this.asMoney(row.unitValue);
+        const totalValue = this.asMoney(row.totalValue);
+        return {
+          code: this.asText(row.code) ?? '-',
+          description: this.asText(row.description) ?? '-',
+          quantity: quantity ?? 0,
+          unitValue: unitValue ?? 0,
+          totalValue: totalValue ?? 0
+        };
+      });
+
+    return parsed.length > 0 ? parsed : fallback;
+  }
+
+  private parseRubrics(
+    input: unknown,
+    type: 'earning' | 'deduction',
+    fallback: Payslip['earnings'] | Payslip['deductions']
+  ) {
+    if (!Array.isArray(input)) {
+      return fallback;
+    }
+
+    const parsed = input
+      .filter((row) => this.isObject(row))
+      .map((row) => ({
+        code: this.asText(row.code) ?? '-',
+        description: this.asText(row.description) ?? '-',
+        amount: this.asMoney(row.amount) ?? 0,
+        type
+      }));
+
+    return parsed.length > 0 ? parsed : fallback;
+  }
+
+  private applyPayslipOverride(
+    base: Payslip,
+    companyProfile: CompanyProfileConfig | null,
+    override: EditablePayslipOverride | undefined
+  ): Payslip {
+    const nextOverride = override ?? {};
+
+    const classComposition = this.parseClassComposition(nextOverride.classComposition, base.classComposition);
+    const earnings = this.parseRubrics(nextOverride.earnings, 'earning', base.earnings) as Payslip['earnings'];
+    const deductions = this.parseRubrics(nextOverride.deductions, 'deduction', base.deductions) as Payslip['deductions'];
+
+    const earningsTotal = this.roundMoney(earnings.reduce((sum, row) => sum + Number(row.amount ?? 0), 0));
+    const deductionsTotal = this.roundMoney(deductions.reduce((sum, row) => sum + Number(row.amount ?? 0), 0));
+
+    const grossSalary = this.asMoney(nextOverride.grossSalary) ?? (nextOverride.earnings ? earningsTotal : base.grossSalary);
+    const totalDiscounts =
+      this.asMoney(nextOverride.totalDiscounts)
+      ?? (nextOverride.deductions ? deductionsTotal : base.totalDiscounts);
+    const netSalary = this.asMoney(nextOverride.netSalary) ?? this.roundMoney(Number(grossSalary ?? 0) - Number(totalDiscounts ?? 0));
+
+    const totalClassQuantity =
+      this.asMoney(nextOverride.totalClassQuantity)
+      ?? this.roundMoney(classComposition.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0));
+
+    const companyName = this.asText(nextOverride.companyName) ?? companyProfile?.name ?? base.companyName;
+    const companyCnpj =
+      this.asText(nextOverride.companyCnpj)
+      ?? (companyProfile?.cnpj ? this.formatCnpj(companyProfile.cnpj) : base.companyCnpj);
+    const companyAddress = this.asText(nextOverride.companyAddress) ?? companyProfile?.address ?? base.companyAddress;
+    const companyLogoUrl = this.asText(nextOverride.companyLogoUrl) ?? companyProfile?.logoUrl ?? base.companyLogoUrl;
+
+    return {
+      ...base,
+      ...nextOverride,
+      companyName,
+      companyCnpj,
+      companyAddress,
+      companyLogoUrl,
+      classComposition,
+      earnings,
+      deductions,
+      grossSalary: grossSalary ?? 0,
+      totalDiscounts: totalDiscounts ?? 0,
+      netSalary,
+      totalClassQuantity,
+      classUnitValue: this.asMoney(nextOverride.classUnitValue) ?? base.classUnitValue
+    };
   }
 
   async createRun(companyId: string, month: number, year: number) {
@@ -883,6 +1138,25 @@ export class PayrollService {
         });
       });
 
+    const systemConfig = await this.getSystemConfig(result.payrollRun.companyId);
+    const companyProfiles = this.getCompanyProfiles(systemConfig);
+    const companyProfile = this.resolveCompanyProfile(
+      companyProfiles,
+      result.employee.employerCnpj,
+      result.payrollRun.company.cnpj
+    );
+    const paystubOverrides = this.getPaystubOverrides(systemConfig);
+    const effectivePayslip = this.applyPayslipOverride(
+      payslip,
+      companyProfile,
+      paystubOverrides[paystubId]
+    );
+
+    const summaryGross = Number(effectivePayslip.grossSalary ?? result.grossSalary);
+    const summaryDeductions = Number(effectivePayslip.totalDiscounts ?? result.totalDeductions);
+    const summaryNet = Number(effectivePayslip.netSalary ?? result.netSalary);
+    const summaryFgts = Number(effectivePayslip.fgts ?? result.fgts);
+
     const events = result.events
       .map((event) => ({
         id: event.id,
@@ -901,8 +1175,8 @@ export class PayrollService {
     return {
       id: result.id,
       company: {
-        name: result.payrollRun.company.name,
-        cnpj: result.payrollRun.company.cnpj
+        name: effectivePayslip.companyName,
+        cnpj: effectivePayslip.companyCnpj
       },
       employee: {
         fullName: result.employee.fullName,
@@ -938,7 +1212,7 @@ export class PayrollService {
             updatedAt: paystubDocument.updatedAt
           }
         : null,
-      payslip,
+      payslip: effectivePayslip,
       earnings: {
         baseSalary: sumByCode(earnings, 'BASE'),
         overtimeValue: sumByCode(earnings, 'EXTRA'),
@@ -964,10 +1238,10 @@ export class PayrollService {
         dependentDeduction
       },
       summary: {
-        grossSalary: Number(result.grossSalary),
-        totalDeductions: Number(result.totalDeductions),
-        netSalary: Number(result.netSalary),
-        fgtsDeposit: Number(result.fgts)
+        grossSalary: summaryGross,
+        totalDeductions: summaryDeductions,
+        netSalary: summaryNet,
+        fgtsDeposit: summaryFgts
       }
     };
   }
@@ -1089,43 +1363,19 @@ export class PayrollService {
       throw new NotFoundException('Paystub not found');
     }
 
-    await this.getPaystubDetail(params.paystubId, params.requester);
-
-    let documentId: string | null = null;
-    const existing = await this.prisma.employeeDocument.findFirst({
-      where: {
-        companyId: params.requester.companyId,
-        payrollRunId: paystub.payrollRunId,
-        employeeId: paystub.employeeId,
-        type: 'holerite' as any,
-        deletedAt: null
-      },
-      orderBy: { updatedAt: 'desc' },
-      select: { id: true }
-    });
-
-    if (existing?.id) {
-      documentId = existing.id;
-    } else {
-      const generated = await this.generateFixedPayslipDocument({
-        companyId: params.requester.companyId,
-        payrollRunId: paystub.payrollRunId,
-        month: paystub.payrollRun.month,
-        year: paystub.payrollRun.year,
-        employeeId: paystub.employeeId,
-        actorUserId: params.userId,
-        reason: 'generate_on_demand_paystub_pdf'
-      });
-      documentId = generated.id;
+    const detail = await this.getPaystubDetail(params.paystubId, params.requester);
+    if (!detail?.payslip) {
+      throw new BadRequestException('Nao foi possivel montar os dados do holerite para gerar o PDF.');
     }
 
-    return this.documents.exportDocumentFile({
-      id: documentId,
-      companyId: params.requester.companyId,
-      userId: params.userId ?? '',
-      role: params.requester.role,
-      format: 'pdf'
-    });
+    const buffer = await this.payslipPdf.generatePayslipPdf(detail.payslip);
+    const filename = `holerite-${detail.year}-${String(detail.month).padStart(2, '0')}-${detail.id}.pdf`;
+
+    return {
+      buffer,
+      filename,
+      contentType: 'application/pdf'
+    };
   }
 
   async updatePaystubEvent(params: {
@@ -1262,6 +1512,193 @@ export class PayrollService {
       }
     };
   }
+
+  async updatePaystubContent(params: {
+    paystubId: string;
+    companyId: string;
+    userId?: string;
+    employee?: {
+      fullName?: string;
+      cpf?: string;
+      position?: string;
+      admissionDate?: string;
+      email?: string;
+      bankName?: string;
+      bankAgency?: string;
+      bankAccount?: string;
+      paymentMethod?: string;
+      employeeCode?: string;
+      pis?: string;
+      weeklyHours?: number;
+      transportVoucherValue?: number;
+    };
+    companyProfile?: {
+      name?: string;
+      cnpj?: string;
+      address?: string;
+      logoUrl?: string;
+    };
+    payslipOverride?: Record<string, unknown>;
+    reason?: string;
+  }) {
+    const paystub = await this.prisma.payrollResult.findUnique({
+      where: { id: params.paystubId },
+      include: {
+        payrollRun: { include: { company: true } },
+        employee: true
+      }
+    });
+
+    if (!paystub || paystub.payrollRun.companyId !== params.companyId) {
+      throw new NotFoundException('Paystub not found');
+    }
+
+    const employeePatch: Record<string, unknown> = {};
+    if (params.employee) {
+      const fullName = this.asText(params.employee.fullName);
+      if (fullName) employeePatch.fullName = fullName;
+
+      if (params.employee.cpf !== undefined) {
+        const cpf = this.onlyDigits(params.employee.cpf);
+        if (cpf.length !== 11) {
+          throw new BadRequestException('CPF invalido. Informe 11 digitos.');
+        }
+        employeePatch.cpf = cpf;
+      }
+
+      const position = this.asText(params.employee.position);
+      if (position) employeePatch.position = position;
+
+      if (params.employee.admissionDate !== undefined) {
+        const parsedDate = new Date(String(params.employee.admissionDate));
+        if (Number.isNaN(parsedDate.getTime())) {
+          throw new BadRequestException('Data de admissao invalida.');
+        }
+        employeePatch.admissionDate = parsedDate;
+      }
+
+      const email = this.asText(params.employee.email);
+      if (email) employeePatch.email = email;
+
+      const bankName = this.asText(params.employee.bankName);
+      if (bankName) employeePatch.bankName = bankName;
+
+      const bankAgency = this.asText(params.employee.bankAgency);
+      if (bankAgency) employeePatch.bankAgency = bankAgency;
+
+      const bankAccount = this.asText(params.employee.bankAccount);
+      if (bankAccount) employeePatch.bankAccount = bankAccount;
+
+      const paymentMethod = this.asText(params.employee.paymentMethod);
+      if (paymentMethod) employeePatch.paymentMethod = paymentMethod;
+
+      const employeeCode = this.asText(params.employee.employeeCode);
+      if (employeeCode) employeePatch.employeeCode = employeeCode;
+
+      const pis = this.asText(params.employee.pis);
+      if (pis) employeePatch.pis = pis;
+
+      if (params.employee.weeklyHours !== undefined) {
+        const weeklyHours = Number(params.employee.weeklyHours);
+        if (!Number.isFinite(weeklyHours) || weeklyHours < 0) {
+          throw new BadRequestException('Carga horaria semanal invalida.');
+        }
+        employeePatch.weeklyHours = this.roundMoney(weeklyHours);
+      }
+
+      if (params.employee.transportVoucherValue !== undefined) {
+        const transportValue = Number(params.employee.transportVoucherValue);
+        if (!Number.isFinite(transportValue) || transportValue < 0) {
+          throw new BadRequestException('Valor de vale-transporte invalido.');
+        }
+        employeePatch.transportVoucherValue = this.roundMoney(transportValue);
+      }
+    }
+
+    if (Object.keys(employeePatch).length > 0) {
+      await this.prisma.employee.update({
+        where: { id: paystub.employeeId },
+        data: employeePatch
+      });
+    }
+
+    let config = await this.getSystemConfig(params.companyId);
+    let configChanged = false;
+
+    if (params.companyProfile) {
+      const companyProfiles = this.getCompanyProfiles(config);
+      const cnpjDigits = this.onlyDigits(
+        params.companyProfile.cnpj
+        ?? paystub.employee.employerCnpj
+        ?? paystub.payrollRun.company.cnpj
+      );
+
+      if (cnpjDigits.length !== 14) {
+        throw new BadRequestException('CNPJ invalido para o perfil da empresa.');
+      }
+
+      const existing = companyProfiles.find((item) => this.onlyDigits(item.cnpj) === cnpjDigits);
+      const profile: CompanyProfileConfig = {
+        name: this.asText(params.companyProfile.name) ?? existing?.name ?? paystub.payrollRun.company.name,
+        cnpj: this.formatCnpj(cnpjDigits),
+        address: this.asText(params.companyProfile.address) ?? existing?.address ?? '-',
+        logoUrl: this.asText(params.companyProfile.logoUrl) ?? existing?.logoUrl
+      };
+
+      const nextProfiles = [
+        ...companyProfiles.filter((item) => this.onlyDigits(item.cnpj) !== cnpjDigits),
+        profile
+      ].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
+
+      config = {
+        ...config,
+        companyProfiles: nextProfiles
+      };
+      configChanged = true;
+    }
+
+    if (this.isObject(params.payslipOverride)) {
+      const overrides = this.getPaystubOverrides(config);
+      const previous = overrides[params.paystubId] ?? {};
+
+      overrides[params.paystubId] = {
+        ...previous,
+        ...params.payslipOverride,
+        updatedAt: new Date().toISOString(),
+        updatedBy: params.userId ?? null
+      };
+
+      config = {
+        ...config,
+        paystubOverrides: overrides
+      };
+      configChanged = true;
+    }
+
+    if (configChanged) {
+      await this.saveSystemConfig(params.companyId, config);
+    }
+
+    await this.audit.log({
+      companyId: params.companyId,
+      userId: params.userId,
+      action: 'update_paystub_content',
+      entity: 'paystub',
+      entityId: params.paystubId,
+      reason: params.reason,
+      after: {
+        employeeUpdated: Object.keys(employeePatch).length > 0,
+        configUpdated: configChanged,
+        overrideUpdated: this.isObject(params.payslipOverride)
+      }
+    });
+
+    return this.getPaystubDetail(params.paystubId, {
+      companyId: params.companyId,
+      role: 'admin'
+    });
+  }
+
   private normalizeEventLabel(value: string) {
     return String(value || '')
       .normalize('NFD')

@@ -25,6 +25,18 @@ body {
   margin-bottom: 8px;
 }
 
+.company-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.company-logo {
+  max-height: 52px;
+  max-width: 220px;
+  object-fit: contain;
+}
+
 .header h1 {
   margin: 0 0 6px;
   text-align: center;

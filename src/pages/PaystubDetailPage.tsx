@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
+import { Textarea } from '../components/ui/textarea';
 import { apiService, PaystubDetail } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/use-toast';
@@ -20,7 +21,9 @@ import {
   Calendar,
   Loader2,
   FileText,
-  Pencil
+  Pencil,
+  Save,
+  Calculator
 } from 'lucide-react';
 
 const parseAmountInput = (value: string) => {
@@ -69,6 +72,79 @@ const buildRubricRows = (paystub: PaystubDetail) => {
   }));
 };
 
+const sumClassQuantity = (paystub: PaystubDetail) => {
+  const classRows = paystub.payslip?.classComposition ?? [];
+  const totalFromRows = classRows.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0);
+  if (totalFromRows > 0) return totalFromRows;
+  return Number(paystub.payslip?.totalClassQuantity ?? 0);
+};
+
+const buildFreeEditPayload = (paystub: PaystubDetail) => {
+  const payslip = paystub.payslip;
+
+  return {
+    companyProfile: {
+      name: payslip?.companyName ?? paystub.company?.name ?? '',
+      cnpj: payslip?.companyCnpj ?? paystub.company?.cnpj ?? '',
+      address: payslip?.companyAddress ?? '',
+      logoUrl: payslip?.companyLogoUrl ?? ''
+    },
+    employee: {
+      fullName: payslip?.employeeName ?? paystub.employee?.fullName ?? '',
+      cpf: payslip?.employeeCpf ?? paystub.employee?.cpf ?? '',
+      position: payslip?.employeeRole ?? paystub.employee?.position ?? '',
+      admissionDate: payslip?.admissionDate ?? '',
+      email: payslip?.employeeEmail ?? paystub.employee?.email ?? '',
+      bankName: payslip?.bank ?? paystub.employee?.bankName ?? '',
+      bankAgency: payslip?.agency ?? paystub.employee?.bankAgency ?? '',
+      bankAccount: payslip?.account ?? paystub.employee?.bankAccount ?? '',
+      paymentMethod: payslip?.paymentMethod ?? paystub.employee?.paymentMethod ?? '',
+      employeeCode: payslip?.employeeCode ?? paystub.employee?.employeeCode ?? '',
+      pis: paystub.employee?.pis ?? '',
+      weeklyHours: paystub.employee?.weeklyHours ?? 0,
+      transportVoucherValue: paystub.employee?.transportVoucherValue ?? 0
+    },
+    payslipOverride: {
+      title: payslip?.title,
+      referenceMonth: payslip?.referenceMonth,
+      companyName: payslip?.companyName,
+      companyCnpj: payslip?.companyCnpj,
+      companyAddress: payslip?.companyAddress,
+      companyLogoUrl: payslip?.companyLogoUrl,
+      employeeName: payslip?.employeeName,
+      employeeCpf: payslip?.employeeCpf,
+      employeeCode: payslip?.employeeCode,
+      employeeRole: payslip?.employeeRole,
+      admissionDate: payslip?.admissionDate,
+      employeeEmail: payslip?.employeeEmail,
+      bank: payslip?.bank,
+      agency: payslip?.agency,
+      account: payslip?.account,
+      paymentMethod: payslip?.paymentMethod,
+      classComposition: payslip?.classComposition ?? [],
+      earnings: payslip?.earnings ?? [],
+      deductions: payslip?.deductions ?? [],
+      grossSalary: payslip?.grossSalary ?? paystub.summary.grossSalary,
+      totalDiscounts: payslip?.totalDiscounts ?? paystub.summary.totalDeductions,
+      netSalary: payslip?.netSalary ?? paystub.summary.netSalary,
+      fgts: payslip?.fgts ?? paystub.summary.fgtsDeposit,
+      inssBase: payslip?.inssBase ?? paystub.bases?.inssBase,
+      fgtsBase: payslip?.fgtsBase ?? paystub.bases?.fgtsBase,
+      irrfBase: payslip?.irrfBase ?? paystub.bases?.irrfBase,
+      foodAllowance: payslip?.foodAllowance,
+      alimony: payslip?.alimony,
+      thirteenthSecondInstallment: payslip?.thirteenthSecondInstallment,
+      thirteenthInss: payslip?.thirteenthInss,
+      thirteenthIrrf: payslip?.thirteenthIrrf,
+      calculationBase: payslip?.calculationBase,
+      totalClassQuantity: payslip?.totalClassQuantity,
+      classUnitValue: payslip?.classUnitValue,
+      pix: payslip?.pix
+    },
+    reason: 'edicao_livre_holerite'
+  };
+};
+
 const PaystubDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -78,6 +154,14 @@ const PaystubDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingEventId, setUpdatingEventId] = useState<string | null>(null);
+  const [freeEditJson, setFreeEditJson] = useState('');
+  const [savingFreeEdit, setSavingFreeEdit] = useState(false);
+  const [transportForm, setTransportForm] = useState({
+    farePerTrip: 5,
+    tripsPerDay: 2,
+    workDays: 22
+  });
+  const [savingTransport, setSavingTransport] = useState(false);
 
   const canEdit = ['admin', 'rh', 'manager'].includes(user?.role ?? '');
 
@@ -86,6 +170,25 @@ const PaystubDetailPage: React.FC = () => {
       void loadPaystubDetail(id);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!paystub) return;
+
+    setFreeEditJson(JSON.stringify(buildFreeEditPayload(paystub), null, 2));
+
+    const classQuantity = sumClassQuantity(paystub);
+    const weeklyHours = Number(paystub.employee?.weeklyHours ?? 0);
+    const estimatedWorkDays =
+      weeklyHours > 0 && classQuantity > 0
+        ? Math.max(1, Math.round((classQuantity / weeklyHours) * 5))
+        : 22;
+
+    setTransportForm({
+      farePerTrip: 5,
+      tripsPerDay: 2,
+      workDays: estimatedWorkDays
+    });
+  }, [paystub]);
 
   const loadPaystubDetail = async (paystubId: string) => {
     try {
@@ -133,7 +236,7 @@ const PaystubDetailPage: React.FC = () => {
       if (err.isValidationError && err.missingFields && err.missingFields.length > 0) {
         toast({
           title: 'Holerite com dados incompletos',
-          description: `Campos ausentes: ${err.missingFields.join(', ')}. Complete a planilha e reimporte.`
+          description: `Campos ausentes: ${err.missingFields.join(', ')}. Voce pode ajustar na edicao livre e tentar novamente.`
         });
       } else {
         toast({
@@ -189,6 +292,79 @@ const PaystubDetailPage: React.FC = () => {
     }
   };
 
+  const handleSaveFreeEdit = async () => {
+    if (!paystub || !canEdit) return;
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(freeEditJson);
+    } catch {
+      toast({
+        title: 'JSON inválido',
+        description: 'Revise a estrutura antes de salvar as alterações.'
+      });
+      return;
+    }
+
+    try {
+      setSavingFreeEdit(true);
+      await apiService.updatePaystubContent(paystub.id, payload as any);
+      await loadPaystubDetail(paystub.id);
+      toast({
+        title: 'Holerite atualizado',
+        description: 'As alterações livres foram salvas com sucesso.'
+      });
+    } catch (saveError) {
+      toast({
+        title: 'Falha ao salvar edição livre',
+        description: getFriendlyError(saveError, 'Nao foi possível salvar os campos do holerite.')
+      });
+    } finally {
+      setSavingFreeEdit(false);
+    }
+  };
+
+  const handleApplyTransportValue = async () => {
+    if (!paystub || !canEdit) return;
+
+    const grossSalary = Number(paystub.payslip?.grossSalary ?? paystub.summary.grossSalary ?? 0);
+    const grossVoucher = Math.max(0, transportForm.farePerTrip * transportForm.tripsPerDay * transportForm.workDays);
+    const legalDiscountLimit = grossSalary * 0.06;
+    const suggestedDiscount = Math.min(grossVoucher, legalDiscountLimit);
+
+    try {
+      setSavingTransport(true);
+      await apiService.updatePaystubContent(paystub.id, {
+        employee: {
+          transportVoucherValue: Number(grossVoucher.toFixed(2))
+        },
+        payslipOverride: {
+          totalDiscounts: Number(
+            (
+              Number(paystub.payslip?.totalDiscounts ?? paystub.summary.totalDeductions ?? 0)
+              - Number(paystub.deductions.transportVoucherDeduction ?? 0)
+              + suggestedDiscount
+            ).toFixed(2)
+          )
+        },
+        reason: 'simulador_vale_transporte'
+      });
+
+      await loadPaystubDetail(paystub.id);
+      toast({
+        title: 'Vale-transporte aplicado',
+        description: 'Valor mensal do vale-transporte salvo no cadastro do funcionario.'
+      });
+    } catch (saveError) {
+      toast({
+        title: 'Falha ao aplicar vale-transporte',
+        description: getFriendlyError(saveError, 'Nao foi possível salvar o vale-transporte.')
+      });
+    } finally {
+      setSavingTransport(false);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -217,6 +393,13 @@ const PaystubDetailPage: React.FC = () => {
 
   const payslip = paystub.payslip;
   const rubricRows = buildRubricRows(paystub);
+  const classQuantity = sumClassQuantity(paystub);
+  const weeklyHours = Number(paystub.employee?.weeklyHours ?? 0);
+  const grossSalaryForTransport = Number(payslip?.grossSalary ?? paystub.summary.grossSalary ?? 0);
+  const transportGrossValue = Math.max(0, transportForm.farePerTrip * transportForm.tripsPerDay * transportForm.workDays);
+  const legalTransportLimit = grossSalaryForTransport * 0.06;
+  const suggestedPayrollDiscount = Math.min(transportGrossValue, legalTransportLimit);
+  const suggestedCompanyCredit = Math.max(0, transportGrossValue - suggestedPayrollDiscount);
 
   return (
     <Layout>
@@ -278,6 +461,20 @@ const PaystubDetailPage: React.FC = () => {
             <div className="md:col-span-2 xl:col-span-4">
               <p className="text-gray-500">Endereço</p>
               <p className="font-medium text-gray-900">{payslip?.companyAddress ?? '-'}</p>
+            </div>
+            <div className="md:col-span-2 xl:col-span-4">
+              <p className="text-gray-500">Logotipo da empresa</p>
+              {payslip?.companyLogoUrl ? (
+                <div className="mt-2 rounded-md border p-3 inline-flex bg-white">
+                  <img
+                    src={payslip.companyLogoUrl}
+                    alt="Logo da empresa"
+                    className="max-h-16 max-w-56 object-contain"
+                  />
+                </div>
+              ) : (
+                <p className="font-medium text-gray-900">Nao informado</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -426,6 +623,110 @@ const PaystubDetailPage: React.FC = () => {
 
         <Card>
           <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5 text-blue-700" />
+              Simulador de Vale-Transporte (folha + carga de aulas)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-md border p-3">
+                <p className="text-gray-500">Carga de aulas (planilha)</p>
+                <p className="text-xl font-semibold text-gray-900">{classQuantity.toFixed(2)}</p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-gray-500">Carga semanal do funcionário</p>
+                <p className="text-xl font-semibold text-gray-900">{weeklyHours > 0 ? weeklyHours.toFixed(2) : '-'}</p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-gray-500">Salário bruto da competência</p>
+                <p className="text-xl font-semibold text-gray-900">{formatCurrency(grossSalaryForTransport)}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-gray-500 mb-1">Tarifa por viagem (R$)</p>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="w-full rounded-md border px-3 py-2"
+                  value={transportForm.farePerTrip}
+                  onChange={(e) =>
+                    setTransportForm((current) => ({
+                      ...current,
+                      farePerTrip: Number(e.target.value) || 0
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <p className="text-gray-500 mb-1">Viagens por dia</p>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  className="w-full rounded-md border px-3 py-2"
+                  value={transportForm.tripsPerDay}
+                  onChange={(e) =>
+                    setTransportForm((current) => ({
+                      ...current,
+                      tripsPerDay: Number(e.target.value) || 0
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <p className="text-gray-500 mb-1">Dias úteis</p>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  className="w-full rounded-md border px-3 py-2"
+                  value={transportForm.workDays}
+                  onChange={(e) =>
+                    setTransportForm((current) => ({
+                      ...current,
+                      workDays: Number(e.target.value) || 0
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                <p className="text-blue-700">Custo mensal calculado</p>
+                <p className="text-lg font-semibold text-blue-800">{formatCurrency(transportGrossValue)}</p>
+              </div>
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                <p className="text-amber-700">Limite legal (6%)</p>
+                <p className="text-lg font-semibold text-amber-800">{formatCurrency(legalTransportLimit)}</p>
+              </div>
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                <p className="text-emerald-700">Complemento estimado da empresa</p>
+                <p className="text-lg font-semibold text-emerald-800">{formatCurrency(suggestedCompanyCredit)}</p>
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3">
+              <p className="text-gray-700">
+                Desconto sugerido em folha: <strong>{formatCurrency(suggestedPayrollDiscount)}</strong>
+              </p>
+            </div>
+
+            {canEdit ? (
+              <Button onClick={() => void handleApplyTransportValue()} disabled={savingTransport}>
+                {savingTransport ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Aplicar valor no cadastro do funcionário
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Rubricas do Holerite</CardTitle>
           </CardHeader>
           <CardContent>
@@ -502,6 +803,28 @@ const PaystubDetailPage: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {canEdit ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Edição livre do holerite (todos os campos)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-gray-600">
+                Edite o JSON abaixo para ajustar quaisquer campos do holerite, empresa, logo e dados do funcionário.
+              </p>
+              <Textarea
+                value={freeEditJson}
+                onChange={(e) => setFreeEditJson(e.target.value)}
+                className="min-h-[320px] font-mono text-xs"
+              />
+              <Button onClick={() => void handleSaveFreeEdit()} disabled={savingFreeEdit}>
+                {savingFreeEdit ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Salvar edição livre
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>

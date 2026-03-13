@@ -41,6 +41,13 @@ export interface BenefitsConfig {
   mealDeductionPercent: number;
 }
 
+export interface CompanyProfileConfig {
+  name: string;
+  cnpj: string;
+  address: string;
+  logoUrl?: string;
+}
+
 export interface SystemConfig {
   hourlyRates: HourlyRateConfig[];
   monthlySalaries: { [key: string]: number };
@@ -58,6 +65,7 @@ export interface SystemConfig {
     defaultMonthlyDays: number;
     weekMultiplier: number; // 4.5 semanas por mês
   };
+  companyProfiles: CompanyProfileConfig[];
 }
 
 const evaluateFormulaExpression = (expression: string) => {
@@ -276,7 +284,21 @@ const currentConfig: SystemConfig = {
   workDays: {
     defaultMonthlyDays: 22,
     weekMultiplier: 4.5
-  }
+  },
+  companyProfiles: [
+    {
+      name: 'Raizes Centro Educacional',
+      cnpj: '20.755.729/0001-85',
+      address: 'Rua Diogo de Sousa, 251, Cidade Lider, Sao Paulo/SP, CEP 08285-330',
+      logoUrl: ''
+    },
+    {
+      name: 'Raizes Recreacao Infantil',
+      cnpj: '59.946.400/0001-37',
+      address: 'Rua Diogo de Sousa, 257, Cidade Lider, Sao Paulo/SP, CEP 08285-330',
+      logoUrl: ''
+    }
+  ]
 };
 
 export const configApi = {

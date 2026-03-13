@@ -34,6 +34,7 @@ export interface PaystubDetail {
     companyName: string;
     companyCnpj: string;
     companyAddress: string;
+    companyLogoUrl?: string;
     employeeId: string;
     employeeName: string;
     employeeCpf: string;
@@ -159,6 +160,32 @@ export interface UpdatePaystubEventPayload {
   reason?: string;
 }
 
+export interface UpdatePaystubContentPayload {
+  employee?: {
+    fullName?: string;
+    cpf?: string;
+    position?: string;
+    admissionDate?: string;
+    email?: string;
+    bankName?: string;
+    bankAgency?: string;
+    bankAccount?: string;
+    paymentMethod?: string;
+    employeeCode?: string;
+    pis?: string;
+    weeklyHours?: number;
+    transportVoucherValue?: number;
+  };
+  companyProfile?: {
+    name?: string;
+    cnpj?: string;
+    address?: string;
+    logoUrl?: string;
+  };
+  payslipOverride?: Record<string, unknown>;
+  reason?: string;
+}
+
 const buildAuthHeaders = () => {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -203,6 +230,13 @@ export const apiService = {
         fgtsDeposit: number;
       };
     }>(`/paystubs/${paystubId}/events/${eventId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async updatePaystubContent(paystubId: string, payload: UpdatePaystubContentPayload) {
+    return request<PaystubDetail>(`/paystubs/${paystubId}/content`, {
       method: 'PATCH',
       body: JSON.stringify(payload)
     });

@@ -33,6 +33,7 @@ export interface Payslip {
   companyName: string;
   companyCnpj: string;
   companyAddress: string;
+  companyLogoUrl?: string;
   employeeId: string;
   employeeName: string;
   employeeCpf: string;

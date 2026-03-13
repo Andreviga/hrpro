@@ -217,6 +217,49 @@ export class PayrollController {
     });
   }
 
+  @Patch('paystubs/:id/content')
+  @Roles('admin', 'rh', 'manager')
+  async updatePaystubContent(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      employee?: {
+        fullName?: string;
+        cpf?: string;
+        position?: string;
+        admissionDate?: string;
+        email?: string;
+        bankName?: string;
+        bankAgency?: string;
+        bankAccount?: string;
+        paymentMethod?: string;
+        employeeCode?: string;
+        pis?: string;
+        weeklyHours?: number;
+        transportVoucherValue?: number;
+      };
+      companyProfile?: {
+        name?: string;
+        cnpj?: string;
+        address?: string;
+        logoUrl?: string;
+      };
+      payslipOverride?: Record<string, unknown>;
+      reason?: string;
+    },
+    @Req() req: { user: { companyId: string; sub: string } }
+  ) {
+    return this.payroll.updatePaystubContent({
+      paystubId: id,
+      companyId: req.user.companyId,
+      userId: req.user.sub,
+      employee: body.employee,
+      companyProfile: body.companyProfile,
+      payslipOverride: body.payslipOverride,
+      reason: body.reason
+    });
+  }
+
   @Get('paystubs/:id/pdf')
   async paystubPdf(
     @Param('id') id: string,

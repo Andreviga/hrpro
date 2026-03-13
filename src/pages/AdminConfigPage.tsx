@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
-import { configApi, SystemConfig, HourlyRateConfig, INSSConfig, IRRFConfig, FormulaConfig } from '../services/configApi';
+import { configApi, SystemConfig, HourlyRateConfig, INSSConfig, IRRFConfig, FormulaConfig, CompanyProfileConfig } from '../services/configApi';
 import { 
   Settings,
   Calculator,
@@ -139,6 +139,40 @@ const AdminConfigPage: React.FC = () => {
     return `${(value * 100).toFixed(2)}%`;
   };
 
+  const updateCompanyProfile = (index: number, patch: Partial<CompanyProfileConfig>) => {
+    if (!tempConfig) return;
+    const companyProfiles = [...(tempConfig.companyProfiles ?? [])];
+    companyProfiles[index] = {
+      ...companyProfiles[index],
+      ...patch
+    };
+    setTempConfig({ ...tempConfig, companyProfiles });
+  };
+
+  const addCompanyProfile = () => {
+    if (!tempConfig) return;
+    setTempConfig({
+      ...tempConfig,
+      companyProfiles: [
+        ...(tempConfig.companyProfiles ?? []),
+        {
+          name: '',
+          cnpj: '',
+          address: '',
+          logoUrl: ''
+        }
+      ]
+    });
+  };
+
+  const removeCompanyProfile = (index: number) => {
+    if (!tempConfig) return;
+    setTempConfig({
+      ...tempConfig,
+      companyProfiles: (tempConfig.companyProfiles ?? []).filter((_, currentIndex) => currentIndex !== index)
+    });
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -212,12 +246,13 @@ const AdminConfigPage: React.FC = () => {
         </Alert>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7">
             <TabsTrigger value="hourly-rates">Horas Aula</TabsTrigger>
             <TabsTrigger value="inss">INSS</TabsTrigger>
             <TabsTrigger value="irrf">IRRF</TabsTrigger>
             <TabsTrigger value="formulas">Fórmulas</TabsTrigger>
             <TabsTrigger value="benefits">Benefícios</TabsTrigger>
+            <TabsTrigger value="companies">Empresas</TabsTrigger>
             <TabsTrigger value="test">Teste</TabsTrigger>
           </TabsList>
 
@@ -741,6 +776,80 @@ const AdminConfigPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tab: Empresas */}
+          <TabsContent value="companies" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Cadastro de Empresas e Logotipo</span>
+                  <Button type="button" variant="outline" size="sm" onClick={addCompanyProfile}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar Empresa
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Defina os dados legais de cada empresa e o link/base64 do logotipo para aparecer no holerite.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(tempConfig.companyProfiles ?? []).map((companyProfile, index) => (
+                  <div key={`${companyProfile.cnpj || 'empresa'}-${index}`} className="rounded-lg border p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Empresa {index + 1}</h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeCompanyProfile(index)}
+                        disabled={(tempConfig.companyProfiles ?? []).length <= 1}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Razão Social / Nome Fantasia</Label>
+                        <Input
+                          value={companyProfile.name}
+                          onChange={(e) => updateCompanyProfile(index, { name: e.target.value })}
+                          placeholder="Ex.: Raízes Centro Educacional"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>CNPJ</Label>
+                        <Input
+                          value={companyProfile.cnpj}
+                          onChange={(e) => updateCompanyProfile(index, { cnpj: e.target.value })}
+                          placeholder="00.000.000/0000-00"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Endereço Completo</Label>
+                      <Input
+                        value={companyProfile.address}
+                        onChange={(e) => updateCompanyProfile(index, { address: e.target.value })}
+                        placeholder="Rua, número, bairro, cidade/UF, CEP"
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Logo (URL ou base64)</Label>
+                      <Input
+                        value={companyProfile.logoUrl ?? ''}
+                        onChange={(e) => updateCompanyProfile(index, { logoUrl: e.target.value })}
+                        placeholder="https://... ou data:image/png;base64,..."
+                      />
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </TabsContent>

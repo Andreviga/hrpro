@@ -99,6 +99,9 @@ export const renderPayslipHtml = (payslip: Payslip) => {
   const css = renderPayslipCss();
   const competence = monthLabel(payslip.competenceMonth, payslip.competenceYear);
   const generatedAt = new Date(payslip.createdAt).toLocaleDateString('pt-BR');
+  const logoHtml = payslip.companyLogoUrl
+    ? `<div class="company-logo-wrap"><img class="company-logo" src="${escapeHtml(payslip.companyLogoUrl)}" alt="Logo da empresa" /></div>`
+    : '';
 
   const classTableHtml = classRows
     .map((row) => {
@@ -138,23 +141,24 @@ export const renderPayslipHtml = (payslip: Payslip) => {
 <body>
   <main class="payslip-sheet">
     <section class="header">
+      ${logoHtml}
       <h1>DEMONSTRATIVO DE PAGAMENTO</h1>
       <div class="header-meta">
-        <div><strong>Razao social:</strong> ${escapeHtml(asText(payslip.companyName))}</div>
-        <div><strong>Endereco:</strong> ${escapeHtml(asText(payslip.companyAddress))}</div>
+        <div><strong>Razão social:</strong> ${escapeHtml(asText(payslip.companyName))}</div>
+        <div><strong>Endereço:</strong> ${escapeHtml(asText(payslip.companyAddress))}</div>
         <div><strong>CNPJ:</strong> ${escapeHtml(asText(payslip.companyCnpj))}</div>
       </div>
     </section>
 
     <section class="employee-info">
-      <div class="employee-info-title">DADOS DO FUNCIONARIO</div>
+      <div class="employee-info-title">DADOS DO FUNCIONÁRIO</div>
       <div class="employee-info-grid">
-        <div class="employee-info-item"><div class="employee-info-label">Codigo</div><div class="employee-info-value">${escapeHtml(asText(payslip.employeeCode))}</div></div>
+        <div class="employee-info-item"><div class="employee-info-label">Código</div><div class="employee-info-value">${escapeHtml(asText(payslip.employeeCode))}</div></div>
         <div class="employee-info-item"><div class="employee-info-label">Nome</div><div class="employee-info-value">${escapeHtml(asText(payslip.employeeName))}</div></div>
         <div class="employee-info-item"><div class="employee-info-label">Cargo</div><div class="employee-info-value">${escapeHtml(asText(payslip.employeeRole))}</div></div>
-        <div class="employee-info-item"><div class="employee-info-label">Competencia</div><div class="employee-info-value">${escapeHtml(competence)}</div></div>
+        <div class="employee-info-item"><div class="employee-info-label">Competência</div><div class="employee-info-value">${escapeHtml(competence)}</div></div>
         <div class="employee-info-item"><div class="employee-info-label">CPF</div><div class="employee-info-value">${escapeHtml(asText(payslip.employeeCpf))}</div></div>
-        <div class="employee-info-item"><div class="employee-info-label">Data de admissao</div><div class="employee-info-value">${escapeHtml(asText(payslip.admissionDate))}</div></div>
+        <div class="employee-info-item"><div class="employee-info-label">Data de admissão</div><div class="employee-info-value">${escapeHtml(asText(payslip.admissionDate))}</div></div>
         <div class="employee-info-item"><div class="employee-info-label">E-mail</div><div class="employee-info-value">${escapeHtml(asText(payslip.employeeEmail))}</div></div>
         <div class="employee-info-item"><div class="employee-info-label">Forma de pagamento</div><div class="employee-info-value">${escapeHtml(asText(payslip.paymentMethod))}</div></div>
       </div>
@@ -165,9 +169,9 @@ export const renderPayslipHtml = (payslip: Payslip) => {
       <thead>
         <tr>
           <th style="width: 8%;">Item</th>
-          <th style="width: 40%;">Descricao</th>
+          <th style="width: 40%;">Descrição</th>
           <th style="width: 17%;">Quantidade</th>
-          <th style="width: 17%;">Valor aula / unitario</th>
+          <th style="width: 17%;">Valor aula / unitário</th>
           <th style="width: 18%;">Total</th>
         </tr>
       </thead>
@@ -179,8 +183,8 @@ export const renderPayslipHtml = (payslip: Payslip) => {
       <caption>PROVENTOS E DESCONTOS</caption>
       <thead>
         <tr>
-          <th style="width: 10%;">Codigo</th>
-          <th style="width: 45%;">Descricao</th>
+          <th style="width: 10%;">Código</th>
+          <th style="width: 45%;">Descrição</th>
           <th style="width: 22%;">Provento</th>
           <th style="width: 23%;">Desconto</th>
         </tr>
@@ -190,20 +194,20 @@ export const renderPayslipHtml = (payslip: Payslip) => {
     </table>
 
     <section class="totals-grid">
-      <div class="totals-item"><span class="totals-label">Salario bruto</span><span class="totals-value">${escapeHtml(toMoney(payslip.grossSalary))}</span></div>
-      <div class="totals-item"><span class="totals-label">Total descontos</span><span class="totals-value value-deduction">${escapeHtml(toMoney(payslip.totalDiscounts, true))}</span></div>
-      <div class="totals-item"><span class="totals-label">Salario liquido</span><span class="totals-value">${escapeHtml(toMoney(payslip.netSalary))}</span></div>
+      <div class="totals-item"><span class="totals-label">Salário bruto</span><span class="totals-value">${escapeHtml(toMoney(payslip.grossSalary))}</span></div>
+      <div class="totals-item"><span class="totals-label">Total de descontos</span><span class="totals-value value-deduction">${escapeHtml(toMoney(payslip.totalDiscounts, true))}</span></div>
+      <div class="totals-item"><span class="totals-label">Salário líquido</span><span class="totals-value">${escapeHtml(toMoney(payslip.netSalary))}</span></div>
       <div class="totals-item"><span class="totals-label">FGTS</span><span class="totals-value">${escapeHtml(toMoney(payslip.fgts))}</span></div>
       <div class="totals-item"><span class="totals-label">Base INSS</span><span class="totals-value">${escapeHtml(toMoney(payslip.inssBase))}</span></div>
       <div class="totals-item"><span class="totals-label">Base FGTS</span><span class="totals-value">${escapeHtml(toMoney(payslip.fgtsBase))}</span></div>
       <div class="totals-item"><span class="totals-label">Base IRRF</span><span class="totals-value">${escapeHtml(toMoney(payslip.irrfBase))}</span></div>
-      <div class="totals-item"><span class="totals-label">Conta bancaria</span><span class="totals-value">${escapeHtml(`${asText(payslip.bank)} / ${asText(payslip.agency)} / ${asText(payslip.account)}`)}</span></div>
-      <div class="totals-item"><span class="totals-label">Vale alimentacao</span><span class="totals-value">${escapeHtml(toMoney(payslip.foodAllowance))}</span></div>
-      <div class="totals-item"><span class="totals-label">Pensao alimenticia</span><span class="totals-value value-deduction">${escapeHtml(toMoney(payslip.alimony, true))}</span></div>
-      <div class="totals-item"><span class="totals-label">2a do 13o</span><span class="totals-value">${escapeHtml(toMoney(payslip.thirteenthSecondInstallment))}</span></div>
-      <div class="totals-item"><span class="totals-label">INSS 13o</span><span class="totals-value value-deduction">${escapeHtml(toMoney(payslip.thirteenthInss, true))}</span></div>
-      <div class="totals-item"><span class="totals-label">IRRF 13o</span><span class="totals-value value-deduction">${escapeHtml(toMoney(payslip.thirteenthIrrf, true))}</span></div>
-      <div class="totals-item"><span class="totals-label">Base de calculo</span><span class="totals-value">${escapeHtml(toMoney(payslip.calculationBase))}</span></div>
+      <div class="totals-item"><span class="totals-label">Conta bancária</span><span class="totals-value">${escapeHtml(`${asText(payslip.bank)} / ${asText(payslip.agency)} / ${asText(payslip.account)}`)}</span></div>
+      <div class="totals-item"><span class="totals-label">Vale-alimentação</span><span class="totals-value">${escapeHtml(toMoney(payslip.foodAllowance))}</span></div>
+      <div class="totals-item"><span class="totals-label">Pensão alimentícia</span><span class="totals-value value-deduction">${escapeHtml(toMoney(payslip.alimony, true))}</span></div>
+      <div class="totals-item"><span class="totals-label">2ª do 13º</span><span class="totals-value">${escapeHtml(toMoney(payslip.thirteenthSecondInstallment))}</span></div>
+      <div class="totals-item"><span class="totals-label">INSS 13º</span><span class="totals-value value-deduction">${escapeHtml(toMoney(payslip.thirteenthInss, true))}</span></div>
+      <div class="totals-item"><span class="totals-label">IRRF 13º</span><span class="totals-value value-deduction">${escapeHtml(toMoney(payslip.thirteenthIrrf, true))}</span></div>
+      <div class="totals-item"><span class="totals-label">Base de cálculo</span><span class="totals-value">${escapeHtml(toMoney(payslip.calculationBase))}</span></div>
     </section>
 
     <section class="footer-note">
