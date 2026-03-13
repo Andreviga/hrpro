@@ -286,7 +286,7 @@ export const buildPayslip = (params: {
   pushWarningIfMissing(warnings, {
     code: 'EMPLOYEE_EMAIL_MISSING',
     value: asString(rowCell(mapped.registrationRow, payrollAliases.registrationEmail)),
-    message: `E-mail do colaborador ${employeeName} nao encontrado. Preencha em Cadastro Funcionários > Tabela1 > email.`,
+    message: `E-mail do colaborador ${employeeName} não encontrado. Preencha em Cadastro Funcionários > Tabela1 > email.`,
     fillLocation: 'Cadastro Funcionários -> Tabela1 -> email',
     sourceSheet: 'Cadastro Funcionários',
     sourceTable: 'Tabela1'

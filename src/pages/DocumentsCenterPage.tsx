@@ -399,7 +399,7 @@ const DocumentsCenterPage: React.FC = () => {
       setVersionsTitle(title);
       setVersionsDialogOpen(true);
     } catch (err) {
-      setError('Erro ao carregar historico.');
+      setError('Erro ao carregar histórico.');
     }
   };
 
@@ -493,7 +493,7 @@ const DocumentsCenterPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Central de Documentos</h1>
             <p className="text-gray-600 mt-1">
-              Templates, geracao e exportacao de documentos oficiais.
+              Templates, geração e exportação de documentos oficiais.
             </p>
           </div>
           <Button variant="outline" onClick={() => {
@@ -594,7 +594,7 @@ const DocumentsCenterPage: React.FC = () => {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>Documentos gerados</CardTitle>
-                    <CardDescription>Gerencie status, exporte e consulte historico.</CardDescription>
+                    <CardDescription>Gerencie status, exporte e consulte histórico.</CardDescription>
                   </div>
                   <Button onClick={() => openDocumentDialog()}>
                     <Plus className="h-4 w-4 mr-2" />
@@ -671,7 +671,7 @@ const DocumentsCenterPage: React.FC = () => {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleViewVersions(`Historico: ${document.title}`, () => documentsApi.listDocumentVersions(document.id))}
+                                    onClick={() => handleViewVersions(`Histórico: ${document.title}`, () => documentsApi.listDocumentVersions(document.id))}
                                   >
                                     <History className="h-4 w-4" />
                                   </Button>
@@ -865,7 +865,7 @@ const DocumentsCenterPage: React.FC = () => {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleViewVersions(`Historico: ${template.name}`, () => documentsApi.listTemplateVersions(template.id))}
+                                    onClick={() => handleViewVersions(`Histórico: ${template.name}`, () => documentsApi.listTemplateVersions(template.id))}
                                   >
                                     <History className="h-4 w-4" />
                                   </Button>
@@ -888,7 +888,7 @@ const DocumentsCenterPage: React.FC = () => {
               <CardHeader>
                 <CardTitle>Gerar documentos pela folha</CardTitle>
                 <CardDescription>
-                  Acione geracao em lote de TRCT, recibo de ferias ou holerite.
+                  Acione geração em lote de TRCT, recibo de férias ou holerite.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1172,7 +1172,7 @@ const DocumentsCenterPage: React.FC = () => {
       <Dialog open={payloadDialogOpen} onOpenChange={setPayloadDialogOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Payload de exportacao</DialogTitle>
+            <DialogTitle>Payload de exportação</DialogTitle>
             <DialogDescription>Dados consolidados para PDF/DOCX.</DialogDescription>
           </DialogHeader>
           <Textarea value={payloadPreview} readOnly rows={12} />

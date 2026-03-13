@@ -203,7 +203,7 @@ export const mapPayrollData = (params: {
   if (!companyRegistry) {
     warnings.push({
       code: 'COMPANY_REGISTRY_MISSING',
-      message: `Empresa ${companyName || 'NAO_INFORMADA'} nao encontrada no registry. Preencha CNPJ e endereco manualmente.`,
+      message: `Empresa ${companyName || 'NAO_INFORMADA'} não encontrada no registry. Preencha CNPJ e endereço manualmente.`,
       fillLocation: COMPANY_REGISTRY_FILL_LOCATION,
       sourceSheet: monthlySheetName,
       sourceTable: 'Tabela35'
@@ -211,7 +211,7 @@ export const mapPayrollData = (params: {
   } else if (!companyRegistry.address) {
     warnings.push({
       code: 'COMPANY_ADDRESS_FILL_REQUIRED',
-      message: `Endereco da empresa ${companyRegistry.name} precisa ser preenchido manualmente no registry antes do uso final do PDF.`,
+      message: `Endereço da empresa ${companyRegistry.name} precisa ser preenchido manualmente no registry antes do uso final do PDF.`,
       fillLocation: COMPANY_REGISTRY_FILL_LOCATION,
       sourceSheet: monthlySheetName,
       sourceTable: 'Tabela35'
@@ -221,7 +221,7 @@ export const mapPayrollData = (params: {
   if (!thirteenthRow) {
     warnings.push({
       code: 'THIRTEENTH_ROW_NOT_FOUND',
-      message: 'Linha do 13o salario nao encontrada para este funcionario; os campos da 2a parcela ficarao vazios.',
+      message: 'Linha do 13º salário não encontrada para este funcionário; os campos da 2ª parcela ficarão vazios.',
       sourceSheet: 'Folha de pagto 13 2025',
       sourceTable: 'Tabela354'
     });

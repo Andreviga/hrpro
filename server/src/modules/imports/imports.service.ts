@@ -546,7 +546,7 @@ const buildTemporaryCpf = (params: {
     }
   }
 
-  throw new Error(`Nao foi possivel gerar CPF temporario para ${params.fullName}`);
+  throw new Error(`Não foi possível gerar CPF temporário para ${params.fullName}`);
 };
 
 const getTargetMonthTokens = (month: number) => {
@@ -681,7 +681,7 @@ export class ImportsService {
       });
 
       upsertCache(updated);
-      warnings.push(`Aba ${sheetName} linha ${rowNumber}: registro nao-funcionario "${fullName}" foi desativado automaticamente.`);
+      warnings.push(`Aba ${sheetName} linha ${rowNumber}: registro não-funcionário "${fullName}" foi desativado automaticamente.`);
     };
 
     const orderedSheetNames = [...workbook.SheetNames].sort((left, right) => {
@@ -710,7 +710,7 @@ export class ImportsService {
       if (profile === 'generic') continue;
 
       if (profile === 'folha' && !isTargetPayrollSheet(sheetName, targetCompetency)) {
-        warnings.push(`Aba "${sheetName}" ignorada por nao corresponder a competencia alvo ${targetCompetency.month}/${targetCompetency.year}.`);
+        warnings.push(`Aba "${sheetName}" ignorada por não corresponder à competência alvo ${targetCompetency.month}/${targetCompetency.year}.`);
         continue;
       }
 
@@ -820,7 +820,7 @@ export class ImportsService {
 
         if (closedRun) {
           failedRows += 1;
-          const message = `Competencia ${competency.month}/${competency.year} ja fechada`;
+          const message = `Competência ${competency.month}/${competency.year} já fechada`;
           errors.push(`Planilha ${sheetName}: ${message}`);
           await this.prisma.importItem.create({
             data: {
@@ -844,7 +844,7 @@ export class ImportsService {
           throw new ConflictException({
             statusCode: 409,
             error: 'Conflict',
-            message: 'Competencia fechada. Importacao de folha bloqueada.',
+            message: 'Competência fechada. Importação de folha bloqueada.',
             code: 'PAYROLL_COMPETENCE_CLOSED',
             details: { payrollRunId: closedRun.id, month: competency.month, year: competency.year }
           });
@@ -904,7 +904,7 @@ export class ImportsService {
 
         if (existingRunResults.length > 0 || Number(deletedDocuments.count ?? 0) > 0) {
           warnings.push(
-            `Competencia ${competency.month}/${competency.year}: resultados anteriores e ${Number(deletedDocuments.count ?? 0)} documentos vinculados removidos para reimportacao completa.`
+            `Competência ${competency.month}/${competency.year}: resultados anteriores e ${Number(deletedDocuments.count ?? 0)} documentos vinculados removidos para reimportação completa.`
           );
         }
       }
@@ -940,7 +940,7 @@ export class ImportsService {
               fullName,
               usedCpfs
             });
-            warnings.push(`Cadastro ${sheetName} linha ${rowNumber}: CPF ausente/invalido para "${fullName}". CPF temporario gerado.`);
+            warnings.push(`Cadastro ${sheetName} linha ${rowNumber}: CPF ausente/inválido para "${fullName}". CPF temporário gerado.`);
           }
 
           const { city, state } = splitCityState(cityStateHeader ? row[cityStateHeader] : undefined);
@@ -1040,19 +1040,19 @@ export class ImportsService {
                 sheet: sheetName,
                 rowNumber,
                 status: 'ok',
-                message: 'Funcionario importado'
+                message: 'Funcionário importado'
               }
             });
           } catch {
             failedRows += 1;
-            errors.push(`Planilha ${sheetName} linha ${rowNumber}: falha ao importar funcionario "${fullName}"`);
+            errors.push(`Planilha ${sheetName} linha ${rowNumber}: falha ao importar funcionário "${fullName}"`);
             await this.prisma.importItem.create({
               data: {
                 batchId: batch.id,
                 sheet: sheetName,
                 rowNumber,
                 status: 'error',
-                message: 'Falha ao importar funcionario'
+                message: 'Falha ao importar funcionário'
               }
             });
           }
@@ -1169,7 +1169,7 @@ export class ImportsService {
 
             upsertCache(created);
             employee = created;
-            warnings.push(`Aba ${sheetName} linha ${rowNumber}: funcionario "${fullName}" criado automaticamente com CPF temporario.`);
+            warnings.push(`Aba ${sheetName} linha ${rowNumber}: funcionário "${fullName}" criado automaticamente com CPF temporário.`);
           }
 
           if (!employee) continue;
@@ -1255,7 +1255,7 @@ export class ImportsService {
 
             upsertCache(created);
             employee = created;
-            warnings.push(`Folha ${sheetName} linha ${rowNumber}: funcionario "${fullName}" criado automaticamente com CPF temporario.`);
+            warnings.push(`Folha ${sheetName} linha ${rowNumber}: funcionário "${fullName}" criado automaticamente com CPF temporário.`);
           }
 
           if (!employee || !payrollRunId) continue;
@@ -1417,7 +1417,7 @@ export class ImportsService {
     return {
       batchId: updatedBatch.id,
       success: failedRows === 0,
-      message: failedRows === 0 ? 'Importacao concluida' : 'Importacao concluida com erros',
+      message: failedRows === 0 ? 'Importação concluída' : 'Importação concluída com erros',
       processedRows,
       failedRows,
       errors,

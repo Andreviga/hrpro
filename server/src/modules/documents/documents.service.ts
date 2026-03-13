@@ -106,45 +106,45 @@ Natureza do rendimento: {{natureza_rendimento}}
 
 3. RENDIMENTOS TRIBUTAVEIS, DEDUCOES E IMPOSTO SOBRE A RENDA RETIDO NA FONTE (IRRF)
 01. Total dos rendimentos (inclusive ferias): {{q3_l1_total_rendimentos}}
-02. Contribuicao previdenciaria oficial: {{q3_l2_previdencia_oficial}}
-03. Contribuicao a entidades de previdencia complementar/FAPI: {{q3_l3_previdencia_complementar}}
-04. Pensao alimenticia: {{q3_l4_pensao_alimenticia}}
+02. Contribuição previdenciária oficial: {{q3_l2_previdencia_oficial}}
+03. Contribuição a entidades de previdência complementar/FAPI: {{q3_l3_previdencia_complementar}}
+04. Pensão alimentícia: {{q3_l4_pensao_alimenticia}}
 05. Imposto sobre a renda retido na fonte (IRRF): {{q3_l5_irrf}}
 
-4. RENDIMENTOS ISENTOS E NAO TRIBUTAVEIS
-01. Parcela isenta de aposentadoria/pensao (65 anos ou mais): {{q4_l1_parcela_isenta_65}}
-02. Parcela isenta do 13o salario (65 anos ou mais): {{q4_l2_parcela_isenta_13_65}}
+4. RENDIMENTOS ISENTOS E NÃO TRIBUTÁVEIS
+01. Parcela isenta de aposentadoria/pensão (65 anos ou mais): {{q4_l1_parcela_isenta_65}}
+02. Parcela isenta do 13º salário (65 anos ou mais): {{q4_l2_parcela_isenta_13_65}}
 03. Diarias e ajudas de custo: {{q4_l3_diarias_ajudas_custo}}
-04. Pensao/proventos por molestia grave ou acidente em servico: {{q4_l4_molestia_grave}}
+04. Pensão/proventos por moléstia grave ou acidente em serviço: {{q4_l4_molestia_grave}}
 05. Lucros e dividendos (a partir de 1996): {{q4_l5_lucros_dividendos}}
-06. Valores pagos a titular/socio de ME/EPP (Simples), exceto pro-labore/alugueis/servicos: {{q4_l6_simples_nacional}}
-07. Indenizacoes por rescisao, inclusive PDV e acidente de trabalho: {{q4_l7_indenizacoes_rescisao}}
-08. Juros de mora por atraso em remuneracao: {{q4_l8_juros_mora}}
+06. Valores pagos a titular/sócio de ME/EPP (Simples), exceto pro-labore/aluguéis/serviços: {{q4_l6_simples_nacional}}
+07. Indenizações por rescisão, inclusive PDV e acidente de trabalho: {{q4_l7_indenizacoes_rescisao}}
+08. Juros de mora por atraso em remuneração: {{q4_l8_juros_mora}}
 09. Outros (especificar): {{q4_l9_outros}}
 
-5. RENDIMENTOS SUJEITOS A TRIBUTACAO EXCLUSIVA (RENDIMENTO LIQUIDO)
-01. 13o salario: {{q5_l1_decimo_terceiro}}
-02. IRRF sobre 13o salario: {{q5_l2_irrf_decimo_terceiro}}
+5. RENDIMENTOS SUJEITOS A TRIBUTAÇÃO EXCLUSIVA (RENDIMENTO LÍQUIDO)
+01. 13º salário: {{q5_l1_decimo_terceiro}}
+02. IRRF sobre 13º salário: {{q5_l2_irrf_decimo_terceiro}}
 03. Outros: {{q5_l3_outros}}
 
-6. RENDIMENTOS RECEBIDOS ACUMULADAMENTE - ART. 12-A DA LEI No 7.713/1988 (TRIBUTACAO EXCLUSIVA)
-6.1 Numero do processo (se houver): {{q6_1_numero_processo}}
+6. RENDIMENTOS RECEBIDOS ACUMULADAMENTE - ART. 12-A DA LEI No 7.713/1988 (TRIBUTAÇÃO EXCLUSIVA)
+6.1 Número do processo (se houver): {{q6_1_numero_processo}}
 6.1 Natureza do rendimento: {{q6_1_natureza_rendimento}}
 6.1 Quantidade de meses: {{q6_1_quantidade_meses}}
-Linha 1 - Total dos rendimentos tributaveis (inclusive ferias e 13o): {{q6_l1_total_rendimentos}}
-Linha 2 - Exclusao: despesas com acao judicial: {{q6_l2_despesas_acao_judicial}}
-Linha 3 - Deducao: contribuicao previdenciaria oficial: {{q6_l3_previdencia_oficial}}
-Linha 4 - Deducao: pensao alimenticia: {{q6_l4_pensao_alimenticia}}
+Linha 1 - Total dos rendimentos tributáveis (inclusive férias e 13º): {{q6_l1_total_rendimentos}}
+Linha 2 - Exclusão: despesas com ação judicial: {{q6_l2_despesas_acao_judicial}}
+Linha 3 - Dedução: contribuição previdenciária oficial: {{q6_l3_previdencia_oficial}}
+Linha 4 - Dedução: pensão alimentícia: {{q6_l4_pensao_alimenticia}}
 Linha 5 - IRRF: {{q6_l5_irrf}}
-Linha 6 - Rendimentos isentos por molestia grave/acidente em servico: {{q6_l6_isentos_molestia}}
+Linha 6 - Rendimentos isentos por moléstia grave/acidente em serviço: {{q6_l6_isentos_molestia}}
 
-7. INFORMACOES COMPLEMENTARES
+7. INFORMAÇÕES COMPLEMENTARES
 {{quadro7_observacoes}}
 
-Declaro que as informacoes acima foram prestadas em conformidade com o modelo da IN RFB no 2.060/2021.
-Data de emissao: {{data_emissao}}
+Declaro que as informações acima foram prestadas em conformidade com o modelo da IN RFB no 2.060/2021.
+Data de emissão: {{data_emissao}}
 Assinatura da fonte pagadora: {{assinatura_fonte_pagadora}}
-Cargo/responsavel: {{responsavel_cargo_nome}}
+Cargo/responsável: {{responsavel_cargo_nome}}
 `.trim();
 
 const PAYSTUB_TEMPLATE_NAME = 'Holerite Padrao (Automatico v2)';
@@ -184,19 +184,19 @@ export const buildPaystubTemplateContent = () => `
 DEMONSTRATIVO DE PAGAMENTO
 Empresa: {{company_name}}
 CNPJ: {{company_cnpj}}
-Funcionario: {{employee_name}}
-Codigo: {{employee_code}}
+Funcionário: {{employee_name}}
+Código: {{employee_code}}
 CPF: {{employee_cpf}}
 Cargo: {{employee_position}}
 Departamento: {{employee_department}}
-Admissao: {{admission_date}}
+Admissão: {{admission_date}}
 E-mail: {{employee_email}}
-Competencia: {{competence}}
+Competência: {{competence}}
 
 PROVENTOS E DESCONTOS
-Salario Bruto: {{gross_salary}}
+Salário Bruto: {{gross_salary}}
 Total de Descontos: {{total_deductions}}
-Salario Liquido: {{net_salary}}
+Salário Líquido: {{net_salary}}
 FGTS: {{fgts}}
 Base INSS: {{inss_base}}
 Base FGTS: {{fgts_base}}
@@ -204,18 +204,18 @@ Base IRRF: {{irrf_base}}
 
 PAGAMENTO
 Banco: {{bank_name}}
-Agencia: {{bank_agency}}
+Agência: {{bank_agency}}
 Conta: {{bank_account}}
 Forma de Pagamento: {{payment_method}}
 
-INFORMACOES COMPLEMENTARES
-Vale Alimentacao (credito): {{meal_voucher_credit}}
-Pensao Alimenticia: {{pension_alimony}}
+INFORMAÇÕES COMPLEMENTARES
+Vale Alimentação (crédito): {{meal_voucher_credit}}
+Pensão Alimentícia: {{pension_alimony}}
 
 RUBRICAS
 {{event_lines}}
 
-Declaro ter recebido os valores acima referentes a competencia informada.
+Declaro ter recebido os valores acima referentes à competência informada.
 `.trim();
 
 const paystubTemplateNeedsRepair = (template: { content: string; requiredPlaceholders?: unknown }) => {
@@ -268,17 +268,17 @@ const renderPdfBuffer = (params: {
       doc.fontSize(16).text(params.title, { align: 'center' });
       doc.moveDown(0.5);
       if (params.competence) {
-        doc.fontSize(10).text(`Competencia: ${params.competence}`, { align: 'center' });
+        doc.fontSize(10).text(`Competência: ${params.competence}`, { align: 'center' });
         doc.moveDown();
       }
 
       if (params.employeeName || params.employeeCpf) {
-        doc.fontSize(11).text(`Funcionario: ${params.employeeName ?? 'N/A'}`);
+        doc.fontSize(11).text(`Funcionário: ${params.employeeName ?? 'N/A'}`);
         doc.fontSize(10).text(`CPF: ${params.employeeCpf ?? 'N/A'}`);
         doc.moveDown();
       }
 
-      doc.fontSize(11).text('Conteudo');
+      doc.fontSize(11).text('Conteúdo');
       doc.moveDown(0.5);
       params.content.split(/\r?\n/).forEach((line) => {
         doc.fontSize(10).text(line || ' ');
@@ -303,10 +303,10 @@ const renderDocxBuffer = async (params: {
   ];
 
   if (params.competence) {
-    paragraphs.push(new Paragraph({ children: [new TextRun(`Competencia: ${params.competence}`)] }));
+    paragraphs.push(new Paragraph({ children: [new TextRun(`Competência: ${params.competence}`)] }));
   }
   if (params.employeeName || params.employeeCpf) {
-    paragraphs.push(new Paragraph({ children: [new TextRun(`Funcionario: ${params.employeeName ?? 'N/A'}`)] }));
+    paragraphs.push(new Paragraph({ children: [new TextRun(`Funcionário: ${params.employeeName ?? 'N/A'}`)] }));
     paragraphs.push(new Paragraph({ children: [new TextRun(`CPF: ${params.employeeCpf ?? 'N/A'}`)] }));
   }
 
@@ -355,7 +355,7 @@ export class DocumentsService {
       throw new ConflictException({
         statusCode: 409,
         error: 'Conflict',
-        message: 'Competencia fechada. Documento nao pode ser alterado.',
+        message: 'Competência fechada. Documento não pode ser alterado.',
         code: 'PAYROLL_COMPETENCE_CLOSED',
         details: { payrollRunId: payrollRun.id, month: payrollRun.month, year: payrollRun.year }
       });
@@ -439,7 +439,7 @@ export class DocumentsService {
       userId: params.userId,
       type: 'holerite',
       name: PAYSTUB_TEMPLATE_NAME,
-      description: 'Template padrao de holerite para emissao em lote.',
+      description: 'Template padrão de holerite para emissão em lote.',
       content: defaultContent,
       status: 'draft',
       requiredPlaceholders: defaultRequired,
@@ -1060,7 +1060,7 @@ export class DocumentsService {
   }) {
     if (!document.month || !document.year) {
       throw new BadRequestException(
-        'Holerite sem competencia associada. Regenerate the document to export PDF.'
+        'Holerite sem competência associada. Regenerate the document to export PDF.'
       );
     }
 
@@ -1224,4 +1224,5 @@ export class DocumentsService {
     return { buffer, filename, contentType };
   }
 }
+
 

@@ -32,7 +32,7 @@ const extractFields = (node: unknown) => {
     return {
       occurrenceTypeCode: undefined,
       code: undefined,
-      description: normalizeString(node) ?? 'Ocorrencia sem descricao',
+      description: normalizeString(node) ?? 'Ocorrência sem descrição',
       location: undefined
     };
   }
@@ -55,7 +55,7 @@ const extractFields = (node: unknown) => {
         objectNode.dsc ??
         objectNode.descricaoOcorrencia ??
         objectNode['#text']
-    ) ?? 'Ocorrencia sem descricao';
+    ) ?? 'Ocorrência sem descrição';
 
   const location = normalizeString(
     objectNode.localizacao ?? objectNode.localizacaoErro ?? objectNode.campo ?? objectNode.tag

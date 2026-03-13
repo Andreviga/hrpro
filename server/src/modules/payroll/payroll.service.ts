@@ -353,7 +353,7 @@ export class PayrollService {
       throw new ConflictException({
         statusCode: 409,
         error: 'Conflict',
-        message: 'Calculo bloqueado: configure Rubricas + INSS + IRRF antes de calcular a folha.',
+        message: 'Cálculo bloqueado: configure Rubricas + INSS + IRRF antes de calcular a folha.',
         code: 'PAYROLL_CALC_PRECONDITION_FAILED',
         details: {
           payrollRunId: payrollRun.id,
