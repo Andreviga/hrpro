@@ -117,7 +117,7 @@ const formatDate = (value: Date | null | undefined) => {
 
 const isLikelyFakeCompanyName = (companyName: string) => {
   const normalized = companyName.toLowerCase();
-  return /demo|fake|fict|empresa\s+nao|teste/.test(normalized);
+  return /demo|fake|fict|empresa\s+n[aã]o|teste/.test(normalized);
 };
 
 const onlyDigits = (value: string) => value.replace(/\D+/g, '');
@@ -290,9 +290,15 @@ export class PayslipDataBuilder {
     const earnings: PayslipRubric[] = [
       {
         code: '1500',
-        description: 'SALARIO BASE',
+        description: 'SALÁRIO BASE',
         amount: sumByMatcher(earningsEvents, (code, description) => {
-          return code === 'BASE' || code === 'SAL_BASE' || code === '1500' || description.includes('SALARIO BASE');
+          return (
+            code === 'BASE' ||
+            code === 'SAL_BASE' ||
+            code === '1500' ||
+            description.includes('SALARIO BASE') ||
+            description.includes('SALÁRIO BASE')
+          );
         }),
         type: 'earning'
       },
@@ -391,10 +397,10 @@ export class PayslipDataBuilder {
       fgtsBase: toNumber(payrollResult.grossSalary),
       irrfBase: toNumber(irrfBase),
       foodAllowance: sumByMatcher(earningsEvents, (code, description) => {
-        return code === 'VA' || description.includes('VALE ALIMENTACAO');
+        return code === 'VA' || description.includes('VALE ALIMENTACAO') || description.includes('VALE ALIMENTAÇÃO');
       }),
       alimony: sumByMatcher(deductionEvents, (code, description) => {
-        return code === 'PENSAO' || description.includes('PENSAO');
+        return code === 'PENSAO' || description.includes('PENSAO') || description.includes('PENSÃO');
       }),
       thirteenthSecondInstallment: sumByMatcher(earningsEvents, (code, description) => {
         return code.includes('13') || description.includes('13') || description.includes('2A PARCELA');

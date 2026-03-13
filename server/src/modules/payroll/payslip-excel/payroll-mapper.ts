@@ -203,7 +203,7 @@ export const mapPayrollData = (params: {
   if (!companyRegistry) {
     warnings.push({
       code: 'COMPANY_REGISTRY_MISSING',
-      message: `Empresa ${companyName || 'NAO_INFORMADA'} não encontrada no registry. Preencha CNPJ e endereço manualmente.`,
+      message: `Empresa ${companyName || 'não informada'} não encontrada no cadastro. Preencha CNPJ e endereço manualmente.`,
       fillLocation: COMPANY_REGISTRY_FILL_LOCATION,
       sourceSheet: monthlySheetName,
       sourceTable: 'Tabela35'
@@ -211,7 +211,7 @@ export const mapPayrollData = (params: {
   } else if (!companyRegistry.address) {
     warnings.push({
       code: 'COMPANY_ADDRESS_FILL_REQUIRED',
-      message: `Endereço da empresa ${companyRegistry.name} precisa ser preenchido manualmente no registry antes do uso final do PDF.`,
+      message: `Endereço da empresa ${companyRegistry.name} precisa ser preenchido manualmente no cadastro antes do uso final do PDF.`,
       fillLocation: COMPANY_REGISTRY_FILL_LOCATION,
       sourceSheet: monthlySheetName,
       sourceTable: 'Tabela35'

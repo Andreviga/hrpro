@@ -56,7 +56,7 @@ export const hasFgtsContributionByCategory = (employee: Employee) => {
   const code = String(employee.esocialCategoryCode ?? '').trim();
 
   // eSocial categories in 7xx (contribuinte individual/TSVE) generally do not calculate FGTS,
-  // except category 721 (diretor nao empregado, com FGTS).
+  // except category 721 (diretor não empregado, com FGTS).
   if (/^7\d\d$/.test(code)) {
     return code === '721';
   }
@@ -156,15 +156,15 @@ export function calculatePayrollForEmployee(params: {
 
   return {
     earnings: [
-      { code: 'BASE', description: 'Salario Base', amount: round(baseSalary) },
+      { code: 'BASE', description: 'Salário Base', amount: round(baseSalary) },
       { code: 'DSR', description: 'DSR', amount: round(dsr) },
-      { code: 'HORA_ATV', description: 'Hora Atividade', amount: round(hourActivity) }
+      { code: 'HORA_ATV', description: 'Hora-atividade', amount: round(hourActivity) }
     ].filter((item) => item.amount > 0),
     deductions: [
       { code: 'INSS', description: 'INSS', amount: inssValue },
       { code: 'IRRF', description: 'IRRF', amount: irrfValue },
       { code: 'VT', description: 'Vale Transporte', amount: transportVoucher },
-      { code: 'VA', description: 'Vale Alimentacao', amount: mealVoucher },
+      { code: 'VA', description: 'Vale Alimentação', amount: mealVoucher },
       { code: 'SIND', description: 'Taxa Sindical', amount: unionFee }
     ].filter((item) => item.amount > 0),
     grossSalary,
