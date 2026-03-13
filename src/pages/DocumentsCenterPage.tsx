@@ -55,8 +55,8 @@ const documentTypes: Array<{ value: DocumentType; label: string }> = [
   { value: 'trct', label: 'TRCT' },
   { value: 'termo_quitacao', label: 'Termo de Quitacao' },
   { value: 'aviso_previo', label: 'Aviso Previo' },
-  { value: 'recibo_ferias', label: 'Recibo de Ferias' },
-  { value: 'aviso_ferias', label: 'Aviso de Ferias' },
+  { value: 'recibo_ferias', label: 'Recibo de Férias' },
+  { value: 'aviso_ferias', label: 'Aviso de Férias' },
   { value: 'holerite', label: 'Holerite' },
   { value: 'recibo_13', label: 'Recibo 13o' },
   { value: 'recibo_plr', label: 'Recibo PLR' },
@@ -921,7 +921,7 @@ const DocumentsCenterPage: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="trct">TRCT</SelectItem>
-                      <SelectItem value="recibo_ferias">Recibo de Ferias</SelectItem>
+                      <SelectItem value="recibo_ferias">Recibo de Férias</SelectItem>
                       <SelectItem value="holerite">Holerite</SelectItem>
                     </SelectContent>
                   </Select>

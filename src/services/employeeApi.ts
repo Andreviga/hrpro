@@ -313,7 +313,7 @@ export const employeeApi = {
 
     const employee = await this.getEmployee(employeeId);
     if (!employee) {
-      throw new Error('Funcionario nao encontrado');
+      throw new Error('Funcionário não encontrado');
     }
 
     return {

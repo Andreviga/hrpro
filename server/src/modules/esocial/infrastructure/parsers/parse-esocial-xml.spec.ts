@@ -23,12 +23,12 @@ describe('eSocial XML parser and normalizer', () => {
     <retornoEvento xmlns="http://www.esocial.gov.br/schema/lote/eventos/retornoEvento/v1_2_1">
       <processamento>
         <cdResposta>409</cdResposta>
-        <descResposta>Falha de validacao</descResposta>
+        <descResposta>Falha de validação</descResposta>
         <ocorrencias>
           <ocorrencia>
             <tipo>1</tipo>
             <codigo>MS0155</codigo>
-            <descricao>CPF invalido</descricao>
+            <descricao>CPF inválido</descricao>
             <localizacao>/evt2200/trabalhador/cpfTrab</localizacao>
           </ocorrencia>
         </ocorrencias>
@@ -63,12 +63,12 @@ describe('eSocial XML parser and normalizer', () => {
         <ocorrencia>
           <tipo>2</tipo>
           <codigo>MS1001</codigo>
-          <descricao>Advertencia 1</descricao>
+          <descricao>Advertência 1</descricao>
         </ocorrencia>
         <ocorrencia>
           <tipo>3</tipo>
           <codigo>MS2001</codigo>
-          <descricao>Historico 1</descricao>
+          <descricao>Histórico 1</descricao>
         </ocorrencia>
       </ocorrencias>
     </retornoEvento>`;
@@ -88,7 +88,7 @@ describe('eSocial XML parser and normalizer', () => {
         <ocorrencia>
           <tipo>2</tipo>
           <codigo>MS2010</codigo>
-          <descricao>Tag unica</descricao>
+          <descricao>Tag única</descricao>
         </ocorrencia>
       </ocorrencias>
     </retornoEvento>`;

@@ -70,7 +70,7 @@ describe('EsocialService', () => {
       protocolNumber: 'P1',
       receiptNumber: 'R1',
       statusCode: '409',
-      statusDescription: 'Erro de validacao',
+      statusDescription: 'Erro de validação',
       occurrences: [
         {
           sourceType: 'evento',
@@ -78,7 +78,7 @@ describe('EsocialService', () => {
           occurrenceTypeLabel: 'ERRO',
           severity: 'ERROR',
           code: 'MS0155',
-          description: 'CPF invalido',
+          description: 'CPF inválido',
           isBlocking: true,
           isSuccessCompatible: false,
           rawFragment: '{}'

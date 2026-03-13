@@ -1269,7 +1269,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Numero</Label>
+                      <Label>Número</Label>
                       <Input
                         value={editingEmployee.address?.number || ''}
                         onChange={(e) => updateEditingAddress('number', e.target.value)}
@@ -1304,7 +1304,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Cod municipio IBGE</Label>
+                      <Label>Cód. município IBGE</Label>
                       <Input
                         value={editingEmployee.cityCode || ''}
                         onChange={(e) => updateEditingEmployee('cityCode', e.target.value)}
@@ -1360,7 +1360,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Tipo salario</Label>
+                      <Label>Tipo salário</Label>
                       <Select
                         value={editingEmployee.salaryType || 'monthly'}
                         onValueChange={(value) => updateEditingEmployee('salaryType', value as Employee['salaryType'])}
@@ -1375,7 +1375,7 @@ const AdminEmployeesPage: React.FC = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label>Salario base</Label>
+                      <Label>Salário base</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -1416,14 +1416,14 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>CTPS numero</Label>
+                      <Label>CTPS número</Label>
                       <Input
                         value={editingEmployee.ctpsNumber || ''}
                         onChange={(e) => updateEditingEmployee('ctpsNumber', e.target.value)}
                       />
                     </div>
                     <div>
-                      <Label>CTPS serie</Label>
+                      <Label>CTPS série</Label>
                       <Input
                         value={editingEmployee.ctpsSeries || ''}
                         onChange={(e) => updateEditingEmployee('ctpsSeries', e.target.value)}
@@ -1440,7 +1440,7 @@ const AdminEmployeesPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <h3 className="font-semibold mb-3">Campos minimos eSocial</h3>
+                  <h3 className="font-semibold mb-3">Campos mínimos eSocial</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label>Sexo</Label>
@@ -1451,7 +1451,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Raca/cor</Label>
+                      <Label>Raça/cor</Label>
                       <Input
                         value={editingEmployee.raceColor || ''}
                         onChange={(e) => updateEditingEmployee('raceColor', e.target.value)}
@@ -1467,14 +1467,14 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Grau instrucao</Label>
+                      <Label>Grau instrução</Label>
                       <Input
                         value={editingEmployee.educationLevel || ''}
                         onChange={(e) => updateEditingEmployee('educationLevel', e.target.value)}
                       />
                     </div>
                     <div>
-                      <Label>Pais nacionalidade</Label>
+                      <Label>País nacionalidade</Label>
                       <Input
                         value={editingEmployee.nationalityCode || ''}
                         onChange={(e) => updateEditingEmployee('nationalityCode', e.target.value)}
@@ -1482,7 +1482,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Pais nascimento</Label>
+                      <Label>País nascimento</Label>
                       <Input
                         value={editingEmployee.birthCountryCode || ''}
                         onChange={(e) => updateEditingEmployee('birthCountryCode', e.target.value)}
@@ -1497,14 +1497,14 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Cod municipio nascimento</Label>
+                      <Label>Cód. município nascimento</Label>
                       <Input
                         value={editingEmployee.birthCityCode || ''}
                         onChange={(e) => updateEditingEmployee('birthCityCode', e.target.value)}
                       />
                     </div>
                     <div>
-                      <Label>Cod categoria eSocial</Label>
+                      <Label>Cód. categoria eSocial</Label>
                       <Input
                         value={editingEmployee.esocialCategoryCode || ''}
                         onChange={(e) => updateEditingEmployee('esocialCategoryCode', e.target.value)}
@@ -1512,7 +1512,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Tipo regime trab</Label>
+                      <Label>Tipo regime trab.</Label>
                       <Input
                         value={editingEmployee.esocialRegistrationType || ''}
                         onChange={(e) => updateEditingEmployee('esocialRegistrationType', e.target.value)}
@@ -1520,7 +1520,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Tipo regime prev</Label>
+                      <Label>Tipo regime prev.</Label>
                       <Input
                         value={editingEmployee.esocialRegimeType || ''}
                         onChange={(e) => updateEditingEmployee('esocialRegimeType', e.target.value)}
@@ -1556,7 +1556,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Unidade salario fixo</Label>
+                      <Label>Unidade salário fixo</Label>
                       <Input
                         value={editingEmployee.esocialSalaryUnit || ''}
                         onChange={(e) => updateEditingEmployee('esocialSalaryUnit', e.target.value)}

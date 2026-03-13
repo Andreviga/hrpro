@@ -99,13 +99,13 @@ Ano-calendario: {{ano_calendario}}
 CNPJ/CPF: {{fonte_cnpj_cpf}}
 Nome empresarial/nome completo: {{fonte_nome}}
 
-2. PESSOA FISICA BENEFICIARIA DOS RENDIMENTOS
+2. PESSOA FÍSICA BENEFICIÁRIA DOS RENDIMENTOS
 CPF: {{beneficiario_cpf}}
 Nome completo: {{beneficiario_nome}}
 Natureza do rendimento: {{natureza_rendimento}}
 
-3. RENDIMENTOS TRIBUTAVEIS, DEDUCOES E IMPOSTO SOBRE A RENDA RETIDO NA FONTE (IRRF)
-01. Total dos rendimentos (inclusive ferias): {{q3_l1_total_rendimentos}}
+3. RENDIMENTOS TRIBUTÁVEIS, DEDUÇÕES E IMPOSTO SOBRE A RENDA RETIDO NA FONTE (IRRF)
+01. Total dos rendimentos (inclusive férias): {{q3_l1_total_rendimentos}}
 02. Contribuição previdenciária oficial: {{q3_l2_previdencia_oficial}}
 03. Contribuição a entidades de previdência complementar/FAPI: {{q3_l3_previdencia_complementar}}
 04. Pensão alimentícia: {{q3_l4_pensao_alimenticia}}
