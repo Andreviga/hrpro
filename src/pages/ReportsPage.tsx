@@ -52,7 +52,7 @@ const ReportsPage: React.FC = () => {
       setReports(data);
     } catch (error) {
       console.error('Erro ao carregar relatórios:', error);
-      setError('Nao foi possivel carregar os relatorios deste periodo.');
+      setError('Não foi possível carregar os relatorios deste período.');
       setReports([]);
     } finally {
       setLoading(false);
@@ -152,7 +152,7 @@ const ReportsPage: React.FC = () => {
 
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                 <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Mes" />
+                  <SelectValue placeholder="Mês" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Ano todo</SelectItem>
@@ -184,7 +184,7 @@ const ReportsPage: React.FC = () => {
             <CardHeader>
               <CardTitle className="text-amber-900">Sem dados para exibir</CardTitle>
               <CardDescription className="text-amber-800">
-                Nao ha aulas registradas para {selectedYear}. Cadastre aulas na Gestao Academica para gerar indicadores e graficos.
+                Não ha aulas registradas para {selectedYear}. Cadastre aulas na Gestao Academica para gerar indicadores e graficos.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -458,3 +458,4 @@ const ReportsPage: React.FC = () => {
 };
 
 export default ReportsPage;
+

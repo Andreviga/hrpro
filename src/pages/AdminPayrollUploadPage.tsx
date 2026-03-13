@@ -157,7 +157,7 @@ const AdminPayrollUploadPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Upload de Folha de Pagamento</h1>
             <p className="text-gray-600 mt-1">
-              Assistente de importacao: selecione, revise e processe a planilha com validacoes antes do envio.
+              Assistente de importação: selecione, revise e processe a planilha com validações antes do envio.
             </p>
           </div>
 
@@ -174,11 +174,11 @@ const AdminPayrollUploadPage: React.FC = () => {
                 </div>
                 <div className={`rounded border p-3 ${wizardStep === 'processing' ? 'border-blue-300 bg-blue-50' : 'border-slate-200'}`}>
                   <div className="font-medium">3. Processar</div>
-                  <div className="text-slate-600">Importacao e validacao</div>
+                  <div className="text-slate-600">Importação e validação</div>
                 </div>
                 <div className={`rounded border p-3 ${wizardStep === 'result' ? 'border-blue-300 bg-blue-50' : 'border-slate-200'}`}>
                   <div className="font-medium">4. Resultado</div>
-                  <div className="text-slate-600">Resumo e inconsistencias</div>
+                  <div className="text-slate-600">Resumo e inconsistências</div>
                 </div>
               </div>
             </CardContent>

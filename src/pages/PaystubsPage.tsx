@@ -1,5 +1,5 @@
 /**
- * Pagina para listagem de holerites do funcionario.
+ * Pagina para listagem de holerites do Funcionário.
  * Exibe lista de holerites com navegacao para detalhes.
  */
 import React, { useState, useEffect } from 'react';
@@ -90,7 +90,7 @@ const PaystubsPage: React.FC = () => {
       } else {
         toast({
           title: 'Falha ao baixar PDF',
-          description: getFriendlyError(downloadError, 'Nao foi possivel baixar o PDF do holerite. Faca login novamente e tente de novo.')
+          description: getFriendlyError(downloadError, 'Não foi possível baixar o PDF do holerite. Faça login novamente e tente de novo.')
         });
       }
     }
@@ -200,7 +200,7 @@ const PaystubsPage: React.FC = () => {
                           Holerite - {formatMonthYear(paystub.month, paystub.year)}
                         </h3>
                         {paystub.employeeName && (
-                          <p className="text-sm text-gray-600 mt-1">Funcionario: {paystub.employeeName}</p>
+                          <p className="text-sm text-gray-600 mt-1">Funcionário: {paystub.employeeName}</p>
                         )}
                         <div className="flex items-center space-x-4 mt-1">
                           <span className="flex items-center text-sm text-gray-600">
@@ -244,7 +244,7 @@ const PaystubsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="text-yellow-800">Precisa de ajuda?</CardTitle>
             <CardDescription className="text-yellow-700">
-              Se voce nao encontrou o holerite que procura ou tem duvidas sobre os valores,
+              Se voce Não encontrou o holerite que procura ou tem dúvidas sobre os valores,
               entre em contato com o RH.
             </CardDescription>
           </CardHeader>
@@ -260,3 +260,4 @@ const PaystubsPage: React.FC = () => {
 };
 
 export default PaystubsPage;
+

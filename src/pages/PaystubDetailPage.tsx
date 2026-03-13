@@ -317,7 +317,7 @@ const PaystubDetailPage: React.FC = () => {
     } catch (saveError) {
       toast({
         title: 'Falha ao salvar edição livre',
-        description: getFriendlyError(saveError, 'Nao foi possível salvar os campos do holerite.')
+        description: getFriendlyError(saveError, 'Não foi possível salvar os campos do holerite.')
       });
     } finally {
       setSavingFreeEdit(false);
@@ -353,12 +353,12 @@ const PaystubDetailPage: React.FC = () => {
       await loadPaystubDetail(paystub.id);
       toast({
         title: 'Vale-transporte aplicado',
-        description: 'Valor mensal do vale-transporte salvo no cadastro do funcionario.'
+        description: 'Valor mensal do vale-transporte salvo no cadastro do Funcionário.'
       });
     } catch (saveError) {
       toast({
         title: 'Falha ao aplicar vale-transporte',
-        description: getFriendlyError(saveError, 'Nao foi possível salvar o vale-transporte.')
+        description: getFriendlyError(saveError, 'Não foi possível salvar o vale-transporte.')
       });
     } finally {
       setSavingTransport(false);
@@ -473,7 +473,7 @@ const PaystubDetailPage: React.FC = () => {
                   />
                 </div>
               ) : (
-                <p className="font-medium text-gray-900">Nao informado</p>
+                <p className="font-medium text-gray-900">Não informado</p>
               )}
             </div>
           </CardContent>
@@ -1008,3 +1008,4 @@ const PaystubDetailPage: React.FC = () => {
 };
 
 export default PaystubDetailPage;
+

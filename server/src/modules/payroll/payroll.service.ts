@@ -342,11 +342,11 @@ export class PayrollService {
     }
 
     if (inssCount === 0) {
-      issues.push('Tabela INSS nao configurada para a competencia.');
+      issues.push('Tabela INSS não configurada para a competência.');
     }
 
     if (irrfCount === 0) {
-      issues.push('Tabela IRRF nao configurada para a competencia.');
+      issues.push('Tabela IRRF não configurada para a competência.');
     }
 
     if (issues.length > 0) {
@@ -390,7 +390,7 @@ export class PayrollService {
       throw new ConflictException({
         statusCode: 409,
         error: 'Conflict',
-        message: 'Competencia ja fechada para esta empresa.',
+        message: 'Competência já fechada para esta empresa.',
         code: 'PAYROLL_COMPETENCE_CLOSED',
         details: { payrollRunId: closedRun.id, month, year }
       });
@@ -580,7 +580,7 @@ export class PayrollService {
       throw new ConflictException({
         statusCode: 409,
         error: 'Conflict',
-        message: 'Competencia ja fechada para esta empresa.',
+        message: 'Competência já fechada para esta empresa.',
         code: 'PAYROLL_CLOSE_DUPLICATE',
         details: { existingPayrollRunId: existingClosed.id }
       });
@@ -702,7 +702,7 @@ export class PayrollService {
       throw new ConflictException({
         statusCode: 409,
         error: 'Conflict',
-        message: 'Outra folha ja esta fechada para esta competencia.',
+        message: 'Outra folha já está fechada para esta competência.',
         code: 'PAYROLL_REOPEN_DUPLICATE',
         details: { payrollRunId: otherClosed.id }
       });
@@ -912,7 +912,7 @@ export class PayrollService {
       throw new ConflictException({
         statusCode: 409,
         error: 'Conflict',
-        message: 'Competencia fechada. Nao e possivel remover funcionario da folha.',
+        message: 'Competência fechada. Não é possível remover funcionário da folha.',
         code: 'PAYROLL_RUN_CLOSED',
         details: { payrollRunId: params.payrollRunId }
       });
@@ -964,7 +964,7 @@ export class PayrollService {
     const removed = removedPayrollResult || deletedDocumentsCount > 0;
 
     if (!removed) {
-      return { removed: false, message: 'Funcionario nao encontrado nesta competencia.' };
+      return { removed: false, message: 'Funcionário não encontrado nesta competência.' };
     }
 
     await this.audit.log({
@@ -1096,7 +1096,7 @@ export class PayrollService {
           companyId: result.payrollRun.companyId,
           companyName: result.payrollRun.company.name,
           companyCnpj: result.payrollRun.company.cnpj,
-          companyAddress: 'Endereco nao informado',
+          companyAddress: 'Endereço não informado',
           employeeId: result.employeeId,
           employeeName: result.employee.fullName,
           employeeCpf: result.employee.cpf,
@@ -1292,7 +1292,7 @@ export class PayrollService {
       companyId: params.companyId,
       companyName: String(params.companyName || '').trim() || '-',
       companyCnpj: String(params.companyCnpj || '').trim() || '-',
-      companyAddress: String(params.companyAddress || '').trim() || 'Endereco nao informado',
+      companyAddress: String(params.companyAddress || '').trim() || 'Endereço não informado',
       employeeId: params.employeeId,
       employeeName: String(params.employeeName || '').trim() || '-',
       employeeCpf: String(params.employeeCpf || '').trim() || '-',
@@ -1365,7 +1365,7 @@ export class PayrollService {
 
     const detail = await this.getPaystubDetail(params.paystubId, params.requester);
     if (!detail?.payslip) {
-      throw new BadRequestException('Nao foi possivel montar os dados do holerite para gerar o PDF.');
+      throw new BadRequestException('Não foi possível montar os dados do holerite para gerar o PDF.');
     }
 
     const buffer = await this.payslipPdf.generatePayslipPdf(detail.payslip);
@@ -1404,7 +1404,7 @@ export class PayrollService {
       throw new ConflictException({
         statusCode: 409,
         error: 'Conflict',
-        message: 'Competencia fechada. Reabra a folha antes de editar holerite.',
+        message: 'Competência fechada. Reabra a folha antes de editar holerite.',
         code: 'PAYROLL_COMPETENCE_CLOSED',
         details: { payrollRunId: paystub.payrollRun.id, month: paystub.payrollRun.month, year: paystub.payrollRun.year }
       });
@@ -1561,7 +1561,7 @@ export class PayrollService {
       if (params.employee.cpf !== undefined) {
         const cpf = this.onlyDigits(params.employee.cpf);
         if (cpf.length !== 11) {
-          throw new BadRequestException('CPF invalido. Informe 11 digitos.');
+          throw new BadRequestException('CPF inválido. Informe 11 dígitos.');
         }
         employeePatch.cpf = cpf;
       }
@@ -1572,7 +1572,7 @@ export class PayrollService {
       if (params.employee.admissionDate !== undefined) {
         const parsedDate = new Date(String(params.employee.admissionDate));
         if (Number.isNaN(parsedDate.getTime())) {
-          throw new BadRequestException('Data de admissao invalida.');
+          throw new BadRequestException('Data de admissão inválida.');
         }
         employeePatch.admissionDate = parsedDate;
       }
@@ -1601,7 +1601,7 @@ export class PayrollService {
       if (params.employee.weeklyHours !== undefined) {
         const weeklyHours = Number(params.employee.weeklyHours);
         if (!Number.isFinite(weeklyHours) || weeklyHours < 0) {
-          throw new BadRequestException('Carga horaria semanal invalida.');
+          throw new BadRequestException('Carga horária semanal inválida.');
         }
         employeePatch.weeklyHours = this.roundMoney(weeklyHours);
       }
@@ -1609,7 +1609,7 @@ export class PayrollService {
       if (params.employee.transportVoucherValue !== undefined) {
         const transportValue = Number(params.employee.transportVoucherValue);
         if (!Number.isFinite(transportValue) || transportValue < 0) {
-          throw new BadRequestException('Valor de vale-transporte invalido.');
+          throw new BadRequestException('Valor de vale-transporte inválido.');
         }
         employeePatch.transportVoucherValue = this.roundMoney(transportValue);
       }
@@ -1634,7 +1634,7 @@ export class PayrollService {
       );
 
       if (cnpjDigits.length !== 14) {
-        throw new BadRequestException('CNPJ invalido para o perfil da empresa.');
+        throw new BadRequestException('CNPJ inválido para o perfil da empresa.');
       }
 
       const existing = companyProfiles.find((item) => this.onlyDigits(item.cnpj) === cnpjDigits);
@@ -1920,7 +1920,7 @@ export class PayrollService {
         q6_l5_irrf: '0,00',
         q6_l6_isentos_molestia: '0,00',
 
-        quadro7_observacoes: `Consolidado anual com ${results.length} competencias fechadas em ${params.year}.`,
+        quadro7_observacoes: `Consolidado anual com ${results.length} competências fechadas em ${params.year}.`,
         data_emissao: issueDate,
         assinatura_fonte_pagadora: company.name,
         responsavel_cargo_nome: 'Responsavel RH'
@@ -2386,3 +2386,4 @@ export class PayrollService {
     };
   }
 }
+

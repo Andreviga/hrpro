@@ -67,21 +67,21 @@ const DashboardPage: React.FC = () => {
     {
       title: 'Perfil',
       value: 'Administrativo',
-      description: 'Sem vinculo de funcionario',
+      description: 'Sem vínculo de Funcionário',
       icon: User,
       color: 'text-blue-600'
     },
     {
       title: 'Holerites pessoais',
       value: 'N/A',
-      description: 'Nao se aplica para este login',
+      description: 'Não se aplica para este login',
       icon: FileText,
       color: 'text-slate-600'
     },
     {
       title: 'Modulo recomendado',
-      value: 'Competencias',
-      description: 'Use Fechamento por Competencia',
+      value: 'competências',
+      description: 'Use Fechamento por competência',
       icon: Calendar,
       color: 'text-emerald-600'
     },
@@ -160,7 +160,7 @@ const DashboardPage: React.FC = () => {
           <CardContent>
             {isAdministrativeProfile ? (
               <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
-                Esta conta nao possui vinculo de funcionario. Dados pessoais de holerite e performance individual nao sao exibidos neste dashboard.
+                Esta conta Não possui vínculo de Funcionário. Dados pessoais de holerite e performance individual Não são exibidos neste dashboard.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -241,7 +241,7 @@ const DashboardPage: React.FC = () => {
           <CardContent>
             {isAdministrativeProfile ? (
               <p className="text-sm text-gray-600">
-                Acompanhe eventos operacionais nos modulos de Competencias, Documentos e Monitor eSocial.
+                Acompanhe eventos operacionais nos modulos de competências, Documentos e Monitor eSocial.
               </p>
             ) : statsLoading ? (
               <p className="text-sm text-gray-500">Carregando atividades...</p>
@@ -277,3 +277,4 @@ const DashboardPage: React.FC = () => {
 };
 
 export default DashboardPage;
+

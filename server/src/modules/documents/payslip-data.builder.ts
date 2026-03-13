@@ -259,7 +259,7 @@ export class PayslipDataBuilder {
     const deductionEvents = events.filter((event) => event.type === 'deduction');
 
     const companyRegistry = resolveCompanyRegistry(company.name);
-    const companyAddress = normalizeText(companyRegistry?.address, 'Endereco nao informado');
+    const companyAddress = normalizeText(companyRegistry?.address, 'Endereço não informado');
     const companyCnpj = normalizeText(company.cnpj || companyRegistry?.cnpj, '');
 
     const inssAmount = sumByMatcher(
@@ -452,7 +452,7 @@ export class PayslipDataBuilder {
           ...legacyPayslip.warnings,
           {
             code: 'WORKBOOK_COMPETENCE_MISMATCH',
-            message: `A planilha carregada retornou a competencia ${legacyPayslip.referenceMonth ?? 'desconhecida'} para este colaborador, diferente da competencia solicitada ${requestedCompetence}. Os valores do banco foram mantidos para evitar mistura de meses.`,
+            message: `A planilha carregada retornou a competência ${legacyPayslip.referenceMonth ?? 'desconhecida'} para este colaborador, diferente da competência solicitada ${requestedCompetence}. Os valores do banco foram mantidos para evitar mistura de meses.`,
             fillLocation: 'Folha de pagamento de fevereiro 2026.xlsm',
             sourceSheet: 'Folha de pagamento janeiro2026'
           }
@@ -672,9 +672,10 @@ export class PayslipDataBuilder {
 
     if (missingFields.length > 0) {
       throw new BadRequestException({
-        message: 'Nao foi possivel gerar holerite. Campos obrigatorios ausentes ou invalidos.',
+        message: 'Não foi possível gerar holerite. Campos obrigatórios ausentes ou inválidos.',
         missingFields: Array.from(new Set(missingFields))
       });
     }
   }
 }
+

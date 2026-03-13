@@ -72,8 +72,8 @@ const AdminPaystubBatchPage: React.FC = () => {
       setRuns(sorted);
     } catch (error) {
       toast({
-        title: 'Falha ao carregar competencias',
-        description: getFriendlyError(error, 'Nao foi possivel carregar as competencias informadas.')
+        title: 'Falha ao carregar competências',
+        description: getFriendlyError(error, 'Não foi possível carregar as competências informadas.')
       });
       setRuns([]);
     } finally {
@@ -115,12 +115,12 @@ const AdminPaystubBatchPage: React.FC = () => {
 
     toast({
       title: 'Calculando folha',
-      description: `Competencia ${run.month}/${run.year} em processamento antes da emissao.`
+      description: `competência ${run.month}/${run.year} em processamento antes da Emissão.`
     });
 
     const calculatedRun = await payrollApi.calculatePayrollRun(run.id);
     if (calculatedRun.status === 'draft') {
-      throw new Error('A folha permanece em rascunho apos tentativa de calculo.');
+      throw new Error('A folha permanece em rascunho apos tentativa de cálculo.');
     }
 
     return calculatedRun.status;
@@ -145,15 +145,15 @@ const AdminPaystubBatchPage: React.FC = () => {
         : `${result.createdCount} holerites emitidos.`;
 
       toast({
-        title: 'Emissao concluida',
-        description: `Competencia ${run.month}/${run.year}: ${summary}`
+        title: 'Emissão concluida',
+        description: `competência ${run.month}/${run.year}: ${summary}`
       });
 
       await loadRuns();
     } catch (error) {
       toast({
         title: 'Falha ao emitir holerites',
-        description: getFriendlyError(error, 'Nao foi possivel emitir os holerites da competencia.')
+        description: getFriendlyError(error, 'Não foi possível emitir os holerites da competência.')
       });
     } finally {
       setEmittingId(null);
@@ -162,7 +162,7 @@ const AdminPaystubBatchPage: React.FC = () => {
 
   const handleRegeneratePaystubs = async (run: PayrollRun) => {
     const confirmed = window.confirm(
-      `Regerar todos os holerites da competencia ${run.month}/${run.year}?\n\nOs holerites atuais serao desativados e novos arquivos serao criados.`
+      `Regerar todos os holerites da competência ${run.month}/${run.year}?\n\nOs holerites atuais serao desativados e novos arquivos serao criados.`
     );
 
     if (!confirmed) return;
@@ -180,14 +180,14 @@ const AdminPaystubBatchPage: React.FC = () => {
       const regenerated = result.regeneratedFromPreviousCount ?? 0;
       toast({
         title: 'Regeracao concluida',
-        description: `Competencia ${run.month}/${run.year}: ${result.createdCount} novos, ${regenerated} anteriores desativados.`
+        description: `competência ${run.month}/${run.year}: ${result.createdCount} novos, ${regenerated} anteriores desativados.`
       });
 
       await loadRuns();
     } catch (error) {
       toast({
         title: 'Falha ao regerar holerites',
-        description: getFriendlyError(error, 'Nao foi possivel regerar os holerites desta competencia.')
+        description: getFriendlyError(error, 'Não foi possível regerar os holerites desta competência.')
       });
     } finally {
       setRegeneratingId(null);
@@ -205,7 +205,7 @@ const AdminPaystubBatchPage: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Emitir Holerites</h1>
-            <p className="text-gray-600 mt-1">Escolha a competencia e emita ou regera com um clique.</p>
+            <p className="text-gray-600 mt-1">Escolha a competência e emita ou regera com um clique.</p>
           </div>
           <Button variant="outline" onClick={() => void loadRuns()} disabled={loading}>
             <RefreshCcw className="h-4 w-4 mr-2" />
@@ -217,15 +217,15 @@ const AdminPaystubBatchPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Emissao Rapida
+              Emissão Rapida
             </CardTitle>
             <CardDescription>
-              Emissao padrao evita duplicidade. Regerar substitui os holerites existentes da competencia.
+              Emissão padrão evita duplicidade. Regerar substitui os holerites existentes da competência.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Competencias existentes</Label>
+              <Label>competências existentes</Label>
               <div className="flex flex-wrap items-end gap-3 mt-1">
                 <Select
                   value={selectedCompetency}
@@ -237,7 +237,7 @@ const AdminPaystubBatchPage: React.FC = () => {
                   }}
                 >
                   <SelectTrigger className="w-[300px]">
-                    <SelectValue placeholder="Selecione uma competencia existente" />
+                    <SelectValue placeholder="Selecione uma competência existente" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableCompetencies.map((competency) => (
@@ -260,7 +260,7 @@ const AdminPaystubBatchPage: React.FC = () => {
 
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <Label>Mes</Label>
+                <Label>Mês</Label>
                 <Input
                   type="number"
                   min={1}
@@ -282,7 +282,7 @@ const AdminPaystubBatchPage: React.FC = () => {
                 />
               </div>
               <Button onClick={() => void loadRuns()} disabled={loading || !month || !year}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar competencia'}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar competência'}
               </Button>
             </div>
 
@@ -292,16 +292,16 @@ const AdminPaystubBatchPage: React.FC = () => {
                 Carregando...
               </div>
             ) : runs.length === 0 ? (
-              <div className="text-sm text-gray-500">Nenhuma competencia encontrada para o periodo informado.</div>
+              <div className="text-sm text-gray-500">Nenhuma competência encontrada para o período informado.</div>
             ) : (
               <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Competencia</TableHead>
+                    <TableHead>Competência</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Versao</TableHead>
-                    <TableHead>Acoes</TableHead>
+                    <TableHead>Versão</TableHead>
+                    <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -370,3 +370,4 @@ const AdminPaystubBatchPage: React.FC = () => {
 };
 
 export default AdminPaystubBatchPage;
+

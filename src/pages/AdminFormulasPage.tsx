@@ -338,10 +338,10 @@ const AdminFormulasPage: React.FC = () => {
                 <p className={`font-medium ${isPayrollReady ? 'text-emerald-800' : 'text-amber-900'}`}>
                   {isPayrollReady
                     ? 'Pronto para calcular folha'
-                    : 'Calculo bloqueado ate completar os parametros obrigatorios'}
+                    : 'cálculo bloqueado ate completar os parametros obrigatórios'}
                 </p>
                 <p className={`text-sm mt-1 ${isPayrollReady ? 'text-emerald-700' : 'text-amber-800'}`}>
-                  Rubricas obrigatorias (BASE, INSS, IRRF), tabela INSS e tabela IRRF devem estar preenchidas para a competencia antes do calculo.
+                  Rubricas obrigatorias (BASE, INSS, IRRF), tabela INSS e tabela IRRF devem estar preenchidas para a competência antes do cálculo.
                 </p>
                 {!isPayrollReady && (
                   <ul className="text-sm mt-2 space-y-1 text-amber-900">
@@ -845,3 +845,4 @@ const AdminFormulasPage: React.FC = () => {
 };
 
 export default AdminFormulasPage;
+

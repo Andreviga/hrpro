@@ -30,43 +30,43 @@ export class EmployeesService {
     const shouldValidate = (fieldName: string) => mode === 'create' || Object.prototype.hasOwnProperty.call(rawData, fieldName);
 
     if (mode === 'create' && !String(mapped.fullName ?? '').trim()) {
-      throw new BadRequestException('Nome completo e obrigatorio.');
+      throw new BadRequestException('Nome completo é obrigatório.');
     }
 
     if (shouldValidate('fullName') && String(mapped.fullName ?? '').trim() && !this.hasLetters(mapped.fullName)) {
-      throw new BadRequestException('Nome completo invalido.');
+      throw new BadRequestException('Nome completo inválido.');
     }
 
     if (mode === 'create' && !String(mapped.cpf ?? '').trim()) {
-      throw new BadRequestException('CPF e obrigatorio.');
+      throw new BadRequestException('CPF é obrigatório.');
     }
 
     if (shouldValidate('cpf') && mapped.cpf && !this.isValidCpf(mapped.cpf)) {
-      throw new BadRequestException('CPF invalido.');
+      throw new BadRequestException('CPF inválido.');
     }
 
     if (mode === 'create' && !String(mapped.email ?? '').trim()) {
-      throw new BadRequestException('E-mail e obrigatorio.');
+      throw new BadRequestException('E-mail é obrigatório.');
     }
 
     if (shouldValidate('email') && mapped.email) {
       const email = String(mapped.email).trim();
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        throw new BadRequestException('E-mail invalido.');
+        throw new BadRequestException('E-mail inválido.');
       }
     }
 
     if (mode === 'create' && !String(mapped.position ?? '').trim()) {
-      throw new BadRequestException('Cargo e obrigatorio.');
+      throw new BadRequestException('Cargo é obrigatório.');
     }
 
     if (shouldValidate('position') && String(mapped.position ?? '').trim() && !this.hasLetters(mapped.position)) {
-      throw new BadRequestException('Cargo invalido.');
+      throw new BadRequestException('Cargo inválido.');
     }
 
     if (mode === 'create' && !mapped.admissionDate) {
-      throw new BadRequestException('Data de admissao e obrigatoria.');
+      throw new BadRequestException('Data de admissão é obrigatória.');
     }
 
     if (shouldValidate('admissionDate') && mapped.admissionDate) {
@@ -74,7 +74,7 @@ export class EmployeesService {
       const year = admissionDate.getFullYear();
       const today = new Date();
       if (year < 1950 || admissionDate.getTime() > today.getTime()) {
-        throw new BadRequestException('Data de admissao invalida.');
+        throw new BadRequestException('Data de admissão inválida.');
       }
     }
   }
@@ -353,7 +353,7 @@ export class EmployeesService {
   async approve(id: string, companyId: string, userId?: string) {
     const before = await this.getEmployeeOrThrow(id, companyId);
     if (before.status === 'dismissed') {
-      throw new ConflictException('Funcionario desligado nao pode ser reativado por aprovacao.');
+      throw new ConflictException('Funcionário desligado não pode ser reativado por aprovação.');
     }
 
     const employee = await this.prisma.employee.update({
@@ -823,3 +823,4 @@ export class EmployeesService {
     return benefit;
   }
 }
+

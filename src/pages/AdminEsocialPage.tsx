@@ -189,11 +189,11 @@ const AdminEsocialPage: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Monitor eSocial</h1>
-            <p className="text-gray-600">Importacao, auditoria e interpretacao de retornos XML com todas as ocorrencias.</p>
+            <p className="text-gray-600">Importação, auditoria e interpretação de retornos XML com todas as ocorrências.</p>
           </div>
           <Button variant="outline" onClick={syncDefaultCatalog}>
             <Database className="h-4 w-4 mr-2" />
-            Sincronizar Catalogo
+            Sincronizar Catálogo
           </Button>
         </div>
 
@@ -374,7 +374,7 @@ const AdminEsocialPage: React.FC = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label>Codigo</Label>
+                    <Label>Código</Label>
                     <Input
                       value={occurrenceFilters.code}
                       onChange={(e) => setOccurrenceFilters({ ...occurrenceFilters, code: e.target.value })}
@@ -483,3 +483,4 @@ const AdminEsocialPage: React.FC = () => {
 };
 
 export default AdminEsocialPage;
+

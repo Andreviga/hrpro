@@ -483,7 +483,7 @@ const AdminEmployeesPage: React.FC = () => {
 
                   <Select value={filters.employerCnpj} onValueChange={(value) => setFilters({...filters, employerCnpj: value})}>
                     <SelectTrigger className="w-[300px]">
-                      <SelectValue placeholder="Vinculo CNPJ" />
+                      <SelectValue placeholder="vínculo CNPJ" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os CNPJs</SelectItem>
@@ -537,7 +537,7 @@ const AdminEmployeesPage: React.FC = () => {
                             </p>
                           </div>
                           <div>
-                            <p className="text-gray-500">Vinculo CNPJ</p>
+                            <p className="text-gray-500">vínculo CNPJ</p>
                             <p className="font-medium">{getEmployerLabel(employee.employerCnpj)}</p>
                           </div>
                         </div>
@@ -1051,7 +1051,7 @@ const AdminEmployeesPage: React.FC = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="employerCnpj">Vinculo CNPJ *</Label>
+                      <Label htmlFor="employerCnpj">vínculo CNPJ *</Label>
                       <Select
                         value={newEmployee.employerCnpj || EMPLOYER_OPTIONS[0].value}
                         onValueChange={(value) => setNewEmployee({ ...newEmployee, employerCnpj: value })}
@@ -1149,12 +1149,12 @@ const AdminEmployeesPage: React.FC = () => {
           </div>
         )}
 
-        {/* Modal de Edicao de Funcionario */}
+        {/* Modal de Edicao de Funcionário */}
         {editingEmployee && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <Card className="w-full max-w-6xl max-h-[90vh] overflow-y-auto">
               <CardHeader>
-                <CardTitle>Editar funcionario</CardTitle>
+                <CardTitle>Editar Funcionário</CardTitle>
                 <CardDescription>Atualize os dados cadastrais e campos eSocial.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -1204,7 +1204,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Data emissao RG</Label>
+                      <Label>Data Emissão RG</Label>
                       <Input
                         type="date"
                         value={editingEmployee.rgIssueDate || ''}
@@ -1237,7 +1237,7 @@ const AdminEmployeesPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <h3 className="font-semibold mb-3">Contato e endereco</h3>
+                  <h3 className="font-semibold mb-3">Contato e Endereço</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label>Email</Label>
@@ -1331,7 +1331,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Vinculo CNPJ</Label>
+                      <Label>vínculo CNPJ</Label>
                       <Select
                         value={editingEmployee.employerCnpj || '__none'}
                         onValueChange={(value) =>
@@ -1342,7 +1342,7 @@ const AdminEmployeesPage: React.FC = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__none">Nao definido</SelectItem>
+                          <SelectItem value="__none">Não definido</SelectItem>
                           {EMPLOYER_OPTIONS.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label} ({option.cnpjFormatted})
@@ -1352,7 +1352,7 @@ const AdminEmployeesPage: React.FC = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label>Data admissao</Label>
+                      <Label>Data admissão</Label>
                       <Input
                         type="date"
                         value={editingEmployee.admissionDate || ''}
@@ -1528,14 +1528,14 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label>Tipo admissao</Label>
+                      <Label>Tipo admissão</Label>
                       <Input
                         value={editingEmployee.esocialAdmissionType || ''}
                         onChange={(e) => updateEditingEmployee('esocialAdmissionType', e.target.value)}
                       />
                     </div>
                     <div>
-                      <Label>Indicativo admissao</Label>
+                      <Label>Indicativo admissão</Label>
                       <Input
                         value={editingEmployee.esocialAdmissionIndicator || ''}
                         onChange={(e) => updateEditingEmployee('esocialAdmissionIndicator', e.target.value)}
@@ -1587,7 +1587,7 @@ const AdminEmployeesPage: React.FC = () => {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <Label>Descricao jornada</Label>
+                      <Label>Descrição jornada</Label>
                       <Input
                         value={editingEmployee.esocialWorkSchedule || ''}
                         onChange={(e) => updateEditingEmployee('esocialWorkSchedule', e.target.value)}
@@ -1613,7 +1613,7 @@ const AdminEmployeesPage: React.FC = () => {
                 <div className="flex space-x-3">
                   <Button onClick={handleUpdateEmployee} disabled={savingEmployee} className="flex-1">
                     {savingEmployee ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Edit className="h-4 w-4 mr-2" />}
-                    Salvar alteracoes
+                    Salvar alterações
                   </Button>
                   <Button variant="outline" onClick={() => setEditingEmployee(null)}>
                     Cancelar
@@ -1706,7 +1706,7 @@ const AdminEmployeesPage: React.FC = () => {
                       </p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Vinculo CNPJ</p>
+                      <p className="text-gray-500">vínculo CNPJ</p>
                       <p className="font-medium">{getEmployerLabel(selectedEmployee.employerCnpj)}</p>
                     </div>
                   </div>
@@ -1764,5 +1764,6 @@ const AdminEmployeesPage: React.FC = () => {
 };
 
 export default AdminEmployeesPage;
+
 
 

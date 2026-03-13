@@ -134,14 +134,14 @@ const AdminPayrollGridPage: React.FC = () => {
   const handleExportCSV = () => {
     if (!gridData || !filteredEmployees.length) return;
     const headers = [
-      'Funcionario',
+      'funcionário',
       'CPF',
       'Cargo',
       'Departamento',
       ...rubricColumns,
       'Bruto',
       'Descontos',
-      'Liquido',
+      'líquido',
       'FGTS',
     ];
     const rows = filteredEmployees.map((e) => [
@@ -169,31 +169,31 @@ const AdminPayrollGridPage: React.FC = () => {
     if (!gridData?.payrollRunId) return;
 
     if (gridData.status === 'closed') {
-      toast({ title: 'Folha fechada', description: 'Reabra a competencia para remover funcionarios.' });
+      toast({ title: 'Folha fechada', description: 'Reabra a competência para remover funcionários.' });
       return;
     }
 
     const confirmed = window.confirm(
-      `Remover ${employee.fullName} da competencia ${String(month).padStart(2, '0')}/${year}?`
+      `Remover ${employee.fullName} da competência ${String(month).padStart(2, '0')}/${year}?`
     );
     if (!confirmed) return;
 
-    const reason = window.prompt('Motivo da exclusao (opcional):', 'ajuste_manual') ?? undefined;
+    const reason = window.prompt('Motivo da exclusão (opcional):', 'ajuste_manual') ?? undefined;
 
     try {
       setRemovingEmployeeId(employee.employeeId);
       const response = await payrollApi.removeEmployeeFromRun(gridData.payrollRunId, employee.employeeId, reason);
 
       if (!response.removed) {
-        toast({ title: 'Nada para remover', description: response.message || 'Funcionario nao estava na folha.' });
+        toast({ title: 'Nada para remover', description: response.message || 'Funcionário não estava na folha.' });
         return;
       }
 
       toast({
-        title: 'Funcionario removido',
+        title: 'Funcionário removido',
         description:
           employee.fullName +
-          ' foi removido da competencia ' +
+          ' foi removido da competência ' +
           String(month).padStart(2, '0') +
           '/' +
           year +
@@ -202,7 +202,7 @@ const AdminPayrollGridPage: React.FC = () => {
 
       await loadGrid();
     } catch {
-      toast({ title: 'Erro', description: 'Nao foi possivel remover o funcionario desta competencia.' });
+      toast({ title: 'Erro', description: 'Não foi possível remover o funcionário desta competência.' });
     } finally {
       setRemovingEmployeeId(null);
     }
@@ -233,10 +233,10 @@ const AdminPayrollGridPage: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <TableProperties className="h-6 w-6" />
-              Visao Macro da Folha
+              Visão Macro da Folha
             </h1>
             <p className="text-muted-foreground mt-1">
-              Visualizacao tipo planilha com todos os funcionarios e rubricas para conferencia
+              Visualização tipo planilha com todos os funcionários e rubricas para conferência
             </p>
           </div>
         </div>
@@ -246,7 +246,7 @@ const AdminPayrollGridPage: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <Label>Mes</Label>
+                  <Label>Mês</Label>
                   <Input
                     type="number"
                     min={1}
@@ -276,7 +276,7 @@ const AdminPayrollGridPage: React.FC = () => {
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Buscar funcionario..."
+                    placeholder="Buscar funcionário..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-8 w-64"
@@ -297,11 +297,11 @@ const AdminPayrollGridPage: React.FC = () => {
               <div className="text-center py-12 text-muted-foreground space-y-4">
                 <div>
                   <p className="text-lg">Nenhuma folha encontrada para {String(month).padStart(2, '0')}/{year}</p>
-                  <p className="text-sm mt-1">Abra e calcule uma competencia para carregar a visao macro.</p>
+                  <p className="text-sm mt-1">Abra e calcule uma competência para carregar a visão macro.</p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   <Button onClick={() => { window.location.href = '#/admin/payroll-runs'; }}>
-                    Ir para Competencias
+                    Ir para competências
                   </Button>
                   <Button
                     variant="outline"
@@ -326,7 +326,7 @@ const AdminPayrollGridPage: React.FC = () => {
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <SortableHeader field="fullName" className="sticky left-0 bg-background z-10 min-w-48">
-                        Funcionario
+                        Funcionário
                       </SortableHeader>
                       <SortableHeader field="department" className="min-w-28">
                         Depto
@@ -348,12 +348,12 @@ const AdminPayrollGridPage: React.FC = () => {
                         DESCONTOS
                       </SortableHeader>
                       <SortableHeader field="netSalary" className="min-w-32 text-right font-bold">
-                        LIQUIDO
+                        Líquido
                       </SortableHeader>
                       <SortableHeader field="fgts" className="min-w-28 text-right">
                         FGTS
                       </SortableHeader>
-                      <TableHead className="min-w-28 text-right">Acoes</TableHead>
+                      <TableHead className="min-w-28 text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -403,7 +403,7 @@ const AdminPayrollGridPage: React.FC = () => {
                     {totals && (
                       <TableRow className="bg-muted/50 font-bold border-t-2">
                         <TableCell className="sticky left-0 bg-muted/50 z-10">
-                          TOTAL ({filteredEmployees.length} funcionario{filteredEmployees.length !== 1 ? 's' : ''})
+                          TOTAL ({filteredEmployees.length} funcionário{filteredEmployees.length !== 1 ? 's' : ''})
                         </TableCell>
                         <TableCell></TableCell>
                         {earningColumns.map((code) => (
@@ -443,3 +443,5 @@ const AdminPayrollGridPage: React.FC = () => {
 };
 
 export default AdminPayrollGridPage;
+
+

@@ -1,5 +1,5 @@
 /**
- * Central de documentos com templates, instancias e exportacoes.
+ * Central de documentos com templates, instâncias e exportações.
  */
 import React, { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
@@ -284,7 +284,7 @@ const DocumentsCenterPage: React.FC = () => {
 
   const handleSaveTemplate = async () => {
     if (!templateForm.name.trim() || !templateForm.content.trim()) {
-      setError('Nome e conteudo do template sao obrigatorios.');
+      setError('Nome e conteúdo do template são obrigatórios.');
       return;
     }
 
@@ -446,7 +446,7 @@ const DocumentsCenterPage: React.FC = () => {
 
   const handleGenerateFromPayroll = async () => {
     if (!generationForm.payrollRunId.trim()) {
-      setError('Selecione uma competencia para gerar documentos.');
+      setError('Selecione uma competência para gerar documentos.');
       return;
     }
 
@@ -531,7 +531,7 @@ const DocumentsCenterPage: React.FC = () => {
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <div>
-                    <Label>Funcionario</Label>
+                    <Label>Funcionário</Label>
                     <Input
                       value={docFilters.employeeId}
                       onChange={(event) => setDocFilters({ ...docFilters, employeeId: event.target.value })}
@@ -834,7 +834,7 @@ const DocumentsCenterPage: React.FC = () => {
                             <TableRow key={template.id}>
                               <TableCell>
                                 <div className="font-medium text-gray-900">{template.name}</div>
-                                <div className="text-xs text-gray-500">{template.description || 'Sem descricao'}</div>
+                                <div className="text-xs text-gray-500">{template.description || 'Sem Descrição'}</div>
                               </TableCell>
                               <TableCell>
                                 {documentTypes.find((item) => item.value === template.type)?.label || template.type}
@@ -893,13 +893,13 @@ const DocumentsCenterPage: React.FC = () => {
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Competencia da folha</Label>
+                  <Label>competência da folha</Label>
                   <Select
                     value={generationForm.payrollRunId}
                     onValueChange={(value) => setGenerationForm({ ...generationForm, payrollRunId: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione a competencia" />
+                      <SelectValue placeholder="Selecione a competência" />
                     </SelectTrigger>
                     <SelectContent>
                       {availableRuns.map((run) => (
@@ -945,7 +945,7 @@ const DocumentsCenterPage: React.FC = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label>Funcionarios (opcional)</Label>
+                  <Label>funcionários (opcional)</Label>
                   <Input
                     value={generationForm.employeeIds}
                     onChange={(event) => setGenerationForm({ ...generationForm, employeeIds: event.target.value })}
@@ -975,7 +975,7 @@ const DocumentsCenterPage: React.FC = () => {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>{templateForm.id ? 'Editar template' : 'Novo template'}</DialogTitle>
-            <DialogDescription>Atualize o conteudo e placeholders obrigatorios.</DialogDescription>
+            <DialogDescription>Atualize o conteúdo e placeholders obrigatórios.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1015,7 +1015,7 @@ const DocumentsCenterPage: React.FC = () => {
               />
             </div>
             <div>
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Input
                 value={templateForm.description}
                 onChange={(event) => setTemplateForm({ ...templateForm, description: event.target.value })}
@@ -1023,7 +1023,7 @@ const DocumentsCenterPage: React.FC = () => {
               />
             </div>
             <div>
-              <Label>Placeholders obrigatorios (separados por virgula)</Label>
+              <Label>Placeholders obrigatórios (separados por virgula)</Label>
               <Input
                 value={templateForm.requiredPlaceholders}
                 onChange={(event) => setTemplateForm({ ...templateForm, requiredPlaceholders: event.target.value })}
@@ -1031,7 +1031,7 @@ const DocumentsCenterPage: React.FC = () => {
               />
             </div>
             <div>
-              <Label>Conteudo</Label>
+              <Label>conteúdo</Label>
               <Textarea
                 value={templateForm.content}
                 onChange={(event) => setTemplateForm({ ...templateForm, content: event.target.value })}
@@ -1133,7 +1133,7 @@ const DocumentsCenterPage: React.FC = () => {
             )}
             {documentForm.id && (
               <div>
-                <Label>Conteudo (opcional)</Label>
+                <Label>conteúdo (opcional)</Label>
                 <Textarea
                   value={documentForm.content}
                   onChange={(event) => setDocumentForm({ ...documentForm, content: event.target.value })}
@@ -1188,11 +1188,11 @@ const DocumentsCenterPage: React.FC = () => {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>{versionsTitle}</DialogTitle>
-            <DialogDescription>Ultimas movimentacoes de auditoria.</DialogDescription>
+            <DialogDescription>Últimas movimentações de auditoria.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             {versions.length === 0 ? (
-              <div className="text-sm text-gray-500">Sem historico.</div>
+              <div className="text-sm text-gray-500">Sem histórico.</div>
             ) : (
               versions.map((version) => (
                 <Card key={version.id}>
@@ -1223,5 +1223,6 @@ const DocumentsCenterPage: React.FC = () => {
 };
 
 export default DocumentsCenterPage;
+
 
 

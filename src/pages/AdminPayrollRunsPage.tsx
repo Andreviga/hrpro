@@ -336,7 +336,7 @@ const AdminPayrollRunsPage: React.FC = () => {
                       </p>
                       <Badge className={statusBadgeClass[summary.status]}>{statusLabels[summary.status]}</Badge>
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">Funcionarios: {summary.employeesCount}</p>
+                    <p className="text-xs text-slate-500 mt-2">funcionários: {summary.employeesCount}</p>
                   </div>
                   <div className="rounded-lg bg-blue-50 p-4">
                     <p className="text-xs text-blue-600">Total bruto</p>
@@ -365,7 +365,7 @@ const AdminPayrollRunsPage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Competências registradas</CardTitle>
-            <CardDescription>Filtre por mes, ano ou status.</CardDescription>
+            <CardDescription>Filtre por mês, ano ou status.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -515,6 +515,7 @@ const AdminPayrollRunsPage: React.FC = () => {
 };
 
 export default AdminPayrollRunsPage;
+
 
 
 

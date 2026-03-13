@@ -129,17 +129,17 @@ const RescisionCalculatorPage: React.FC = () => {
     if (!calculation) return;
 
     const lines = [
-      'RESUMO DE RESCISAO',
+      'RESUMO DE rescisão',
       '==================',
-      `Funcionario: ${calculation.employee.name}`,
+      `Funcionário: ${calculation.employee.name}`,
       `CPF: ${formatCPF(calculation.employee.cpf)}`,
       `Tipo: ${getRescisionTypeName(calculation.rescisionType)}`,
-      `Data da rescisao: ${new Date(calculation.rescisionDate).toLocaleDateString('pt-BR')}`,
+      `Data da rescisão: ${new Date(calculation.rescisionDate).toLocaleDateString('pt-BR')}`,
       '',
       'VALORES',
       `Total bruto: ${formatCurrency(calculation.calculation.totalGross)}`,
       `Deducoes: ${formatCurrency(calculation.calculation.totalDeductions)}`,
-      `Liquido: ${formatCurrency(calculation.calculation.netValue)}`,
+      `líquido: ${formatCurrency(calculation.calculation.netValue)}`,
       `FGTS deposito: ${formatCurrency(calculation.calculation.fgtsDeposit)}`,
       `FGTS multa: ${formatCurrency(calculation.calculation.fgtsFine)}`,
       '',
