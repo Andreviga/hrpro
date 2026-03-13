@@ -223,10 +223,10 @@ const DocumentsCenterPage: React.FC = () => {
       const result = await documentsApi.bootstrapIncomeStatementTemplate('Inclusao do modelo oficial de informe de rendimentos');
       await loadTemplates();
       toast({
-        title: result.created ? 'Modelo incluido' : 'Modelo ja disponivel',
+        title: result.created ? 'Modelo incluído' : 'Modelo já disponível',
         description: result.created
           ? 'Template oficial de informe de rendimentos adicionado com sucesso.'
-          : 'O template oficial ja existe e foi mantido.'
+          : 'O template oficial já existe e foi mantido.'
       });
       setError('');
     } catch (err) {
@@ -703,7 +703,7 @@ const DocumentsCenterPage: React.FC = () => {
 
                   {!documentsLoading && documents.length > documentsPerPage && (
                     <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-                      <span>Pagina {documentPage} de {totalDocumentPages}</span>
+                      <span>Página {documentPage} de {totalDocumentPages}</span>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"

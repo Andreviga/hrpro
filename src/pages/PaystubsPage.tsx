@@ -1,6 +1,6 @@
 /**
- * Pagina para listagem de holerites do Funcionário.
- * Exibe lista de holerites com navegacao para detalhes.
+ * Página para listagem de holerites do Funcionário.
+ * Exibe lista de holerites com navegação para detalhes.
  */
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';

@@ -84,7 +84,7 @@ const AdminPayrollUploadPage: React.FC = () => {
 
     const validExtension = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.xlsm');
     if (!validTypes.includes(file.type) && !validExtension) {
-      return 'Selecione um arquivo Excel valido (.xlsx, .xls ou .xlsm).';
+      return 'Selecione um arquivo Excel válido (.xlsx, .xls ou .xlsm).';
     }
 
     const maxSizeMb = 15;

@@ -2197,7 +2197,7 @@ export class PayrollService {
       const documentTitle = params.documentType === 'holerite'
         ? `Holerite ${String(payrollRun.month).padStart(2, '0')}/${payrollRun.year} - ${result.employee.fullName}`
         : params.documentType === 'recibo_ferias'
-          ? `Recibo de Ferias ${String(payrollRun.month).padStart(2, '0')}/${payrollRun.year} - ${result.employee.fullName}`
+          ? `Recibo de Férias ${String(payrollRun.month).padStart(2, '0')}/${payrollRun.year} - ${result.employee.fullName}`
           : template!.name;
 
       const doc = await this.documents.createDocumentFromTemplate({

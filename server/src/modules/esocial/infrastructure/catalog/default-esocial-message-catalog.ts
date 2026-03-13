@@ -29,7 +29,7 @@ export const DEFAULT_ESOCIAL_MESSAGE_CATALOG: DefaultCatalogEntry[] = [
     officialDescription: 'Inconsistência de dados no evento.',
     humanExplanation: 'Existe ao menos um campo do XML em desconformidade com regra de validação.',
     probableCause: 'Dados obrigatórios ausentes, formato inválido ou regra de negócio violada.',
-    suggestedAction: 'Corrigir os campos apontados nas ocorrencias e reenviar o evento.',
+    suggestedAction: 'Corrigir os campos apontados nas ocorrências e reenviar o evento.',
     category: 'VALIDACAO'
   }
 ];

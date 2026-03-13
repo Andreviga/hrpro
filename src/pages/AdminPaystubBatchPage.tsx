@@ -120,7 +120,7 @@ const AdminPaystubBatchPage: React.FC = () => {
 
     const calculatedRun = await payrollApi.calculatePayrollRun(run.id);
     if (calculatedRun.status === 'draft') {
-      throw new Error('A folha permanece em rascunho apos tentativa de cálculo.');
+      throw new Error('A folha permanece em rascunho após tentativa de cálculo.');
     }
 
     return calculatedRun.status;
@@ -141,11 +141,11 @@ const AdminPaystubBatchPage: React.FC = () => {
       );
 
       const summary = result.skippedCount > 0
-        ? `${result.createdCount} novos e ${result.skippedCount} ja existentes.`
+        ? `${result.createdCount} novos e ${result.skippedCount} já existentes.`
         : `${result.createdCount} holerites emitidos.`;
 
       toast({
-        title: 'Emissão concluida',
+        title: 'Emissão concluída',
         description: `competência ${run.month}/${run.year}: ${summary}`
       });
 
@@ -162,7 +162,7 @@ const AdminPaystubBatchPage: React.FC = () => {
 
   const handleRegeneratePaystubs = async (run: PayrollRun) => {
     const confirmed = window.confirm(
-      `Regerar todos os holerites da competência ${run.month}/${run.year}?\n\nOs holerites atuais serao desativados e novos arquivos serao criados.`
+      `Regerar todos os holerites da competência ${run.month}/${run.year}?\n\nOs holerites atuais serão desativados e novos arquivos serão criados.`
     );
 
     if (!confirmed) return;
@@ -179,7 +179,7 @@ const AdminPaystubBatchPage: React.FC = () => {
 
       const regenerated = result.regeneratedFromPreviousCount ?? 0;
       toast({
-        title: 'Regeracao concluida',
+        title: 'Regeneração concluída',
         description: `competência ${run.month}/${run.year}: ${result.createdCount} novos, ${regenerated} anteriores desativados.`
       });
 

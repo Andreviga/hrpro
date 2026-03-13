@@ -112,7 +112,7 @@ const AdminEsocialPage: React.FC = () => {
       });
       setGlobalOccurrences(data.items);
     } catch (error) {
-      setFeedback(getFriendlyEsocialError(error, 'Erro ao carregar ocorrencias do eSocial.'));
+      setFeedback(getFriendlyEsocialError(error, 'Erro ao carregar ocorrências do eSocial.'));
     } finally {
       setGlobalOccurrencesLoading(false);
     }
@@ -144,7 +144,7 @@ const AdminEsocialPage: React.FC = () => {
       });
 
       if (result.duplicated) {
-        setFeedback('XML ja importado anteriormente. O sistema retornou o documento existente.');
+        setFeedback('XML já importado anteriormente. O sistema retornou o documento existente.');
       } else {
         setFeedback('XML importado com sucesso.');
       }
@@ -176,10 +176,10 @@ const AdminEsocialPage: React.FC = () => {
   const syncDefaultCatalog = async () => {
     try {
       const result = await esocialApi.syncCatalog();
-      setFeedback(`Catalogo sincronizado (${result.syncedCount} mensagens).`);
+      setFeedback(`Catálogo sincronizado (${result.syncedCount} mensagens).`);
       await loadGlobalOccurrences();
     } catch (error) {
-      setFeedback(getFriendlyEsocialError(error, 'Falha ao sincronizar catalogo.'));
+      setFeedback(getFriendlyEsocialError(error, 'Falha ao sincronizar catálogo.'));
     }
   };
 
@@ -207,8 +207,8 @@ const AdminEsocialPage: React.FC = () => {
         <Card className="border-blue-200 bg-blue-50">
           <CardContent className="pt-4 text-sm text-blue-900 space-y-1">
             <p>Como usar: envie um XML de evento/retorno do eSocial por arquivo ou colagem no campo de texto.</p>
-            <p>Formato aceito: arquivo .xml valido. Recomendacao: usar arquivos oficiais exportados do ambiente de folha/eSocial.</p>
-            <p>Fluxo sugerido: importar XML, revisar ocorrencias e depois sincronizar catalogo para enriquecer mensagens.</p>
+            <p>Formato aceito: arquivo .xml válido. Recomendação: usar arquivos oficiais exportados do ambiente de folha/eSocial.</p>
+            <p>Fluxo sugerido: importar XML, revisar ocorrências e depois sincronizar catálogo para enriquecer mensagens.</p>
           </CardContent>
         </Card>
 
@@ -254,7 +254,7 @@ const AdminEsocialPage: React.FC = () => {
         <Tabs defaultValue="documents" className="space-y-4">
           <TabsList>
             <TabsTrigger value="documents">Documentos</TabsTrigger>
-            <TabsTrigger value="occurrences">Ocorrencias</TabsTrigger>
+            <TabsTrigger value="occurrences">Ocorrências</TabsTrigger>
             <TabsTrigger value="details">Detalhes</TabsTrigger>
           </TabsList>
 
@@ -293,9 +293,9 @@ const AdminEsocialPage: React.FC = () => {
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="event_xml">Evento enviado</SelectItem>
                         <SelectItem value="lote_envio">Envio de lote</SelectItem>
-                        <SelectItem value="retorno_recepcao_lote">Retorno de recepcao</SelectItem>
-                        <SelectItem value="retorno_processamento_lote">Retorno processamento lote</SelectItem>
-                        <SelectItem value="retorno_processamento_evento">Retorno processamento evento</SelectItem>
+                        <SelectItem value="retorno_recepcao_lote">Retorno de recepção</SelectItem>
+                        <SelectItem value="retorno_processamento_lote">Retorno de processamento do lote</SelectItem>
+                        <SelectItem value="retorno_processamento_evento">Retorno de processamento do evento</SelectItem>
                         <SelectItem value="consulta">Consulta</SelectItem>
                       </SelectContent>
                     </Select>
@@ -306,7 +306,7 @@ const AdminEsocialPage: React.FC = () => {
                     <Input
                       value={documentFilters.workerCpf}
                       onChange={(e) => setDocumentFilters({ ...documentFilters, workerCpf: e.target.value })}
-                      placeholder="Somente numeros"
+                      placeholder="Somente números"
                     />
                   </div>
 
@@ -338,7 +338,7 @@ const AdminEsocialPage: React.FC = () => {
                             Evento: {doc.eventType || '--'} | Recibo: {doc.receiptNumber || '--'} | Protocolo: {doc.protocolNumber || '--'}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Ocorrencias: {doc._count?.occurrences ?? doc.occurrences?.length ?? 0}
+                            Ocorrências: {doc._count?.occurrences ?? doc.occurrences?.length ?? 0}
                           </div>
                         </div>
                         <Button variant="outline" onClick={() => handleSelectDocument(doc.id)}>Ver detalhes</Button>
@@ -404,8 +404,8 @@ const AdminEsocialPage: React.FC = () => {
                         <span className="text-xs text-gray-500">{occurrence.sourceType}</span>
                       </div>
                       <p className="text-sm">{occurrence.description}</p>
-                      {occurrence.location && <p className="text-xs text-gray-500 mt-1">Localizacao: {occurrence.location}</p>}
-                      {occurrence.suggestedAction && <p className="text-xs text-blue-700 mt-1">Sugestao: {occurrence.suggestedAction}</p>}
+                      {occurrence.location && <p className="text-xs text-gray-500 mt-1">Localização: {occurrence.location}</p>}
+                      {occurrence.suggestedAction && <p className="text-xs text-blue-700 mt-1">Sugestão: {occurrence.suggestedAction}</p>}
                     </div>
                   ))
                 )}
@@ -444,7 +444,7 @@ const AdminEsocialPage: React.FC = () => {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Ocorrencias do Documento ({selectedOccurrences.length})</CardTitle>
+                    <CardTitle>Ocorrências do Documento ({selectedOccurrences.length})</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {selectedOccurrences.map((occurrence) => (
@@ -457,11 +457,11 @@ const AdminEsocialPage: React.FC = () => {
                           <span className="text-xs text-gray-500">{occurrence.occurrenceTypeLabel || 'UNKNOWN'}</span>
                         </div>
                         <p className="text-sm">{occurrence.description}</p>
-                        {occurrence.location && <p className="text-xs text-gray-500 mt-1">Localizacao: {occurrence.location}</p>}
-                        {occurrence.logicalXpath && <p className="text-xs text-gray-500">XPath logico: {occurrence.logicalXpath}</p>}
+                        {occurrence.location && <p className="text-xs text-gray-500 mt-1">Localização: {occurrence.location}</p>}
+                        {occurrence.logicalXpath && <p className="text-xs text-gray-500">XPath lógico: {occurrence.logicalXpath}</p>}
                       </div>
                     ))}
-                    {selectedOccurrences.length === 0 && <p className="text-sm text-gray-500">Sem ocorrencias extraidas.</p>}
+                    {selectedOccurrences.length === 0 && <p className="text-sm text-gray-500">Sem ocorrências extraídas.</p>}
                   </CardContent>
                 </Card>
 
