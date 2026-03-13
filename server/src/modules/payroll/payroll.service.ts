@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Queue } from 'bullmq';
@@ -16,7 +17,10 @@ interface CompanyProfileConfig {
   logoUrl?: string;
 }
 
-type EditablePayslipOverride = Partial<Payslip>;
+type EditablePayslipOverride = Partial<Payslip> & {
+  updatedAt?: string;
+  updatedBy?: string | null;
+};
 
 const SYSTEM_CONFIG_KEY = 'system_config';
 
@@ -124,6 +128,8 @@ export class PayrollService {
   }
 
   private async saveSystemConfig(companyId: string, value: Record<string, unknown>) {
+    const jsonValue = value as Prisma.InputJsonValue;
+
     await this.prisma.systemConfig.upsert({
       where: {
         companyId_key: {
@@ -134,10 +140,10 @@ export class PayrollService {
       create: {
         companyId,
         key: SYSTEM_CONFIG_KEY,
-        value
+        value: jsonValue
       },
       update: {
-        value
+        value: jsonValue
       }
     });
   }
