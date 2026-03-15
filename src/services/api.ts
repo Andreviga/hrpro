@@ -187,6 +187,12 @@ export interface UpdatePaystubContentPayload {
   reason?: string;
 }
 
+export interface SendPaystubEmailPayload {
+  email?: string;
+  subject?: string;
+  message?: string;
+}
+
 const buildAuthHeaders = () => {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -284,6 +290,19 @@ export const apiService = {
     link.remove();
 
     window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+  },
+
+  async sendPaystubByEmail(paystubId: string, payload?: SendPaystubEmailPayload) {
+    return request<{
+      sent: boolean;
+      to: string;
+      subject: string;
+      filename: string;
+      messageId?: string;
+    }>(`/paystubs/${paystubId}/send-email`, {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {})
+    });
   },
 
   async uploadPayroll(file: File): Promise<{

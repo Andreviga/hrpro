@@ -15,6 +15,7 @@ import { useToast } from '../hooks/use-toast';
 import {
   ArrowLeft,
   Download,
+  Mail,
   TrendingUp,
   TrendingDown,
   DollarSign,
@@ -187,6 +188,7 @@ const PaystubDetailPage: React.FC = () => {
   const [savingTransport, setSavingTransport] = useState(false);
   const [mealVoucherValue, setMealVoucherValue] = useState(0);
   const [savingMealVoucher, setSavingMealVoucher] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [bonusForm, setBonusForm] = useState({
     code: 'BONUS_MANUAL',
     description: 'Bonificação',
@@ -293,6 +295,45 @@ const PaystubDetailPage: React.FC = () => {
           description: getFriendlyError(downloadError, 'Não foi possível abrir o PDF deste holerite.')
         });
       }
+    }
+  };
+
+  const handleSendByEmail = async () => {
+    if (!paystub) return;
+
+    let destinationEmail: string | undefined;
+    if (canEdit) {
+      const suggestedEmail = paystub.payslip?.employeeEmail ?? paystub.employee?.email ?? '';
+      const typedEmail = window.prompt(
+        'E-mail de destino (deixe em branco para usar o e-mail cadastrado do funcionário):',
+        suggestedEmail
+      );
+
+      if (typedEmail === null) {
+        return;
+      }
+
+      const normalized = typedEmail.trim();
+      destinationEmail = normalized.length > 0 ? normalized : undefined;
+    }
+
+    try {
+      setSendingEmail(true);
+      const result = await apiService.sendPaystubByEmail(paystub.id, {
+        email: destinationEmail
+      });
+
+      toast({
+        title: 'Holerite enviado',
+        description: `E-mail enviado para ${result.to}.`
+      });
+    } catch (sendError) {
+      toast({
+        title: 'Falha ao enviar e-mail',
+        description: getFriendlyError(sendError, 'Não foi possível enviar o holerite por e-mail.')
+      });
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -588,10 +629,16 @@ const PaystubDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <Button onClick={() => void handleDownload()}>
-            <Download className="h-4 w-4 mr-2" />
-            Baixar PDF
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => void handleSendByEmail()} disabled={sendingEmail}>
+              {sendingEmail ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+              Enviar por e-mail
+            </Button>
+            <Button onClick={() => void handleDownload()}>
+              <Download className="h-4 w-4 mr-2" />
+              Baixar PDF
+            </Button>
+          </div>
         </div>
 
         <Card>

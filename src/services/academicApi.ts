@@ -96,6 +96,21 @@ export interface TeacherScheduleSummary {
   };
 }
 
+export interface MonthlyReportSubject {
+  subjectName: string;
+  hours: number;
+  value: number;
+  color: string;
+}
+
+export interface MonthlyReport {
+  month: number;
+  year: number;
+  totalHours: number;
+  totalValue: number;
+  classesBySubject: MonthlyReportSubject[];
+}
+
 // Mock data baseado no horário 2025
 const mockSubjects: Subject[] = [
   { id: 1, name: 'Português', code: 'PORT', level: 'fundamental2', hourlyRate: 31.44 },
@@ -211,6 +226,67 @@ const mockExtraClasses: ExtraClass[] = [
 ];
 
 export const academicApi = {
+  /**
+   * Relatório consolidado por mês para gráficos da tela de relatórios.
+   */
+  async getYearlyReports(teacherId: number, year: number): Promise<MonthlyReport[]> {
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    const palette = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#06B6D4', '#84CC16'];
+    const subjectColor = new Map<number, string>(
+      mockSubjects.map((subject, index) => [subject.id, palette[index % palette.length]])
+    );
+
+    const monthly = mockMonthlyClasses
+      .filter((item) => item.teacherId === teacherId && item.year === year)
+      .sort((a, b) => a.month - b.month);
+
+    const grouped = new Map<number, MonthlyClasses[]>();
+    for (const item of monthly) {
+      if (!grouped.has(item.month)) grouped.set(item.month, []);
+      grouped.get(item.month)!.push(item);
+    }
+
+    const reports: MonthlyReport[] = [];
+    for (const [month, entries] of grouped.entries()) {
+      const bySubject = new Map<string, MonthlyReportSubject>();
+      let totalHours = 0;
+      let totalValue = 0;
+
+      for (const entry of entries) {
+        const hours = (entry.actualHours || 0) + (entry.extraHours || 0) + (entry.substitutionHours || 0);
+        const subject = mockSubjects.find((s) => s.id === entry.subjectId);
+        const value = hours * (subject?.hourlyRate ?? 0);
+        totalHours += hours;
+        totalValue += value;
+
+        const key = entry.subjectName;
+        const existing = bySubject.get(key);
+        if (existing) {
+          existing.hours += hours;
+          existing.value += value;
+        } else {
+          bySubject.set(key, {
+            subjectName: entry.subjectName,
+            hours,
+            value,
+            color: subjectColor.get(entry.subjectId) ?? '#6B7280'
+          });
+        }
+      }
+
+      reports.push({
+        month,
+        year,
+        totalHours,
+        totalValue,
+        classesBySubject: Array.from(bySubject.values())
+      });
+    }
+
+    return reports;
+  },
+
   /**
    * Busca horário de aulas por professor
    */

@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Loader2, FileText, Download, Eye, RefreshCcw, Search } from 'lucide-react';
+import { Loader2, FileText, Download, Eye, RefreshCcw, Search, Mail } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { apiService, PaystubSummary } from '../services/api';
 
@@ -22,6 +22,7 @@ const AdminPaystubsListPage: React.FC = () => {
   const [paystubs, setPaystubs] = useState<PaystubSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [sendingPaystubId, setSendingPaystubId] = useState<string | null>(null);
 
   const handleSearch = async () => {
     setLoading(true);
@@ -68,6 +69,24 @@ const AdminPaystubsListPage: React.FC = () => {
 
   const handleView = (id: string) => {
     window.location.href = `#/paystubs/${id}`;
+  };
+
+  const handleSendByEmail = async (paystub: PaystubSummary) => {
+    try {
+      setSendingPaystubId(paystub.id);
+      const result = await apiService.sendPaystubByEmail(paystub.id);
+      toast({
+        title: 'Holerite enviado',
+        description: `E-mail enviado para ${result.to}.`
+      });
+    } catch (error) {
+      toast({
+        title: 'Falha ao enviar e-mail',
+        description: error instanceof Error ? error.message : 'Não foi possível enviar o holerite por e-mail.'
+      });
+    } finally {
+      setSendingPaystubId(null);
+    }
   };
 
   return (
@@ -195,6 +214,19 @@ const AdminPaystubsListPage: React.FC = () => {
                               >
                                 <Eye className="h-4 w-4 mr-1" />
                                 Ver
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void handleSendByEmail(p)}
+                                disabled={sendingPaystubId === p.id}
+                              >
+                                {sendingPaystubId === p.id ? (
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : (
+                                  <Mail className="h-4 w-4 mr-1" />
+                                )}
+                                E-mail
                               </Button>
                               {p.filePath && (
                                 <Button

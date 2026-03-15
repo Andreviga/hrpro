@@ -305,6 +305,18 @@ export const employeeApi = {
     });
   },
 
+  async getSalaryHistory(employeeId: string): Promise<any[]> {
+    return request<any[]>(`/employees/${employeeId}/salary-history`);
+  },
+
+  async getContracts(employeeId: string): Promise<any[]> {
+    return request<any[]>(`/employees/${employeeId}/contracts`);
+  },
+
+  async getBenefitsList(employeeId: string): Promise<any[]> {
+    return request<any[]>(`/employees/${employeeId}/benefits`);
+  },
+
   async calculateSalary(employeeId: string, month: number, year: number): Promise<PayrollCalculation> {
     const calculation = await request<any>('/payroll/preview', {
       method: 'POST',

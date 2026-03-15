@@ -1,9 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
+import nodemailer from 'nodemailer';
 import { calculatePayrollForEmployee, hasFgtsContributionByCategory } from './payroll.utils';
 import { DocumentsService } from '../documents/documents.service';
 import { Payslip, PayslipDataBuilder } from '../documents/payslip-data.builder';
@@ -104,6 +105,19 @@ export class PayrollService {
     }
     const normalized = value.trim();
     return normalized.length > 0 ? normalized : null;
+  }
+
+  private isValidEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
+
+  private escapeHtml(value: string) {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   private isObject(value: unknown): value is Record<string, unknown> {
@@ -1382,6 +1396,126 @@ export class PayrollService {
       filename,
       contentType: 'application/pdf'
     };
+  }
+
+  async sendPaystubByEmail(params: {
+    paystubId: string;
+    requester: { companyId: string; role: string; employeeId?: string | null };
+    userId?: string;
+    recipientEmail?: string;
+    subject?: string;
+    message?: string;
+  }) {
+    const detail = await this.getPaystubDetail(params.paystubId, params.requester);
+    if (!detail?.payslip) {
+      throw new BadRequestException('Não foi possível montar os dados do holerite para enviar por e-mail.');
+    }
+
+    const employeeEmail = this.asText(detail.payslip.employeeEmail) ?? this.asText(detail.employee?.email) ?? null;
+    const isAdminScope = ['admin', 'rh', 'manager'].includes(params.requester.role);
+    const overrideRecipient = this.asText(params.recipientEmail);
+
+    if (overrideRecipient && !isAdminScope) {
+      throw new BadRequestException('Somente perfis administrativos podem informar e-mail de destino manual.');
+    }
+
+    const recipientEmail = overrideRecipient ?? employeeEmail;
+    if (!recipientEmail) {
+      throw new BadRequestException('Funcionário sem e-mail cadastrado para envio do holerite.');
+    }
+
+    if (!this.isValidEmail(recipientEmail)) {
+      throw new BadRequestException('E-mail de destino inválido.');
+    }
+
+    const smtpHost = this.asText(process.env.SMTP_HOST);
+    const smtpPortRaw = this.asText(process.env.SMTP_PORT) ?? '587';
+    const smtpPort = Number(smtpPortRaw);
+    const smtpSecureRaw = (this.asText(process.env.SMTP_SECURE) ?? 'false').toLowerCase();
+    const smtpSecure = smtpSecureRaw === 'true' || smtpSecureRaw === '1' || smtpSecureRaw === 'yes';
+    const smtpUser = this.asText(process.env.SMTP_USER);
+    const smtpPass = this.asText(process.env.SMTP_PASS);
+    const smtpFrom = this.asText(process.env.SMTP_FROM) ?? smtpUser;
+
+    if ((smtpUser && !smtpPass) || (!smtpUser && smtpPass)) {
+      throw new BadRequestException('Defina SMTP_USER e SMTP_PASS juntos para autenticação SMTP.');
+    }
+
+    if (!smtpHost || Number.isNaN(smtpPort) || smtpPort <= 0 || !smtpFrom) {
+      throw new BadRequestException(
+        'Configuração de e-mail incompleta. Defina SMTP_HOST, SMTP_PORT e SMTP_FROM (ou SMTP_USER).'
+      );
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined
+    });
+
+    const filename = `holerite-${detail.year}-${String(detail.month).padStart(2, '0')}-${detail.id}.pdf`;
+    const pdfBuffer = await this.payslipPdf.generatePayslipPdf(detail.payslip);
+
+    const defaultSubject = `Holerite ${String(detail.month).padStart(2, '0')}/${detail.year} - ${detail.payslip.employeeName}`;
+    const subject = this.asText(params.subject) ?? defaultSubject;
+    const customMessage = this.asText(params.message);
+    const htmlMessage = customMessage
+      ? this.escapeHtml(customMessage).replace(/\r?\n/g, '<br/>')
+      : 'Segue em anexo o holerite da competência informada.';
+
+    try {
+      const info = await transporter.sendMail({
+        from: smtpFrom,
+        to: recipientEmail,
+        subject,
+        text: customMessage
+          ? `${customMessage}\n\nDocumento: ${filename}`
+          : `Olá ${detail.payslip.employeeName},\n\nSegue em anexo seu holerite de ${String(detail.month).padStart(2, '0')}/${detail.year}.`,
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+            <p>Olá ${this.escapeHtml(detail.payslip.employeeName)},</p>
+            <p>${htmlMessage}</p>
+            <p><strong>Competência:</strong> ${String(detail.month).padStart(2, '0')}/${detail.year}</p>
+            <p><strong>Documento:</strong> ${this.escapeHtml(filename)}</p>
+            <p>Atenciosamente,<br/>Equipe HRPro</p>
+          </div>
+        `,
+        attachments: [
+          {
+            filename,
+            content: pdfBuffer,
+            contentType: 'application/pdf'
+          }
+        ]
+      });
+
+      await this.audit.log({
+        companyId: params.requester.companyId,
+        userId: params.userId,
+        action: 'send_paystub_email',
+        entity: 'payroll_result',
+        entityId: params.paystubId,
+        reason: 'envio_holerite_email',
+        after: {
+          to: recipientEmail,
+          subject,
+          filename,
+          messageId: info.messageId
+        }
+      });
+
+      return {
+        sent: true,
+        to: recipientEmail,
+        subject,
+        filename,
+        messageId: info.messageId
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      throw new InternalServerErrorException(`Falha ao enviar e-mail do holerite: ${message}`);
+    }
   }
 
   async updatePaystubEvent(params: {

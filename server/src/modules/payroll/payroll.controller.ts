@@ -277,6 +277,23 @@ export class PayrollController {
     res.setHeader('Content-Disposition', `inline; filename=${exportedDocument.filename}`);
     res.send(exportedDocument.buffer);
   }
+
+  @Post('paystubs/:id/send-email')
+  async sendPaystubByEmail(
+    @Param('id') id: string,
+    @Body() body: { email?: string; subject?: string; message?: string },
+    @Req() req: { user: { employeeId?: string | null; companyId: string; role: string; sub?: string } }
+  ) {
+    return this.payroll.sendPaystubByEmail({
+      paystubId: id,
+      requester: req.user,
+      userId: req.user.sub,
+      recipientEmail: body.email,
+      subject: body.subject,
+      message: body.message
+    });
+  }
+
   @Post('payroll-runs/:id/documents')
   @Roles('admin', 'rh', 'manager')
   async generateDocuments(

@@ -3,6 +3,7 @@
  * Cadastro, aprovação, cálculo de folha e gerenciamento
  */
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -56,6 +57,7 @@ const EMPLOYER_OPTIONS = [
 ] as const;
 
 const AdminEmployeesPage: React.FC = () => {
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [pendingEmployees, setPendingEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -561,6 +563,9 @@ const AdminEmployeesPage: React.FC = () => {
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => openEditEmployee(employee)}>
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" onClick={() => navigate(`/admin/employees/${employee.id}`)}>
+                          <Eye className="h-4 w-4 mr-1" /> Perfil
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => window.location.href = '#/calendar'}>
                           <Calculator className="h-4 w-4" />

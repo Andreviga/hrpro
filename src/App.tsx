@@ -27,6 +27,7 @@ import AdminPayrollGridPage from './pages/AdminPayrollGridPage';
 import AdminPaystubBatchPage from './pages/AdminPaystubBatchPage';
 import AdminPaystubsListPage from './pages/AdminPaystubsListPage';
 import AdminEsocialPage from './pages/AdminEsocialPage';
+import AdminEmployeeProfilePage from './pages/AdminEmployeeProfilePage';
 import { Toaster } from './components/ui/toaster';
 
 export default function App() {
@@ -148,6 +149,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/admin/employees/:id" 
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminEmployeeProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/admin/config" 
             element={
               <ProtectedRoute requiredRole="admin">
@@ -200,14 +209,6 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminEsocialPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/rescision" 
-            element={
-              <ProtectedRoute>
-                <RescisionCalculatorPage />
               </ProtectedRoute>
             } 
           />

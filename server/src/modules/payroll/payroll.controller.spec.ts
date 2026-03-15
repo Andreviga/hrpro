@@ -11,7 +11,8 @@ const payrollServiceMock = {
   listPaystubsByCompany: jest.fn(),
   listPaystubsForCompany: jest.fn(),
   removeEmployeeFromRun: jest.fn(),
-  updatePaystubEvent: jest.fn()
+  updatePaystubEvent: jest.fn(),
+  sendPaystubByEmail: jest.fn()
 };
 
 describe('PayrollController', () => {
@@ -243,6 +244,33 @@ describe('PayrollController', () => {
       reason: undefined
     });
   });
+
+  it('sends paystub by email via controller', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PayrollController],
+      providers: [{ provide: PayrollService, useValue: payrollServiceMock }]
+    }).compile();
+
+    const controller = moduleRef.get(PayrollController);
+    payrollServiceMock.sendPaystubByEmail.mockResolvedValueOnce({ sent: true, to: 'ana@example.com' });
+
+    const result = await controller.sendPaystubByEmail(
+      'p1',
+      { email: 'ana@example.com', subject: 'Holerite', message: 'Segue anexo.' },
+      { user: { companyId: 'c1', role: 'admin', sub: 'u1' } } as any
+    );
+
+    expect(result).toEqual({ sent: true, to: 'ana@example.com' });
+    expect(payrollServiceMock.sendPaystubByEmail).toHaveBeenCalledWith({
+      paystubId: 'p1',
+      requester: { companyId: 'c1', role: 'admin', sub: 'u1' },
+      userId: 'u1',
+      recipientEmail: 'ana@example.com',
+      subject: 'Holerite',
+      message: 'Segue anexo.'
+    });
+  });
+
   it('closes a payroll run', async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [PayrollController],

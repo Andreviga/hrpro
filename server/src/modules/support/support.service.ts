@@ -5,6 +5,13 @@ import { PrismaService } from '../../common/prisma.service';
 export class SupportService {
   constructor(private prisma: PrismaService) {}
 
+  private isMissingTableError(error: unknown) {
+    if (!error || typeof error !== 'object') return false;
+    const maybeCode = (error as { code?: string }).code;
+    const message = String((error as { message?: string }).message ?? '');
+    return maybeCode === 'P2021' || message.includes('does not exist');
+  }
+
   private isAdminRole(role?: string) {
     return Boolean(role && ['admin', 'rh', 'manager'].includes(role));
   }
@@ -26,11 +33,18 @@ export class SupportService {
         ? { companyId }
         : { companyId, employeeId: employeeId ?? undefined };
 
-    return this.prisma.supportTicket.findMany({
-      where,
-      include: { messages: { orderBy: { createdAt: 'asc' } } },
-      orderBy: { updatedAt: 'desc' }
-    });
+    try {
+      return await this.prisma.supportTicket.findMany({
+        where,
+        include: { messages: { orderBy: { createdAt: 'asc' } } },
+        orderBy: { updatedAt: 'desc' }
+      });
+    } catch (error) {
+      if (this.isMissingTableError(error)) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   async getTicket(id: string, companyId: string, employeeId?: string, role?: string) {
@@ -154,11 +168,18 @@ export class SupportService {
   }
 
   async listChatMessages(companyId: string) {
-    return this.prisma.chatMessage.findMany({
-      where: { companyId },
-      orderBy: { createdAt: 'asc' },
-      take: 200
-    });
+    try {
+      return await this.prisma.chatMessage.findMany({
+        where: { companyId },
+        orderBy: { createdAt: 'asc' },
+        take: 200
+      });
+    } catch (error) {
+      if (this.isMissingTableError(error)) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   async sendChatMessage(
@@ -175,9 +196,26 @@ export class SupportService {
     const sanitizedMessage = this.sanitizeText(message, 'message', 4000);
     const sender = this.isAdminRole(role) ? 'admin' : 'employee';
 
-    return this.prisma.chatMessage.create({
-      data: { companyId, userId, message: sanitizedMessage, sender, senderName }
-    });
+    try {
+      return await this.prisma.chatMessage.create({
+        data: { companyId, userId, message: sanitizedMessage, sender, senderName }
+      });
+    } catch (error) {
+      if (this.isMissingTableError(error)) {
+        return {
+          id: `local-${Date.now()}`,
+          companyId,
+          userId,
+          message: sanitizedMessage,
+          sender,
+          senderName,
+          isRead: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
+      throw error;
+    }
   }
 
   async markChatRead(companyId: string, role?: string) {
@@ -185,10 +223,16 @@ export class SupportService {
       throw new ForbiddenException('Only admin/rh/manager can mark chat messages as read.');
     }
 
-    await this.prisma.chatMessage.updateMany({
-      where: { companyId, isRead: false },
-      data: { isRead: true }
-    });
+    try {
+      await this.prisma.chatMessage.updateMany({
+        where: { companyId, isRead: false },
+        data: { isRead: true }
+      });
+    } catch (error) {
+      if (!this.isMissingTableError(error)) {
+        throw error;
+      }
+    }
     return { ok: true };
   }
 }

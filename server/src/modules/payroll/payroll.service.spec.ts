@@ -51,6 +51,10 @@ describe('PayrollService document generation', () => {
     rubric: {
       findMany: jest.fn()
     },
+    systemConfig: {
+      findUnique: jest.fn(),
+      upsert: jest.fn()
+    },
     $transaction: jest.fn()
   } as any;
 
@@ -75,6 +79,12 @@ describe('PayrollService document generation', () => {
     prisma.taxTableIrrf.count.mockResolvedValue(1);
     prisma.taxTableInss.count.mockResolvedValue(1);
     prisma.rubric.findMany.mockResolvedValue([{ code: 'BASE' }, { code: 'INSS' }, { code: 'IRRF' }]);
+    prisma.systemConfig.findUnique.mockResolvedValue(null);
+    prisma.systemConfig.upsert.mockResolvedValue({
+      companyId: 'c1',
+      key: 'company_profiles',
+      value: {}
+    });
     payslipBuilder.buildPayslip.mockResolvedValue({
       companyId: 'c1',
       companyName: 'Empresa Teste',

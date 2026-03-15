@@ -14,7 +14,7 @@ describe('payslip excel module', () => {
     expect(registration.rows.length).toBeGreaterThan(1);
   });
 
-  it('builds a real payslip for André with explicit fill warnings', async () => {
+  it('builds a real payslip for André without registry fill warnings', async () => {
     const workbook = await loadWorkbook(workbookPath);
     const payslip = buildPayslipFromExcel({
       workbook,
@@ -25,7 +25,7 @@ describe('payslip excel module', () => {
     expect(payslip.companyName).toBe('RAIZES CENTRO EDUCACIONAL LTDA ME');
     expect(payslip.companyCnpj).toBe('20.755.729/0001-85');
     expect(payslip.bank).toBe('ITAU');
-    expect(payslip.warnings).toEqual(
+    expect(payslip.warnings).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           code: 'COMPANY_ADDRESS_FILL_REQUIRED',

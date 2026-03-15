@@ -50,6 +50,12 @@ export class EsocialService {
     return createHash('sha256').update(xml).digest('hex');
   }
 
+  private toPositiveInt(value: unknown, fallback: number, max = 200) {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) return fallback;
+    return Math.min(parsed, max);
+  }
+
   async importXml(params: {
     dto: ImportEsocialXmlDto;
     file?: Express.Multer.File;
@@ -162,10 +168,13 @@ export class EsocialService {
   }
 
   async listDocuments(companyId: string, query: QueryEsocialDocumentsDto) {
+    const page = this.toPositiveInt(query.page, 1, 100000);
+    const pageSize = this.toPositiveInt(query.pageSize, 25, 200);
+
     return this.repository.listDocuments(companyId, {
       ...query,
-      page: query.page ?? 1,
-      pageSize: query.pageSize ?? 25
+      page,
+      pageSize
     });
   }
 
@@ -184,10 +193,13 @@ export class EsocialService {
   }
 
   async listOccurrences(companyId: string, query: QueryEsocialOccurrencesDto) {
+    const page = this.toPositiveInt(query.page, 1, 100000);
+    const pageSize = this.toPositiveInt(query.pageSize, 50, 200);
+
     return this.repository.listOccurrences(companyId, {
       ...query,
-      page: query.page ?? 1,
-      pageSize: query.pageSize ?? 50
+      page,
+      pageSize
     });
   }
 
