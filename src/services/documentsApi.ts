@@ -72,8 +72,13 @@ export interface GenerateIncomeStatementsResponse {
   templateCreated: boolean;
   createdCount: number;
   skippedCount: number;
+  sourceRunStatus?: 'closed' | 'calculated';
   documents: Document[];
   skipped?: Array<{ employeeId: string; reason: string }>;
+  noDataReason?: 'no_closed_payroll_results' | 'no_payroll_results_for_year' | 'no_payroll_results_for_selected_employees';
+  closedRunsCount?: number;
+  calculatedRunsCount?: number;
+  existingCount?: number;
 }
 
 export const documentsApi = {

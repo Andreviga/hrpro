@@ -56,6 +56,8 @@ const AdminPayrollRunsPage: React.FC = () => {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [incomeYear, setIncomeYear] = useState(String(currentYear - 1));
   const [generatingIncomeStatements, setGeneratingIncomeStatements] = useState(false);
+  const [bulkYear, setBulkYear] = useState(String(currentYear));
+  const [processingBulkPayslips, setProcessingBulkPayslips] = useState(false);
 
   const getFriendlyError = (error: unknown, fallback: string) => {
     if (error instanceof Error) {
@@ -239,9 +241,27 @@ const AdminPayrollRunsPage: React.FC = () => {
         idempotent: true
       });
 
+      if (result.createdCount === 0 && result.skippedCount === 0) {
+        if (result.noDataReason === 'no_closed_payroll_results') {
+          toast({
+            title: 'Nenhuma folha fechada encontrada',
+            description: `Para emitir informes de ${year}, feche as competências do ano (atualmente: ${result.calculatedRunsCount ?? 0} calculada(s) e ${result.closedRunsCount ?? 0} fechada(s)).`
+          });
+          return;
+        }
+
+        if (result.noDataReason === 'no_payroll_results_for_year') {
+          toast({
+            title: 'Sem dados de folha no ano',
+            description: `Não encontramos resultados de folha para ${year}. Verifique se as competências foram calculadas.`
+          });
+          return;
+        }
+      }
+
       toast({
         title: 'Informes gerados',
-        description: `${result.createdCount} criado(s) e ${result.skippedCount} já existente(s) para ${year}.`
+        description: `${result.createdCount} criado(s) e ${result.skippedCount} já existente(s) para ${year}${result.sourceRunStatus === 'calculated' ? ' (usando competências calculadas).' : '.'}`
       });
     } catch (error) {
       toast({
@@ -250,6 +270,95 @@ const AdminPayrollRunsPage: React.FC = () => {
       });
     } finally {
       setGeneratingIncomeStatements(false);
+    }
+  };
+
+  const handleCalculateAndEmitAllPayslips = async () => {
+    const year = Number(bulkYear);
+    if (!bulkYear || Number.isNaN(year)) {
+      toast({
+        title: 'Ano inválido',
+        description: 'Informe um ano válido para processar as folhas em lote.'
+      });
+      return;
+    }
+
+    try {
+      setProcessingBulkPayslips(true);
+
+      const runsForYear = await payrollApi.listRuns({ year });
+      if (runsForYear.length === 0) {
+        toast({
+          title: 'Nenhuma competência encontrada',
+          description: `Não existem folhas registradas para ${year}.`
+        });
+        return;
+      }
+
+      const orderedRuns = [...runsForYear].sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.month - b.month;
+      });
+
+      let successCount = 0;
+      let createdCount = 0;
+      let skippedCount = 0;
+      const failures: Array<{ run: PayrollRun; message: string }> = [];
+
+      for (const run of orderedRuns) {
+        try {
+          let status = run.status;
+          if (status === 'draft') {
+            const calculatedRun = await payrollApi.calculatePayrollRun(run.id);
+            status = calculatedRun.status;
+          }
+
+          if (status === 'draft') {
+            throw new Error('A folha continuou em rascunho após tentativa de cálculo.');
+          }
+
+          const generated = await payrollApi.generateDocumentsFromRun(
+            run.id,
+            {
+              documentType: 'holerite',
+              reason: `emissao_lote_holerites_${run.year}_${String(run.month).padStart(2, '0')}`
+            },
+            true
+          );
+
+          successCount += 1;
+          createdCount += generated.createdCount;
+          skippedCount += generated.skippedCount;
+        } catch (error) {
+          failures.push({
+            run,
+            message: getFriendlyError(error, 'Não foi possível calcular/emitir esta competência.')
+          });
+        }
+      }
+
+      await loadRuns();
+
+      if (failures.length === 0) {
+        toast({
+          title: 'Processamento em lote concluído',
+          description: `${successCount} competência(s) processada(s). ${createdCount} holerite(s) gerado(s) e ${skippedCount} já existente(s).`
+        });
+        return;
+      }
+
+      const firstFailure = failures[0];
+      toast({
+        title: 'Lote concluído com pendências',
+        description: `${successCount} competência(s) concluída(s), ${failures.length} com erro. Primeiro erro em ${firstFailure.run.month}/${firstFailure.run.year}: ${firstFailure.message}`
+      });
+    } catch (error) {
+      toast({
+        title: 'Falha no processamento em lote',
+        description: getFriendlyError(error, 'Não foi possível calcular e emitir todas as folhas.')
+      });
+    } finally {
+      setProcessingBulkPayslips(false);
     }
   };
   const formatDate = (value?: string | null) => {
@@ -288,10 +397,40 @@ const AdminPayrollRunsPage: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
+                <BarChart3 className="h-5 w-5" />
+                <span>Ações em lote</span>
+              </CardTitle>
+              <CardDescription>Calcula (se necessário) e emite holerites para todas as competências do ano.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Ano</Label>
+                <Input
+                  type="number"
+                  min={2020}
+                  max={2100}
+                  value={bulkYear}
+                  onChange={(event) => setBulkYear(event.target.value)}
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => void handleCalculateAndEmitAllPayslips()}
+                disabled={processingBulkPayslips}
+              >
+                {processingBulkPayslips ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                Calcular e emitir todas as folhas
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
                 <FileText className="h-5 w-5" />
                 <span>Informe de rendimentos</span>
               </CardTitle>
-              <CardDescription>Emite em lote para todos os funcionários com folha fechada no ano.</CardDescription>
+              <CardDescription>Emite em lote para todos os funcionários com folha calculada/fechada no ano.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>

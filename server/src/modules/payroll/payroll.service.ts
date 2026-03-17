@@ -1881,27 +1881,77 @@ export class PayrollService {
 
     const template = templateResult.template;
 
-    const payrollResults = await this.prisma.payrollResult.findMany({
-      where: {
-        employeeId: params.employeeIds && params.employeeIds.length > 0 ? { in: params.employeeIds } : undefined,
-        payrollRun: {
-          is: {
-            companyId: params.companyId,
-            year: params.year,
-            status: 'closed'
+    const queryByRunStatus = async (status: 'closed' | 'calculated') => {
+      return this.prisma.payrollResult.findMany({
+        where: {
+          employeeId: params.employeeIds && params.employeeIds.length > 0 ? { in: params.employeeIds } : undefined,
+          payrollRun: {
+            is: {
+              companyId: params.companyId,
+              year: params.year,
+              status
+            }
           }
-        }
-      },
-      include: { employee: true, events: true, payrollRun: true },
-      orderBy: [{ employee: { fullName: 'asc' } }, { payrollRun: { month: 'asc' } }]
-    });
+        },
+        include: { employee: true, events: true, payrollRun: true },
+        orderBy: [{ employee: { fullName: 'asc' } }, { payrollRun: { month: 'asc' } }]
+      });
+    };
+
+    let sourceRunStatus: 'closed' | 'calculated' = 'closed';
+    let payrollResults = await queryByRunStatus('closed');
 
     if (payrollResults.length === 0) {
+      const calculatedResults = await queryByRunStatus('calculated');
+      if (calculatedResults.length > 0) {
+        payrollResults = calculatedResults;
+        sourceRunStatus = 'calculated';
+      }
+    }
+
+    if (payrollResults.length === 0) {
+      const existingCount = await this.prisma.employeeDocument.count({
+        where: {
+          companyId: params.companyId,
+          employeeId: params.employeeIds && params.employeeIds.length > 0 ? { in: params.employeeIds } : undefined,
+          templateId: template.id,
+          year: params.year,
+          deletedAt: null
+        }
+      });
+
+      const closedRunsCount = await this.prisma.payrollRun.count({
+        where: {
+          companyId: params.companyId,
+          year: params.year,
+          status: 'closed'
+        }
+      });
+
+      const calculatedRunsCount = await this.prisma.payrollRun.count({
+        where: {
+          companyId: params.companyId,
+          year: params.year,
+          status: 'calculated'
+        }
+      });
+
+      const noDataReason = params.employeeIds && params.employeeIds.length > 0
+        ? 'no_payroll_results_for_selected_employees'
+        : closedRunsCount === 0 && calculatedRunsCount > 0
+          ? 'no_closed_payroll_results'
+          : 'no_payroll_results_for_year';
+
       return {
         templateCreated: templateResult.created,
         createdCount: 0,
-        skippedCount: 0,
-        documents: []
+        skippedCount: existingCount,
+        documents: [],
+        noDataReason,
+        closedRunsCount,
+        calculatedRunsCount,
+        existingCount,
+        sourceRunStatus
       };
     }
 
@@ -2100,6 +2150,7 @@ export class PayrollService {
       after: {
         year: params.year,
         templateId: template.id,
+        sourceRunStatus,
         createdCount: created.length,
         skippedCount: skipped.length
       }
@@ -2109,6 +2160,7 @@ export class PayrollService {
       templateCreated: templateResult.created,
       createdCount: created.length,
       skippedCount: skipped.length,
+      sourceRunStatus,
       documents: created,
       skipped
     };
