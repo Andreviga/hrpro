@@ -8,10 +8,13 @@
   Post,
   Query,
   Req,
+  UploadedFile,
   Res,
+  UseInterceptors,
   UseGuards
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOkResponse, ApiProduces, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -175,6 +178,74 @@ export class DocumentsController {
     @Query() query: { type?: string }
   ) {
     return this.documents.listUserDocuments(userId, query.type);
+  }
+
+  @Post('employee/:employeeId/upload')
+  @Roles('admin', 'rh', 'manager')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadEmployeeDocument(
+    @Param('employeeId') employeeId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body()
+    body: {
+      category?: string;
+      layoutHint?: string;
+      title?: string;
+      month?: string;
+      year?: string;
+      reason?: string;
+    },
+    @Req() req: { user: { companyId: string; sub: string } }
+  ) {
+    return this.documents.uploadEmployeeDocumentFile({
+      companyId: req.user.companyId,
+      userId: req.user.sub,
+      employeeId,
+      file,
+      category: body.category,
+      layoutHint: body.layoutHint,
+      title: body.title,
+      month: body.month ? Number(body.month) : undefined,
+      year: body.year ? Number(body.year) : undefined,
+      reason: body.reason
+    });
+  }
+
+  @Post('employee/:employeeId/import-folder')
+  @Roles('admin', 'rh', 'manager')
+  async importEmployeeDocumentsFromFolder(
+    @Param('employeeId') employeeId: string,
+    @Body() body: { folderPath?: string; category?: string; layoutHint?: string; reason?: string },
+    @Req() req: { user: { companyId: string; sub: string } }
+  ) {
+    return this.documents.importEmployeeDocumentsFromFolder({
+      companyId: req.user.companyId,
+      userId: req.user.sub,
+      employeeId,
+      folderPath: body.folderPath,
+      category: body.category,
+      layoutHint: body.layoutHint,
+      reason: body.reason
+    });
+  }
+
+  @Get(':id/file')
+  @Roles('admin', 'rh', 'manager', 'employee', 'intern')
+  async exportOriginalFile(
+    @Param('id') id: string,
+    @Req() req: { user: { companyId: string; sub: string; role: string } },
+    @Res() res: Response
+  ) {
+    const result = await this.documents.exportOriginalDocumentFile({
+      id,
+      companyId: req.user.companyId,
+      userId: req.user.sub,
+      role: req.user.role
+    });
+
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename=${result.filename}`);
+    res.send(result.buffer);
   }
 
   @Get(':id')

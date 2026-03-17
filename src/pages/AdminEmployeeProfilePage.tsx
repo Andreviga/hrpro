@@ -32,6 +32,8 @@ import {
   AlertCircle,
   RefreshCw,
   Printer,
+  Upload,
+  Download,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -42,7 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useToast } from '../hooks/use-toast';
 import { employeeApi, Employee } from '../services/employeeApi';
 import { apiService } from '../services/api';
-import { documentsApi, Document as HRDocument } from '../services/documentsApi';
+import { documentsApi, Document as HRDocument, UploadDocumentCategory } from '../services/documentsApi';
 import { supportApi, Ticket } from '../services/supportApi';
 import { request } from '../services/http';
 import Layout from '../components/Layout';
@@ -107,6 +109,14 @@ const benefitTypeLabel: Record<string, string> = {
   other:     'Outro',
 };
 
+const uploadCategoryLabel: Record<UploadDocumentCategory, string> = {
+  cartao_ponto: 'Cartão de Ponto',
+  rg: 'RG',
+  cpf: 'CPF',
+  cnh: 'CNH',
+  outros: 'Outros'
+};
+
 // ─── Tab definitions ─────────────────────────────────────────────────────────
 
 type TabId = 'pessoal' | 'vinculo' | 'folha' | 'historico' | 'beneficios' | 'documentos' | 'tickets';
@@ -147,6 +157,21 @@ export default function AdminEmployeeProfilePage() {
   const [loadingBenefits, setLoadingBenefits] = useState(false);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [loadingTickets, setLoadingTickets] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [importingFolder, setImportingFolder] = useState(false);
+
+  const [uploadCategory, setUploadCategory] = useState<UploadDocumentCategory>('cartao_ponto');
+  const [documentCategoryFilter, setDocumentCategoryFilter] = useState<'all' | UploadDocumentCategory>('all');
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadMonth, setUploadMonth] = useState(new Date().getMonth() + 1);
+  const [uploadYear, setUploadYear] = useState(new Date().getFullYear());
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+
+  const filteredDocuments = documents.filter((doc) => {
+    if (documentCategoryFilter === 'all') return true;
+    const docCategory = normalizeDocumentCategory((doc.placeholders as any)?.documentCategory);
+    return docCategory === documentCategoryFilter;
+  });
 
   // edit state
   const [editing, setEditing] = useState(false);
@@ -361,6 +386,89 @@ export default function AdminEmployeeProfilePage() {
       toast({ title: 'Erro ao salvar benefício', description: e?.message, variant: 'destructive' });
     } finally {
       setSavingBenefit(false);
+    }
+  };
+
+  const handleUploadDocument = async () => {
+    if (!id) return;
+    if (!uploadFile) {
+      toast({ title: 'Selecione um arquivo para enviar.', variant: 'destructive' });
+      return;
+    }
+
+    setUploadingDoc(true);
+    try {
+      const created = await documentsApi.uploadEmployeeDocument(id, {
+        file: uploadFile,
+        category: uploadCategory,
+        title: uploadTitle.trim() || undefined,
+        month: uploadMonth,
+        year: uploadYear,
+        reason: 'Upload via perfil do funcionário'
+      });
+
+      const extractionStatus = String((created.placeholders as any)?.extraction?.status ?? 'unavailable');
+      toast({
+        title: 'Documento enviado com sucesso!',
+        description: `Leitura automática: ${formatExtractionStatus(extractionStatus)}`
+      });
+
+      setUploadTitle('');
+      setUploadFile(null);
+      await loadDocuments();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao enviar documento',
+        description: error?.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleImportFromCartaoFolder = async () => {
+    if (!id) return;
+    setImportingFolder(true);
+    try {
+      const result = await documentsApi.importEmployeeDocumentsFromFolder(id, {
+        reason: 'Importação automática pasta cartao'
+      });
+
+      toast({
+        title: 'Importação concluída',
+        description: `${result.processedCount} arquivo(s) importado(s) da pasta cartao.`
+      });
+
+      await loadDocuments();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao importar pasta cartao',
+        description: error?.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setImportingFolder(false);
+    }
+  };
+
+  const handleDownloadOriginal = async (documentId: string) => {
+    try {
+      const result = await documentsApi.downloadOriginalDocumentFile(documentId);
+      const url = window.URL.createObjectURL(result.blob);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = result.filename;
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao baixar arquivo',
+        description: error?.message,
+        variant: 'destructive'
+      });
     }
   };
 
@@ -1171,39 +1279,172 @@ export default function AdminEmployeeProfilePage() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-base font-semibold text-gray-800">Documentos do Funcionário</h2>
-              <Button size="sm" variant="outline" onClick={loadDocuments} disabled={loadingDocs}>
-                <RefreshCw className={`h-4 w-4 mr-1 ${loadingDocs ? 'animate-spin' : ''}`} />
-                Atualizar
-              </Button>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={documentCategoryFilter}
+                  onValueChange={(v) => setDocumentCategoryFilter(v as 'all' | UploadDocumentCategory)}
+                >
+                  <SelectTrigger className="h-8 text-sm w-44">
+                    <SelectValue placeholder="Filtrar categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas categorias</SelectItem>
+                    {(Object.keys(uploadCategoryLabel) as UploadDocumentCategory[]).map((key) => (
+                      <SelectItem key={key} value={key}>{uploadCategoryLabel[key]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleImportFromCartaoFolder}
+                  disabled={importingFolder || uploadingDoc}
+                >
+                  <Upload className={`h-4 w-4 mr-1 ${importingFolder ? 'animate-pulse' : ''}`} />
+                  {importingFolder ? 'Importando pasta cartao…' : 'Importar pasta cartao'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={loadDocuments} disabled={loadingDocs}>
+                  <RefreshCw className={`h-4 w-4 mr-1 ${loadingDocs ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </Button>
+              </div>
             </div>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Enviar Documento com Leitura Automática</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select value={uploadCategory} onValueChange={(v) => setUploadCategory(v as UploadDocumentCategory)}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(uploadCategoryLabel) as UploadDocumentCategory[]).map((key) => (
+                          <SelectItem key={key} value={key}>{uploadCategoryLabel[key]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs">Mês</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={uploadMonth}
+                      onChange={(e) => setUploadMonth(Number(e.target.value) || new Date().getMonth() + 1)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs">Ano</Label>
+                    <Input
+                      type="number"
+                      min={2000}
+                      max={2100}
+                      value={uploadYear}
+                      onChange={(e) => setUploadYear(Number(e.target.value) || new Date().getFullYear())}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs">Título (opcional)</Label>
+                    <Input
+                      value={uploadTitle}
+                      onChange={(e) => setUploadTitle(e.target.value)}
+                      placeholder="Ex: Cartão ponto março"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-3 md:items-center">
+                  <input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.txt,.csv,.json,.xml,.xls,.xlsx,.xlsm"
+                    onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                    className="text-sm"
+                  />
+                  <Button size="sm" onClick={handleUploadDocument} disabled={uploadingDoc || !uploadFile}>
+                    <Upload className="h-4 w-4 mr-1" />
+                    {uploadingDoc ? 'Enviando…' : 'Enviar e Ler Documento'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
             {loadingDocs ? (
               <div className="text-center text-gray-500 py-8">Carregando documentos…</div>
-            ) : documents.length === 0 ? (
+            ) : filteredDocuments.length === 0 ? (
               <Card>
                 <CardContent className="p-12 text-center text-gray-400">
                   <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                  Nenhum documento encontrado para este funcionário.
+                  Nenhum documento encontrado para o filtro selecionado.
                 </CardContent>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {documents.map((doc) => (
+                {filteredDocuments.map((doc) => (
                   <Card key={doc.id}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm truncate">{doc.title}</p>
                           <p className="text-xs text-gray-500 mt-0.5">{docTypeLabel[doc.type] ?? doc.type}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Categoria: {formatUploadCategory((doc.placeholders as any)?.documentCategory)}
+                          </p>
                           {doc.month && doc.year && (
                             <p className="text-xs text-gray-400">
                               {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][doc.month - 1]}/{doc.year}
+                            </p>
+                          )}
+                          {((doc.placeholders as any)?.extraction?.status as string | undefined) && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Leitura automática: {formatExtractionStatus((doc.placeholders as any)?.extraction?.status)}
+                            </p>
+                          )}
+                          {((doc.placeholders as any)?.extraction?.data?.mainCpf as string | undefined) && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              CPF lido: {(doc.placeholders as any)?.extraction?.data?.mainCpf}
+                            </p>
+                          )}
+                          {((doc.placeholders as any)?.extraction?.data?.mainRg as string | undefined) && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              RG lido: {(doc.placeholders as any)?.extraction?.data?.mainRg}
+                            </p>
+                          )}
+                          {((doc.placeholders as any)?.extraction?.data?.mainCnh as string | undefined) && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              CNH lida: {(doc.placeholders as any)?.extraction?.data?.mainCnh}
+                            </p>
+                          )}
+                          {((doc.placeholders as any)?.extraction?.data?.totalTimeMarks as number | undefined) !== undefined && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Marcações de ponto: {(doc.placeholders as any)?.extraction?.data?.totalTimeMarks}
                             </p>
                           )}
                         </div>
                         <div className="text-right shrink-0">
                           <DocStatusBadge status={doc.status} />
                           <p className="text-xs text-gray-400 mt-1">{fmtDate(doc.updatedAt ?? doc.createdAt)}</p>
+                          {(doc.filePath || (doc.placeholders as any)?.storedFileName) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="mt-1 h-7 px-2"
+                              onClick={() => handleDownloadOriginal(doc.id)}
+                            >
+                              <Download className="h-3.5 w-3.5 mr-1" /> Baixar
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -1286,6 +1527,29 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="text-gray-900 text-right font-medium">{value ?? '—'}</span>
     </div>
   );
+}
+
+function formatUploadCategory(value?: string): string {
+  const normalized = normalizeDocumentCategory(value);
+  if (normalized === 'cartao_ponto') return 'Cartão de Ponto';
+  if (normalized === 'rg') return 'RG';
+  if (normalized === 'cpf') return 'CPF';
+  if (normalized === 'cnh') return 'CNH';
+  return 'Outros';
+}
+
+function normalizeDocumentCategory(value?: string): UploadDocumentCategory {
+  if (value === 'cartao_ponto') return 'cartao_ponto';
+  if (value === 'rg') return 'rg';
+  if (value === 'cpf') return 'cpf';
+  if (value === 'cnh') return 'cnh';
+  return 'outros';
+}
+
+function formatExtractionStatus(value?: string): string {
+  if (value === 'ok') return 'Concluída';
+  if (value === 'partial') return 'Parcial';
+  return 'Sem leitura';
 }
 
 function EditableField({

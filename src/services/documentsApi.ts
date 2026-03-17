@@ -1,4 +1,5 @@
 import { request } from './http';
+import { API_BASE, getAuthToken } from './http';
 
 export type DocumentType =
   | 'trct'
@@ -40,14 +41,17 @@ export interface Document {
   title: string;
   status: DocumentStatus;
   content: string;
+  filePath?: string | null;
   month?: number | null;
   year?: number | null;
   templateId?: string | null;
-  placeholders?: Record<string, string> | null;
+  placeholders?: Record<string, any> | null;
   payrollRun?: DocumentPayrollRun | null;
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type UploadDocumentCategory = 'cartao_ponto' | 'rg' | 'cpf' | 'cnh' | 'outros';
 
 export interface DocumentVersion {
   id: string;
@@ -228,6 +232,75 @@ export const documentsApi = {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+  },
+
+  async uploadEmployeeDocument(
+    employeeId: string,
+    payload: {
+      file: File;
+      category: UploadDocumentCategory;
+      title?: string;
+      month?: number;
+      year?: number;
+      reason?: string;
+    }
+  ) {
+    const formData = new FormData();
+    formData.append('file', payload.file);
+    formData.append('category', payload.category);
+    if (payload.title) formData.append('title', payload.title);
+    if (payload.month) formData.append('month', String(payload.month));
+    if (payload.year) formData.append('year', String(payload.year));
+    if (payload.reason) formData.append('reason', payload.reason);
+
+    return request<Document>(`/documents/employee/${employeeId}/upload`, {
+      method: 'POST',
+      body: formData
+    });
+  },
+
+  async importEmployeeDocumentsFromFolder(
+    employeeId: string,
+    payload?: {
+      folderPath?: string;
+      category?: UploadDocumentCategory;
+      reason?: string;
+    }
+  ) {
+    return request<{
+      folderPath: string;
+      processedCount: number;
+      skippedCount: number;
+      documents: Document[];
+      skipped: Array<{ fileName: string; reason: string }>;
+    }>(`/documents/employee/${employeeId}/import-folder`, {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {})
+    });
+  },
+
+  async downloadOriginalDocumentFile(documentId: string) {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE}/documents/${documentId}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Falha ao baixar arquivo original');
+    }
+
+    const disposition = response.headers.get('Content-Disposition') ?? '';
+    const contentType = response.headers.get('Content-Type') ?? 'application/octet-stream';
+    const match = disposition.match(/filename=([^;]+)/i);
+    const filename = match ? match[1].replace(/"/g, '').trim() : `documento-${documentId}`;
+    const blob = await response.blob();
+
+    return {
+      blob,
+      filename,
+      contentType
+    };
   }
 };
 

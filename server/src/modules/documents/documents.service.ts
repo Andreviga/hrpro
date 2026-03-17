@@ -2,12 +2,15 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { PrismaService } from '../../common/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DocumentStatus } from '@prisma/client';
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { basename, extname, join, resolve } from 'node:path';
 import PDFDocument from 'pdfkit';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 import { DocumentStorageService } from './document-storage.service';
 import { PayslipDataBuilder } from './payslip-data.builder';
 import { PayslipPdfService } from './payslip-pdf.service';
 import { renderPayslipHtml } from './payslip-template';
+import { DocumentReaderService, UploadDocumentCategory } from './document-reader.service';
 
 const PLACEHOLDER_REGEX = /{{\s*([a-zA-Z0-9_.-]+)\s*}}/g;
 
@@ -230,6 +233,71 @@ const sanitizeFilenamePart = (value: string) => {
   return value.replace(/[^a-zA-Z0-9_-]+/g, '_');
 };
 
+const sanitizeUploadedFilename = (value: string) => {
+  const extension = extname(value || '').toLowerCase();
+  const base = basename(value || '', extension)
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 90);
+
+  const safeBase = base || 'documento';
+  const safeExt = extension && extension.length <= 10 ? extension : '';
+  return `${safeBase}${safeExt}`;
+};
+
+const normalizeUploadCategory = (value?: string): UploadDocumentCategory => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'cartao_ponto') return 'cartao_ponto';
+  if (normalized === 'rg') return 'rg';
+  if (normalized === 'cpf') return 'cpf';
+  if (normalized === 'cnh') return 'cnh';
+  return 'outros';
+};
+
+const inferMimeTypeFromFilename = (filename: string) => {
+  const extension = extname(filename || '').toLowerCase();
+  if (extension === '.pdf') return 'application/pdf';
+  if (extension === '.png') return 'image/png';
+  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg';
+  if (extension === '.webp') return 'image/webp';
+  if (extension === '.bmp') return 'image/bmp';
+  if (extension === '.tif' || extension === '.tiff') return 'image/tiff';
+  if (extension === '.txt') return 'text/plain';
+  if (extension === '.csv') return 'text/csv';
+  if (extension === '.json') return 'application/json';
+  if (extension === '.xml') return 'application/xml';
+  if (extension === '.xls') return 'application/vnd.ms-excel';
+  if (extension === '.xlsx' || extension === '.xlsm') {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
+  return 'application/octet-stream';
+};
+
+const inferCategoryFromFilename = (filename: string) => {
+  const lower = String(filename || '').toLowerCase();
+  if (lower.includes('cartao') || lower.includes('ponto')) return 'cartao_ponto';
+  if (lower.includes('cnh')) return 'cnh';
+  if (lower.includes('cpf')) return 'cpf';
+  if (lower.includes('rg')) return 'rg';
+  return 'outros';
+};
+
+const inferLayoutHintFromFilename = (filename: string) => {
+  const lower = String(filename || '').toLowerCase();
+  if (
+    lower.includes('verso') ||
+    lower.includes('ocorr') ||
+    lower.includes('justific') ||
+    lower.includes('observ')
+  ) {
+    return 'timecard_dense';
+  }
+  if (lower.includes('frente') || lower.includes('espelho') || lower.includes('cartao')) {
+    return 'timecard_grid';
+  }
+  return undefined;
+};
+
 const formatCompetence = (month?: number | null, year?: number | null) => {
   if (!month || !year) return 'sem_competencia';
   return `${String(month).padStart(2, '0')}${year}`;
@@ -329,7 +397,8 @@ export class DocumentsService {
     private audit: AuditService,
     private storage: DocumentStorageService,
     private payslipBuilder: PayslipDataBuilder,
-    private payslipPdf: PayslipPdfService
+    private payslipPdf: PayslipPdfService,
+    private reader: DocumentReaderService
   ) {}
 
   private async getTemplateOrThrow(id: string, companyId: string) {
@@ -798,6 +867,310 @@ export class DocumentsService {
     });
 
     return document;
+  }
+
+  private async ensureEmployeeInCompany(employeeId: string, companyId: string) {
+    const employee = await this.prisma.employee.findUnique({ where: { id: employeeId } });
+    if (!employee || employee.companyId !== companyId || employee.deletedAt) {
+      throw new NotFoundException('Employee not found');
+    }
+    return employee;
+  }
+
+  private buildUploadedDocumentTitle(params: {
+    category: UploadDocumentCategory;
+    originalName: string;
+    explicitTitle?: string;
+  }) {
+    const explicit = String(params.explicitTitle ?? '').trim();
+    if (explicit) return explicit;
+
+    const map: Record<UploadDocumentCategory, string> = {
+      cartao_ponto: 'Cartão de Ponto',
+      rg: 'Documento RG',
+      cpf: 'Documento CPF',
+      cnh: 'Documento CNH',
+      outros: 'Documento'
+    };
+
+    const cleanName = basename(params.originalName || 'arquivo');
+    return `${map[params.category]} - ${cleanName}`;
+  }
+
+  async uploadEmployeeDocumentFile(params: {
+    companyId: string;
+    userId?: string;
+    employeeId: string;
+    file: Express.Multer.File;
+    category?: string;
+    layoutHint?: string;
+    title?: string;
+    month?: number;
+    year?: number;
+    reason?: string;
+  }) {
+    if (!params.file?.buffer || params.file.buffer.length === 0) {
+      throw new BadRequestException('Arquivo inválido.');
+    }
+
+    await this.ensureEmployeeInCompany(params.employeeId, params.companyId);
+
+    const now = new Date();
+    const month =
+      Number.isFinite(params.month) && Number(params.month) >= 1 && Number(params.month) <= 12
+        ? Number(params.month)
+        : now.getMonth() + 1;
+    const year =
+      Number.isFinite(params.year) && Number(params.year) >= 2000 && Number(params.year) <= 2100
+        ? Number(params.year)
+        : now.getFullYear();
+
+    const requestedCategory = normalizeUploadCategory(params.category);
+    const ownerUserId = await this.resolveDocumentOwnerUserId({
+      companyId: params.companyId,
+      employeeId: params.employeeId,
+      userId: null
+    });
+
+    const originalName = params.file.originalname || `documento-${Date.now()}.bin`;
+    const safeName = sanitizeUploadedFilename(originalName);
+    const storedFilename = `${Date.now()}-${safeName}`;
+
+    const pathInfo = this.storage.getUserDocumentPath(
+      params.companyId,
+      ownerUserId,
+      'documentos',
+      year,
+      month,
+      storedFilename
+    );
+
+    await this.storage.ensureUserDocumentFolders(params.companyId, ownerUserId);
+    await mkdir(pathInfo.folderAbsolutePath, { recursive: true });
+    await writeFile(pathInfo.absolutePath, params.file.buffer);
+
+    const extraction = await this.reader.readDocument({
+      buffer: params.file.buffer,
+      fileName: originalName,
+      mimeType: params.file.mimetype || inferMimeTypeFromFilename(originalName),
+      category: requestedCategory,
+      companyId: params.companyId,
+      layoutHint: params.layoutHint
+    });
+
+    const content = extraction.fullText.trim()
+      ? extraction.fullText.trim().slice(0, 12000)
+      : `Arquivo enviado: ${originalName}`;
+
+    const placeholders = {
+      source: 'employee_upload',
+      requestedCategory,
+      documentCategory: extraction.detectedCategory,
+      originalFileName: originalName,
+      storedFileName: storedFilename,
+      mimeType: params.file.mimetype || inferMimeTypeFromFilename(originalName),
+      size: params.file.size ?? params.file.buffer.length,
+      uploadedAt: now.toISOString(),
+      extraction: {
+        status: extraction.status,
+        engine: extraction.engine,
+        profile: extraction.profile ?? null,
+        textPreview: extraction.textPreview,
+        data: extraction.extractedData,
+        warnings: extraction.warnings
+      }
+    };
+
+    const document = await this.prisma.employeeDocument.create({
+      data: {
+        companyId: params.companyId,
+        employeeId: params.employeeId,
+        userId: ownerUserId,
+        type: 'outros',
+        title: this.buildUploadedDocumentTitle({
+          category: extraction.detectedCategory,
+          originalName,
+          explicitTitle: params.title
+        }),
+        status: 'draft',
+        content,
+        filePath: pathInfo.relativePath,
+        placeholders: placeholders as any,
+        requiredPlaceholders: [],
+        month,
+        year,
+        createdBy: params.userId
+      },
+      include: {
+        payrollRun: {
+          select: { id: true, month: true, year: true, status: true, closedAt: true }
+        }
+      }
+    });
+
+    await this.prisma.documentVersion.create({
+      data: {
+        companyId: params.companyId,
+        documentId: document.id,
+        action: 'upload_document',
+        reason: params.reason,
+        after: {
+          id: document.id,
+          employeeId: document.employeeId,
+          filePath: document.filePath,
+          requestedCategory,
+          detectedCategory: extraction.detectedCategory,
+          extractionStatus: extraction.status
+        },
+        createdBy: params.userId
+      }
+    });
+
+    await this.audit.log({
+      companyId: params.companyId,
+      userId: params.userId,
+      action: 'upload',
+      entity: 'employee_document',
+      entityId: document.id,
+      reason: params.reason,
+      after: {
+        employeeId: params.employeeId,
+        filePath: document.filePath,
+        requestedCategory,
+        detectedCategory: extraction.detectedCategory,
+        extractionStatus: extraction.status
+      }
+    });
+
+    return document;
+  }
+
+  async importEmployeeDocumentsFromFolder(params: {
+    companyId: string;
+    userId?: string;
+    employeeId: string;
+    folderPath?: string;
+    category?: string;
+    layoutHint?: string;
+    reason?: string;
+  }) {
+    await this.ensureEmployeeInCompany(params.employeeId, params.companyId);
+
+    const folderPath = resolve(
+      params.folderPath && params.folderPath.trim().length > 0
+        ? params.folderPath
+        : join(process.cwd(), 'cartao')
+    );
+
+    let entries;
+    try {
+      entries = await readdir(folderPath, { withFileTypes: true, encoding: 'utf8' });
+    } catch (_error) {
+      throw new BadRequestException(`Pasta não encontrada: ${folderPath}`);
+    }
+
+    const files = entries.filter((entry) => entry.isFile());
+    if (files.length === 0) {
+      return {
+        folderPath,
+        processedCount: 0,
+        skippedCount: 0,
+        documents: [],
+        skipped: [] as Array<{ fileName: string; reason: string }>
+      };
+    }
+
+    const documents: any[] = [];
+    const skipped: Array<{ fileName: string; reason: string }> = [];
+
+    for (const entry of files) {
+      const fileName = String(entry.name);
+      const absolutePath = join(folderPath, fileName);
+      try {
+        const fileStat = await stat(absolutePath);
+        const buffer = await readFile(absolutePath);
+        const inferredCategory = normalizeUploadCategory(
+          params.category || inferCategoryFromFilename(fileName)
+        );
+
+        const file = {
+          fieldname: 'file',
+          originalname: fileName,
+          encoding: '7bit',
+          mimetype: inferMimeTypeFromFilename(fileName),
+          size: fileStat.size,
+          destination: '',
+          filename: fileName,
+          path: absolutePath,
+          buffer,
+          stream: undefined as any
+        } as unknown as Express.Multer.File;
+
+        const document = await this.uploadEmployeeDocumentFile({
+          companyId: params.companyId,
+          userId: params.userId,
+          employeeId: params.employeeId,
+          file,
+          category: inferredCategory,
+          layoutHint: params.layoutHint || inferLayoutHintFromFilename(fileName),
+          reason: params.reason || 'import_folder_cartao'
+        });
+
+        documents.push(document);
+      } catch (error: any) {
+        skipped.push({
+          fileName,
+          reason: String(error?.message || 'Falha ao importar arquivo')
+        });
+      }
+    }
+
+    return {
+      folderPath,
+      processedCount: documents.length,
+      skippedCount: skipped.length,
+      documents,
+      skipped
+    };
+  }
+
+  async exportOriginalDocumentFile(params: {
+    id: string;
+    companyId: string;
+    userId: string;
+    role: string;
+  }) {
+    const document = await this.getDocumentForUser(params.id, params.companyId, params.userId, params.role);
+    const relativePath = this.storage.getStoredFilePath(document) || document.filePath;
+
+    if (!relativePath) {
+      throw new NotFoundException('Arquivo original não encontrado para este documento.');
+    }
+
+    const buffer = await this.storage.readStoredPdf(relativePath);
+    const filename = basename(relativePath);
+    const metaMime =
+      document.placeholders && typeof document.placeholders === 'object'
+        ? String((document.placeholders as any).mimeType ?? '')
+        : '';
+
+    const contentType = metaMime || inferMimeTypeFromFilename(filename);
+
+    await this.audit.log({
+      companyId: params.companyId,
+      userId: params.userId,
+      action: 'export',
+      entity: 'employee_document',
+      entityId: document.id,
+      after: {
+        source: 'original_file',
+        filePath: relativePath,
+        contentType,
+        exportedAt: new Date().toISOString()
+      }
+    });
+
+    return { buffer, filename, contentType };
   }
 
   async updateDocument(
