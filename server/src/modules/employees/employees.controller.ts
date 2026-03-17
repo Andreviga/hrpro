@@ -17,6 +17,25 @@ export class EmployeesController {
     return this.employees.listPending(req.user.companyId);
   }
 
+  @Get('cleanup/extra/candidates')
+  async listExtraCleanupCandidates(@Req() req: { user: { companyId: string } }) {
+    return this.employees.listExtraCleanupCandidates(req.user.companyId);
+  }
+
+  @Post('cleanup/extra/delete')
+  async cleanupExtraEmployees(
+    @Body() body: { employeeIds?: string[]; execute?: boolean; reason?: string },
+    @Req() req: { user: { companyId: string; sub: string } }
+  ) {
+    return this.employees.cleanupExtraEmployees({
+      companyId: req.user.companyId,
+      userId: req.user.sub,
+      employeeIds: body.employeeIds,
+      execute: body.execute,
+      reason: body.reason
+    });
+  }
+
   @Get(':id')
   async getById(@Param('id') id: string) {
     return this.employees.getById(id);

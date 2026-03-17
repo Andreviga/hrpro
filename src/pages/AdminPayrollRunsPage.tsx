@@ -22,6 +22,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { useToast } from '../hooks/use-toast';
 import { payrollApi, PayrollRun, PayrollRunSummary } from '../services/payrollApi';
+import { documentsApi } from '../services/documentsApi';
 import { BarChart3, CalendarCheck, FileText, Loader2, Lock, RefreshCcw, Unlock } from 'lucide-react';
 
 const statusLabels: Record<PayrollRun['status'], string> = {
@@ -53,6 +54,8 @@ const AdminPayrollRunsPage: React.FC = () => {
   const [actionType, setActionType] = useState<'close' | 'reopen' | null>(null);
   const [actionRun, setActionRun] = useState<PayrollRun | null>(null);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [incomeYear, setIncomeYear] = useState(String(currentYear - 1));
+  const [generatingIncomeStatements, setGeneratingIncomeStatements] = useState(false);
 
   const getFriendlyError = (error: unknown, fallback: string) => {
     if (error instanceof Error) {
@@ -217,6 +220,38 @@ const AdminPayrollRunsPage: React.FC = () => {
       setGeneratingId(null);
     }
   };
+
+  const handleGenerateIncomeStatementsAll = async () => {
+    const year = Number(incomeYear);
+    if (!incomeYear || Number.isNaN(year)) {
+      toast({
+        title: 'Ano inválido',
+        description: 'Informe um ano válido para gerar os informes.'
+      });
+      return;
+    }
+
+    try {
+      setGeneratingIncomeStatements(true);
+      const result = await documentsApi.generateIncomeStatementsForYear({
+        year,
+        reason: `emissao_informes_rendimento_${year}`,
+        idempotent: true
+      });
+
+      toast({
+        title: 'Informes gerados',
+        description: `${result.createdCount} criado(s) e ${result.skippedCount} já existente(s) para ${year}.`
+      });
+    } catch (error) {
+      toast({
+        title: 'Falha ao emitir informes',
+        description: getFriendlyError(error, 'Não foi possível emitir os informes de rendimento.')
+      });
+    } finally {
+      setGeneratingIncomeStatements(false);
+    }
+  };
   const formatDate = (value?: string | null) => {
     if (!value) return '--';
     return new Date(value).toLocaleDateString('pt-BR');
@@ -250,6 +285,36 @@ const AdminPayrollRunsPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <FileText className="h-5 w-5" />
+                <span>Informe de rendimentos</span>
+              </CardTitle>
+              <CardDescription>Emite em lote para todos os funcionários com folha fechada no ano.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Ano-calendário</Label>
+                <Input
+                  type="number"
+                  min={2020}
+                  max={2100}
+                  value={incomeYear}
+                  onChange={(event) => setIncomeYear(event.target.value)}
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => void handleGenerateIncomeStatementsAll()}
+                disabled={generatingIncomeStatements}
+              >
+                {generatingIncomeStatements ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                Emitir todos os informes
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">

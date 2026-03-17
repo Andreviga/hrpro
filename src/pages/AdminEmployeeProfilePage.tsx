@@ -43,7 +43,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useToast } from '../hooks/use-toast';
 import { employeeApi, Employee } from '../services/employeeApi';
-import { apiService } from '../services/api';
+import { apiService, PaystubDetail } from '../services/api';
 import { documentsApi, Document as HRDocument, UploadDocumentCategory } from '../services/documentsApi';
 import { supportApi, Ticket } from '../services/supportApi';
 import { request } from '../services/http';
@@ -56,6 +56,13 @@ const fmtCurrency = (v?: number | null) => (v != null ? fmt.format(v) : '—');
 const fmtDate = (d?: string | null) => {
   if (!d) return '—';
   try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return d; }
+};
+const parseAmountInput = (raw: string) => {
+  const normalized = raw.replace(/\./g, '').replace(',', '.').trim();
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.round(parsed * 100) / 100;
 };
 const formatCPF = (v: string) =>
   v.replace(/\D/g, '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
@@ -144,6 +151,8 @@ export default function AdminEmployeeProfilePage() {
 
   // secondary data
   const [paystubs, setPaystubs] = useState<any[]>([]);
+  const [paystubDetails, setPaystubDetails] = useState<Record<string, PaystubDetail | null>>({});
+  const [expandedPaystubs, setExpandedPaystubs] = useState<Record<string, boolean>>({});
   const [salaryHistory, setSalaryHistory] = useState<any[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [benefits, setBenefits] = useState<any[]>([]);
@@ -152,6 +161,8 @@ export default function AdminEmployeeProfilePage() {
 
   // loading states
   const [loadingPaystubs, setLoadingPaystubs] = useState(false);
+  const [loadingPaystubDetailId, setLoadingPaystubDetailId] = useState<string | null>(null);
+  const [updatingPaystubEventId, setUpdatingPaystubEventId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingContracts, setLoadingContracts] = useState(false);
   const [loadingBenefits, setLoadingBenefits] = useState(false);
@@ -216,7 +227,7 @@ export default function AdminEmployeeProfilePage() {
       const data = await apiService.getPaystubsAdmin({
         month: folhaMonth,
         year: folhaYear,
-        employeeName: employee.fullName,
+        employeeId: employee.id,
       });
       setPaystubs(data);
     } catch {
@@ -469,6 +480,80 @@ export default function AdminEmployeeProfilePage() {
         description: error?.message,
         variant: 'destructive'
       });
+    }
+  };
+
+  const loadPaystubDetail = async (paystubId: string) => {
+    setLoadingPaystubDetailId(paystubId);
+    try {
+      const detail = await apiService.getPaystubDetail(paystubId);
+      setPaystubDetails((prev) => ({ ...prev, [paystubId]: detail }));
+    } catch {
+      setPaystubDetails((prev) => ({ ...prev, [paystubId]: null }));
+      toast({
+        title: 'Erro ao carregar recebimentos',
+        description: 'Não foi possível carregar os eventos do holerite.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingPaystubDetailId(null);
+    }
+  };
+
+  const togglePaystubExpansion = async (paystubId: string) => {
+    const isExpanded = Boolean(expandedPaystubs[paystubId]);
+    setExpandedPaystubs((prev) => ({ ...prev, [paystubId]: !isExpanded }));
+    if (!isExpanded && paystubDetails[paystubId] === undefined) {
+      await loadPaystubDetail(paystubId);
+    }
+  };
+
+  const handleEditPaystubEvent = async (
+    paystubId: string,
+    eventItem: { id: string; code: string; description: string; amount: number }
+  ) => {
+    const amountInput = window.prompt(
+      `Novo valor para ${eventItem.code} (${eventItem.description})`,
+      eventItem.amount.toFixed(2).replace('.', ',')
+    );
+
+    if (amountInput === null) return;
+
+    const parsedAmount = parseAmountInput(amountInput);
+    if (parsedAmount === null) {
+      toast({
+        title: 'Valor inválido',
+        description: 'Informe um valor numérico maior ou igual a zero.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const descriptionInput = window.prompt('Nova descrição (opcional)', eventItem.description);
+    if (descriptionInput === null) return;
+
+    try {
+      setUpdatingPaystubEventId(eventItem.id);
+      await apiService.updatePaystubEvent(paystubId, eventItem.id, {
+        amount: parsedAmount,
+        description: descriptionInput,
+        reason: 'ajuste_manual_recebimentos_perfil_funcionario'
+      });
+
+      await loadPaystubDetail(paystubId);
+      await loadPaystubs();
+      toast({
+        title: 'Recebimento atualizado',
+        description: `${eventItem.code} ajustado com sucesso.`
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao editar recebimento',
+        description: error?.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setUpdatingPaystubEventId(null);
     }
   };
 
@@ -996,6 +1081,18 @@ export default function AdminEmployeeProfilePage() {
                           </div>
                           <Button
                             size="sm"
+                            variant="ghost"
+                            onClick={() => togglePaystubExpansion(p.id)}
+                          >
+                            {expandedPaystubs[p.id] ? (
+                              <ChevronUp className="h-4 w-4 mr-1" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 mr-1" />
+                            )}
+                            {expandedPaystubs[p.id] ? 'Ocultar recebimentos' : 'Ver recebimentos'}
+                          </Button>
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => navigate(`/paystubs/${p.id}`)}
                           >
@@ -1003,6 +1100,77 @@ export default function AdminEmployeeProfilePage() {
                           </Button>
                         </div>
                       </div>
+
+                      {expandedPaystubs[p.id] && (
+                        <div className="mt-4 border-t pt-4 space-y-3">
+                          {loadingPaystubDetailId === p.id ? (
+                            <div className="text-sm text-gray-500">Carregando recebimentos…</div>
+                          ) : paystubDetails[p.id] === null ? (
+                            <div className="text-sm text-red-600">Não foi possível carregar os recebimentos deste holerite.</div>
+                          ) : (
+                            <>
+                              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                <div className="rounded-lg bg-gray-50 p-3">
+                                  <p className="text-xs text-gray-500">Bruto</p>
+                                  <p className="text-sm font-semibold text-gray-800">{fmtCurrency(paystubDetails[p.id]?.summary?.grossSalary)}</p>
+                                </div>
+                                <div className="rounded-lg bg-gray-50 p-3">
+                                  <p className="text-xs text-gray-500">Descontos</p>
+                                  <p className="text-sm font-semibold text-red-700">{fmtCurrency(paystubDetails[p.id]?.summary?.totalDeductions)}</p>
+                                </div>
+                                <div className="rounded-lg bg-gray-50 p-3">
+                                  <p className="text-xs text-gray-500">Líquido</p>
+                                  <p className="text-sm font-semibold text-green-700">{fmtCurrency(paystubDetails[p.id]?.summary?.netSalary)}</p>
+                                </div>
+                                <div className="rounded-lg bg-gray-50 p-3">
+                                  <p className="text-xs text-gray-500">FGTS Depósito</p>
+                                  <p className="text-sm font-semibold text-gray-800">{fmtCurrency(paystubDetails[p.id]?.summary?.fgtsDeposit)}</p>
+                                </div>
+                              </div>
+
+                              {(paystubDetails[p.id]?.events?.length ?? 0) === 0 ? (
+                                <div className="text-sm text-gray-500">Nenhum recebimento/desconto detalhado neste holerite.</div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {paystubDetails[p.id]?.events?.map((eventItem) => (
+                                    <div
+                                      key={eventItem.id}
+                                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-medium text-gray-900">{eventItem.code}</span>
+                                          <Badge
+                                            variant="outline"
+                                            className={eventItem.type === 'earning' ? 'border-green-300 text-green-700' : 'border-red-300 text-red-700'}
+                                          >
+                                            {eventItem.type === 'earning' ? 'Provento' : 'Desconto'}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-0.5 truncate">{eventItem.description}</p>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <p className={`text-sm font-semibold ${eventItem.type === 'earning' ? 'text-green-700' : 'text-red-700'}`}>
+                                          {eventItem.type === 'deduction' ? '-' : '+'} {fmtCurrency(eventItem.amount)}
+                                        </p>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={updatingPaystubEventId === eventItem.id}
+                                          onClick={() => handleEditPaystubEvent(p.id, eventItem)}
+                                        >
+                                          <Edit className="h-4 w-4 mr-1" />
+                                          {updatingPaystubEventId === eventItem.id ? 'Salvando…' : 'Editar'}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}

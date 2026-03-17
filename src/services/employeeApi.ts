@@ -150,6 +150,23 @@ export interface PayrollCalculation {
   };
 }
 
+export interface ExtraEmployeeCleanupCandidate {
+  employee: {
+    id: string;
+    fullName: string;
+    cpf: string;
+    status: string;
+    position: string;
+    department: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  links: Record<string, number>;
+  totalLinks: number;
+  candidate: boolean;
+  reasons: string[];
+}
+
 const mapEmployee = (apiEmployee: any): Employee => {
   const addressLine = apiEmployee.addressLine || '';
   const [streetPart, numberPart] = addressLine.split(',').map((value: string) => value.trim());
@@ -302,6 +319,31 @@ export const employeeApi = {
     await request<void>(`/employees/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason })
+    });
+  },
+
+  async getExtraCleanupCandidates(): Promise<{
+    totalCandidates: number;
+    candidates: ExtraEmployeeCleanupCandidate[];
+  }> {
+    return request('/employees/cleanup/extra/candidates');
+  },
+
+  async cleanupExtraEmployees(payload: {
+    employeeIds?: string[];
+    execute?: boolean;
+    reason?: string;
+  }): Promise<{
+    execute: boolean;
+    totalCandidates: number;
+    selectedCount: number;
+    deletedCount: number;
+    deletedEmployeeIds: string[];
+    candidates: ExtraEmployeeCleanupCandidate[];
+  }> {
+    return request('/employees/cleanup/extra/delete', {
+      method: 'POST',
+      body: JSON.stringify(payload)
     });
   },
 

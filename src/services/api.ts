@@ -206,11 +206,13 @@ export const apiService = {
   async getPaystubsAdmin(params?: {
     month?: number;
     year?: number;
+    employeeId?: string;
     employeeName?: string;
   }): Promise<PaystubSummary[]> {
     const query = new URLSearchParams();
     if (params?.month) query.set('month', String(params.month));
     if (params?.year) query.set('year', String(params.year));
+    if (params?.employeeId) query.set('employeeId', params.employeeId);
     if (params?.employeeName) query.set('employeeName', params.employeeName);
     const qs = query.toString();
     return request<PaystubSummary[]>(`/paystubs/admin${qs ? `?${qs}` : ''}`);

@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
-import { employeeApi, Employee, PayrollCalculation } from '../services/employeeApi';
+import { employeeApi, Employee, PayrollCalculation, ExtraEmployeeCleanupCandidate } from '../services/employeeApi';
 import { payrollApi } from '../services/payrollApi';
 import { 
   Users,
@@ -78,6 +78,9 @@ const AdminEmployeesPage: React.FC = () => {
   const [calculatingPayroll, setCalculatingPayroll] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [cleanupCandidates, setCleanupCandidates] = useState<ExtraEmployeeCleanupCandidate[]>([]);
+  const [checkingCleanup, setCheckingCleanup] = useState(false);
+  const [executingCleanup, setExecutingCleanup] = useState(false);
 
   const getFriendlyError = (error: unknown, fallback: string) => {
     if (error instanceof Error) {
@@ -279,6 +282,49 @@ const AdminEmployeesPage: React.FC = () => {
       alert(getFriendlyError(error, 'Erro ao calcular folha de pagamento'));
     } finally {
       setCalculatingPayroll(false);
+    }
+  };
+
+  const handleCheckExtraEmployees = async () => {
+    try {
+      setCheckingCleanup(true);
+      const result = await employeeApi.getExtraCleanupCandidates();
+      setCleanupCandidates(result.candidates ?? []);
+      alert(`Verificação concluída: ${result.totalCandidates} funcionário(s) excedente(s) identificado(s).`);
+    } catch (error) {
+      alert(getFriendlyError(error, 'Erro ao verificar funcionários excedentes'));
+    } finally {
+      setCheckingCleanup(false);
+    }
+  };
+
+  const handleDeleteAllExtraEmployees = async () => {
+    const count = cleanupCandidates.length;
+    if (count <= 0) {
+      alert('Não há funcionários excedentes para excluir.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Confirma a exclusão lógica de ${count} funcionário(s) excedente(s)? Esta ação pode ser revertida apenas manualmente no banco.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setExecutingCleanup(true);
+      const result = await employeeApi.cleanupExtraEmployees({
+        execute: true,
+        reason: 'limpeza_funcionarios_excedentes'
+      });
+
+      setCleanupCandidates([]);
+      await loadData();
+      alert(`Limpeza concluída: ${result.deletedCount} funcionário(s) excluído(s).`);
+    } catch (error) {
+      alert(getFriendlyError(error, 'Erro ao excluir funcionários excedentes'));
+    } finally {
+      setExecutingCleanup(false);
     }
   };
 
@@ -837,6 +883,68 @@ const AdminEmployeesPage: React.FC = () => {
 
           {/* Tab: Relatórios */}
           <TabsContent value="reports" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Verificação de Funcionários Excedentes</CardTitle>
+                <CardDescription>
+                  Identifica funcionários sem vínculos de folha/documentos/histórico e permite exclusão em lote.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCheckExtraEmployees}
+                    disabled={checkingCleanup || executingCleanup}
+                  >
+                    {checkingCleanup ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4 mr-2" />
+                    )}
+                    Verificar excedentes
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteAllExtraEmployees}
+                    disabled={executingCleanup || checkingCleanup || cleanupCandidates.length === 0}
+                  >
+                    {executingCleanup ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    Excluir todos os excedentes ({cleanupCandidates.length})
+                  </Button>
+                </div>
+
+                {cleanupCandidates.length > 0 ? (
+                  <div className="space-y-2">
+                    {cleanupCandidates.slice(0, 20).map((item) => (
+                      <div key={item.employee.id} className="rounded border border-amber-200 bg-amber-50 p-3">
+                        <p className="font-medium text-amber-900">{item.employee.fullName}</p>
+                        <p className="text-xs text-amber-700">
+                          CPF: {formatCPF(item.employee.cpf)} · Status: {getStatusText(item.employee.status)}
+                        </p>
+                        <p className="text-xs text-amber-700">
+                          Cargo: {item.employee.position} · Departamento: {item.employee.department}
+                        </p>
+                      </div>
+                    ))}
+                    {cleanupCandidates.length > 20 && (
+                      <p className="text-xs text-gray-500">
+                        Exibindo 20 de {cleanupCandidates.length} candidatos.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    Execute a verificação para listar funcionários excedentes.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="p-4">

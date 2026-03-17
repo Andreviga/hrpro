@@ -6,6 +6,89 @@ import { AuditService } from '../audit/audit.service';
 export class EmployeesService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
+  private async buildExtraCleanupCandidates(companyId: string) {
+    const rows = await this.prisma.employee.findMany({
+      where: {
+        companyId,
+        deletedAt: null
+      },
+      select: {
+        id: true,
+        fullName: true,
+        cpf: true,
+        status: true,
+        position: true,
+        department: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            payrollResults: true,
+            timeBankEntries: true,
+            timeBankCloses: true,
+            dependentsList: true,
+            contracts: true,
+            salaryHistory: true,
+            benefits: true,
+            rubricAssignments: true,
+            attachments: true,
+            users: true,
+            documents: true,
+            documentSignatures: true,
+            supportTickets: true
+          }
+        }
+      }
+    });
+
+    return rows
+      .map((row) => {
+        const links = {
+          payrollResults: row._count.payrollResults,
+          timeBankEntries: row._count.timeBankEntries,
+          timeBankCloses: row._count.timeBankCloses,
+          dependents: row._count.dependentsList,
+          contracts: row._count.contracts,
+          salaryHistory: row._count.salaryHistory,
+          benefits: row._count.benefits,
+          rubricAssignments: row._count.rubricAssignments,
+          attachments: row._count.attachments,
+          users: row._count.users,
+          documents: row._count.documents,
+          documentSignatures: row._count.documentSignatures,
+          supportTickets: row._count.supportTickets
+        };
+
+        const totalLinks = Object.values(links).reduce((sum, value) => sum + Number(value || 0), 0);
+
+        const statusEligible =
+          row.status === 'pending_approval' || row.status === 'inactive' || row.status === 'dismissed';
+        const candidate = statusEligible && totalLinks === 0;
+
+        return {
+          employee: {
+            id: row.id,
+            fullName: row.fullName,
+            cpf: row.cpf,
+            status: row.status,
+            position: row.position,
+            department: row.department,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt
+          },
+          links,
+          totalLinks,
+          candidate,
+          reasons: [
+            statusEligible ? 'status_eligible' : 'status_not_eligible',
+            totalLinks === 0 ? 'no_related_records' : 'has_related_records'
+          ]
+        };
+      })
+      .filter((item) => item.candidate)
+      .sort((a, b) => b.employee.updatedAt.getTime() - a.employee.updatedAt.getTime());
+  }
+
   private isValidCpf(cpf: string) {
     if (!/^\d{11}$/.test(cpf)) return false;
     if (/^(\d)\1{10}$/.test(cpf)) return false;
@@ -199,6 +282,83 @@ export class EmployeesService {
       },
       orderBy: { fullName: 'asc' }
     });
+  }
+
+  async listExtraCleanupCandidates(companyId: string) {
+    const candidates = await this.buildExtraCleanupCandidates(companyId);
+    return {
+      totalCandidates: candidates.length,
+      candidates
+    };
+  }
+
+  async cleanupExtraEmployees(params: {
+    companyId: string;
+    userId?: string;
+    employeeIds?: string[];
+    execute?: boolean;
+    reason?: string;
+  }) {
+    const candidates = await this.buildExtraCleanupCandidates(params.companyId);
+    const candidateIds = new Set(candidates.map((item) => item.employee.id));
+
+    const selectedCandidates =
+      params.employeeIds && params.employeeIds.length > 0
+        ? candidates.filter((item) => candidateIds.has(item.employee.id) && params.employeeIds?.includes(item.employee.id))
+        : candidates;
+
+    const execute = Boolean(params.execute);
+    if (!execute || selectedCandidates.length === 0) {
+      return {
+        execute,
+        totalCandidates: candidates.length,
+        selectedCount: selectedCandidates.length,
+        deletedCount: 0,
+        deletedEmployeeIds: [] as string[],
+        candidates: selectedCandidates
+      };
+    }
+
+    const now = new Date();
+    const deletedEmployeeIds: string[] = [];
+
+    for (const item of selectedCandidates) {
+      const employee = await this.prisma.employee.update({
+        where: { id: item.employee.id },
+        data: {
+          deletedAt: now,
+          deletedBy: params.userId,
+          deletedReason: params.reason ?? 'cleanup_extra_employees'
+        }
+      });
+
+      deletedEmployeeIds.push(employee.id);
+
+      await this.audit.log({
+        companyId: params.companyId,
+        userId: params.userId,
+        action: 'delete',
+        entity: 'employee',
+        entityId: employee.id,
+        reason: params.reason ?? 'cleanup_extra_employees',
+        before: item.employee,
+        after: {
+          id: employee.id,
+          deletedAt: employee.deletedAt,
+          deletedBy: employee.deletedBy,
+          deletedReason: employee.deletedReason
+        }
+      });
+    }
+
+    return {
+      execute,
+      totalCandidates: candidates.length,
+      selectedCount: selectedCandidates.length,
+      deletedCount: deletedEmployeeIds.length,
+      deletedEmployeeIds,
+      candidates: selectedCandidates
+    };
   }
 
   async listPending(companyId: string) {
