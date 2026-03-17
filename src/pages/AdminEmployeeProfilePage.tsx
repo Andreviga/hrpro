@@ -57,9 +57,22 @@ const fmtDate = (d?: string | null) => {
   if (!d) return '—';
   try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return d; }
 };
+const toDateInputValue = (d?: string | null) => {
+  if (!d) return '';
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 10);
+};
 const parseAmountInput = (raw: string) => {
   const normalized = raw.replace(/\./g, '').replace(',', '.').trim();
   if (!normalized) return null;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.round(parsed * 100) / 100;
+};
+const parseOptionalNumberInput = (raw?: string) => {
+  if (!raw || !raw.trim()) return undefined;
+  const normalized = raw.replace(/\./g, '').replace(',', '.').trim();
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed) || parsed < 0) return null;
   return Math.round(parsed * 100) / 100;
@@ -197,6 +210,18 @@ export default function AdminEmployeeProfilePage() {
   const [showSalaryForm, setShowSalaryForm] = useState(false);
   const [salaryFormData, setSalaryFormData] = useState({ baseSalary: '', reason: '', effectiveFrom: '' });
   const [savingSalary, setSavingSalary] = useState(false);
+  const [editingSalaryHistoryId, setEditingSalaryHistoryId] = useState<string | null>(null);
+  const [savingSalaryHistoryId, setSavingSalaryHistoryId] = useState<string | null>(null);
+  const [salaryHistoryEditData, setSalaryHistoryEditData] = useState({
+    salaryType: 'monthly',
+    baseSalary: '',
+    hourlyRate: '',
+    weeklyHours: '',
+    effectiveFrom: '',
+    effectiveTo: '',
+    approvalStatus: 'pending',
+    reason: ''
+  });
 
   // benefit form
   const [showBenefitForm, setShowBenefitForm] = useState(false);
@@ -372,6 +397,62 @@ export default function AdminEmployeeProfilePage() {
       toast({ title: 'Erro ao salvar histórico', description: e?.message, variant: 'destructive' });
     } finally {
       setSavingSalary(false);
+    }
+  };
+
+  const startEditSalaryHistory = (history: any) => {
+    setEditingSalaryHistoryId(history.id);
+    setSalaryHistoryEditData({
+      salaryType: history.salaryType ?? employee?.salaryType ?? 'monthly',
+      baseSalary: history.baseSalary != null ? String(history.baseSalary) : '',
+      hourlyRate: history.hourlyRate != null ? String(history.hourlyRate) : '',
+      weeklyHours: history.weeklyHours != null ? String(history.weeklyHours) : '',
+      effectiveFrom: toDateInputValue(history.effectiveFrom),
+      effectiveTo: toDateInputValue(history.effectiveTo),
+      approvalStatus: history.approvalStatus ?? 'pending',
+      reason: history.reason ?? ''
+    });
+  };
+
+  const cancelEditSalaryHistory = () => {
+    setEditingSalaryHistoryId(null);
+    setSavingSalaryHistoryId(null);
+  };
+
+  const saveEditSalaryHistory = async (historyId: string) => {
+    const baseSalary = parseOptionalNumberInput(salaryHistoryEditData.baseSalary);
+    const hourlyRate = parseOptionalNumberInput(salaryHistoryEditData.hourlyRate);
+    const weeklyHours = parseOptionalNumberInput(salaryHistoryEditData.weeklyHours);
+
+    if (baseSalary === null || hourlyRate === null || weeklyHours === null) {
+      toast({
+        title: 'Valores inválidos',
+        description: 'Preencha salários e horas com números válidos (maior ou igual a zero).',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      setSavingSalaryHistoryId(historyId);
+      await employeeApi.updateSalaryHistory(historyId, {
+        salaryType: salaryHistoryEditData.salaryType,
+        baseSalary,
+        hourlyRate,
+        weeklyHours,
+        effectiveFrom: salaryHistoryEditData.effectiveFrom || undefined,
+        effectiveTo: salaryHistoryEditData.effectiveTo || undefined,
+        approvalStatus: salaryHistoryEditData.approvalStatus,
+        reason: salaryHistoryEditData.reason?.trim() || undefined
+      });
+
+      await loadSalaryHistory();
+      setEditingSalaryHistoryId(null);
+      toast({ title: 'Histórico salarial atualizado com sucesso!' });
+    } catch (e: any) {
+      toast({ title: 'Erro ao atualizar histórico', description: e?.message, variant: 'destructive' });
+    } finally {
+      setSavingSalaryHistoryId(null);
     }
   };
 
@@ -1248,26 +1329,150 @@ export default function AdminEmployeeProfilePage() {
               <div className="space-y-2">
                 {salaryHistory.map((h: any, idx: number) => (
                   <Card key={h.id}>
-                    <CardContent className="p-4 flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <span className="text-sm font-medium">
-                          {h.salaryType === 'hourly' ? 'Valor/hora: ' : 'Salário: '}
-                          <span className="text-green-700">{fmtCurrency(h.baseSalary ? Number(h.baseSalary) : undefined)}</span>
-                        </span>
-                        {h.reason && (
-                          <p className="text-xs text-gray-500 mt-0.5">Motivo: {h.reason}</p>
-                        )}
-                      </div>
-                      <div className="text-right">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">Registro #{salaryHistory.length - idx}</p>
+                          <p className="text-xs text-gray-500">Vigente: {fmtDate(h.effectiveFrom)}{h.effectiveTo ? ` até ${fmtDate(h.effectiveTo)}` : ''}</p>
+                        </div>
                         <div className="flex items-center gap-2">
                           <ApprovalBadge status={h.approvalStatus} />
                           {idx === 0 && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Atual</span>}
+                          {editingSalaryHistoryId === h.id ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={cancelEditSalaryHistory}
+                                disabled={savingSalaryHistoryId === h.id}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => saveEditSalaryHistory(h.id)}
+                                disabled={savingSalaryHistoryId === h.id}
+                              >
+                                {savingSalaryHistoryId === h.id ? 'Salvando…' : 'Salvar'}
+                              </Button>
+                            </>
+                          ) : (
+                            <Button variant="outline" size="sm" onClick={() => startEditSalaryHistory(h)}>
+                              <Edit className="h-4 w-4 mr-1" /> Editar
+                            </Button>
+                          )}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Vigente: {fmtDate(h.effectiveFrom)}
-                          {h.effectiveTo ? ` até ${fmtDate(h.effectiveTo)}` : ''}
-                        </p>
                       </div>
+
+                      {editingSalaryHistoryId === h.id ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs">Tipo de salário</Label>
+                            <Select
+                              value={salaryHistoryEditData.salaryType}
+                              onValueChange={(value) => setSalaryHistoryEditData((prev) => ({ ...prev, salaryType: value }))}
+                            >
+                              <SelectTrigger className="h-8 text-sm mt-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="monthly">Mensal</SelectItem>
+                                <SelectItem value="hourly">Por hora</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Status de aprovação</Label>
+                            <Select
+                              value={salaryHistoryEditData.approvalStatus}
+                              onValueChange={(value) => setSalaryHistoryEditData((prev) => ({ ...prev, approvalStatus: value }))}
+                            >
+                              <SelectTrigger className="h-8 text-sm mt-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pendente</SelectItem>
+                                <SelectItem value="approved">Aprovado</SelectItem>
+                                <SelectItem value="rejected">Rejeitado</SelectItem>
+                                <SelectItem value="draft">Rascunho</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Salário base (R$)</Label>
+                            <Input
+                              className="h-8 text-sm mt-1"
+                              value={salaryHistoryEditData.baseSalary}
+                              onChange={(e) => setSalaryHistoryEditData((prev) => ({ ...prev, baseSalary: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Valor/hora (R$)</Label>
+                            <Input
+                              className="h-8 text-sm mt-1"
+                              value={salaryHistoryEditData.hourlyRate}
+                              onChange={(e) => setSalaryHistoryEditData((prev) => ({ ...prev, hourlyRate: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Horas semanais</Label>
+                            <Input
+                              className="h-8 text-sm mt-1"
+                              value={salaryHistoryEditData.weeklyHours}
+                              onChange={(e) => setSalaryHistoryEditData((prev) => ({ ...prev, weeklyHours: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Motivo</Label>
+                            <Input
+                              className="h-8 text-sm mt-1"
+                              value={salaryHistoryEditData.reason}
+                              onChange={(e) => setSalaryHistoryEditData((prev) => ({ ...prev, reason: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Vigência inicial</Label>
+                            <Input
+                              type="date"
+                              className="h-8 text-sm mt-1"
+                              value={salaryHistoryEditData.effectiveFrom}
+                              onChange={(e) => setSalaryHistoryEditData((prev) => ({ ...prev, effectiveFrom: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Vigência final</Label>
+                            <Input
+                              type="date"
+                              className="h-8 text-sm mt-1"
+                              value={salaryHistoryEditData.effectiveTo}
+                              onChange={(e) => setSalaryHistoryEditData((prev) => ({ ...prev, effectiveTo: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1 text-sm">
+                          <p>
+                            <span className="text-gray-500">Tipo:</span>{' '}
+                            <span className="font-medium text-gray-800">{h.salaryType === 'hourly' ? 'Por hora' : 'Mensal'}</span>
+                          </p>
+                          <p>
+                            <span className="text-gray-500">Salário base:</span>{' '}
+                            <span className="font-medium text-green-700">{fmtCurrency(h.baseSalary ? Number(h.baseSalary) : undefined)}</span>
+                          </p>
+                          <p>
+                            <span className="text-gray-500">Valor/hora:</span>{' '}
+                            <span className="font-medium text-gray-800">{fmtCurrency(h.hourlyRate ? Number(h.hourlyRate) : undefined)}</span>
+                          </p>
+                          <p>
+                            <span className="text-gray-500">Horas semanais:</span>{' '}
+                            <span className="font-medium text-gray-800">{h.weeklyHours ?? '—'}</span>
+                          </p>
+                          <p>
+                            <span className="text-gray-500">Motivo:</span>{' '}
+                            <span className="font-medium text-gray-800">{h.reason || '—'}</span>
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}

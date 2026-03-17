@@ -351,6 +351,22 @@ export const employeeApi = {
     return request<any[]>(`/employees/${employeeId}/salary-history`);
   },
 
+  async updateSalaryHistory(historyId: string, payload: {
+    salaryType?: string;
+    baseSalary?: number;
+    hourlyRate?: number;
+    weeklyHours?: number;
+    effectiveFrom?: string;
+    effectiveTo?: string;
+    approvalStatus?: string;
+    reason?: string;
+  }): Promise<any> {
+    return request<any>(`/employees/salary-history/${historyId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  },
+
   async getContracts(employeeId: string): Promise<any[]> {
     return request<any[]>(`/employees/${employeeId}/contracts`);
   },
